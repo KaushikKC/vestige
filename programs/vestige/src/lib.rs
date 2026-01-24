@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 use anchor_spl::token::{self, Token, TokenAccount, Mint, Transfer};
+use std::str::FromStr;
 
 declare_id!("4aJM8a9pVjURSomWoLdmdp6eVCWt961c5GHVJnLKfdhf");
 
@@ -14,8 +15,10 @@ pub const VAULT_SEED: &[u8] = b"vault";
 pub const EARLY_BONUS_ALPHA: u64 = 50; // 50% bonus for earliest participants
 pub const BASIS_POINTS: u64 = 10000;
 
-// MagicBlock Delegation Program ID
-pub const DELEGATION_PROGRAM_ID: Pubkey = pubkey!("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh");
+// MagicBlock Delegation Program ID - using lazy_static pattern
+pub fn get_delegation_program_id() -> Pubkey {
+    Pubkey::from_str("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh").unwrap()
+}
 
 #[program]
 pub mod vestige {
@@ -50,14 +53,14 @@ pub mod vestige {
         launch.is_graduated = false;
         launch.is_delegated = false;
         launch.graduation_time = 0;
-        launch.bump = ctx.bumps.launch;
+        launch.bump = *ctx.bumps.get("launch").unwrap();
 
         // Initialize commitment pool
         let pool = &mut ctx.accounts.commitment_pool;
         pool.launch = launch.key();
         pool.total_committed = 0;
         pool.total_participants = 0;
-        pool.bump = ctx.bumps.commitment_pool;
+        pool.bump = *ctx.bumps.get("commitment_pool").unwrap();
 
         msg!("Vestige Launch Initialized!");
         msg!("Token Supply: {}", token_supply);
@@ -76,7 +79,7 @@ pub mod vestige {
         // Build the delegation instruction
         // The delegation program will transfer ownership of the PDA to the ER
         let delegation_ix = anchor_lang::solana_program::instruction::Instruction {
-            program_id: DELEGATION_PROGRAM_ID,
+            program_id: get_delegation_program_id(),
             accounts: vec![
                 anchor_lang::solana_program::instruction::AccountMeta::new(ctx.accounts.payer.key(), true),
                 anchor_lang::solana_program::instruction::AccountMeta::new(ctx.accounts.commitment_pool.key(), false),
@@ -84,7 +87,7 @@ pub mod vestige {
                 anchor_lang::solana_program::instruction::AccountMeta::new(ctx.accounts.buffer.key(), false),
                 anchor_lang::solana_program::instruction::AccountMeta::new(ctx.accounts.delegation_record.key(), false),
                 anchor_lang::solana_program::instruction::AccountMeta::new_readonly(ctx.accounts.delegation_metadata.key(), false),
-                anchor_lang::solana_program::instruction::AccountMeta::new_readonly(DELEGATION_PROGRAM_ID, false),
+                anchor_lang::solana_program::instruction::AccountMeta::new_readonly(get_delegation_program_id(), false),
                 anchor_lang::solana_program::instruction::AccountMeta::new_readonly(anchor_lang::solana_program::system_program::ID, false),
             ],
             data: vec![0], // Delegate instruction discriminator
@@ -152,7 +155,7 @@ pub mod vestige {
         user_commitment.weight = 0; // Calculated at graduation
         user_commitment.tokens_allocated = 0;
         user_commitment.has_claimed = false;
-        user_commitment.bump = ctx.bumps.user_commitment;
+        user_commitment.bump = *ctx.bumps.get("user_commitment").unwrap();
 
         // Update pool totals (hidden in ER)
         commitment_pool.total_committed = commitment_pool.total_committed.checked_add(amount).unwrap();
@@ -202,13 +205,13 @@ pub mod vestige {
 
         // Build the undelegation instruction
         let undelegate_ix = anchor_lang::solana_program::instruction::Instruction {
-            program_id: DELEGATION_PROGRAM_ID,
+            program_id: get_delegation_program_id(),
             accounts: vec![
                 anchor_lang::solana_program::instruction::AccountMeta::new(ctx.accounts.payer.key(), true),
                 anchor_lang::solana_program::instruction::AccountMeta::new(ctx.accounts.commitment_pool.key(), false),
                 anchor_lang::solana_program::instruction::AccountMeta::new_readonly(crate::ID, false),
                 anchor_lang::solana_program::instruction::AccountMeta::new(ctx.accounts.delegation_record.key(), false),
-                anchor_lang::solana_program::instruction::AccountMeta::new_readonly(DELEGATION_PROGRAM_ID, false),
+                anchor_lang::solana_program::instruction::AccountMeta::new_readonly(get_delegation_program_id(), false),
             ],
             data: vec![1], // Undelegate instruction discriminator
         };
@@ -483,8 +486,7 @@ pub struct DelegateToEr<'info> {
     /// CHECK: Delegation metadata
     pub delegation_metadata: AccountInfo<'info>,
 
-    /// CHECK: Delegation program
-    #[account(address = DELEGATION_PROGRAM_ID)]
+    /// CHECK: Delegation program - verified in instruction
     pub delegation_program: AccountInfo<'info>,
 
     pub system_program: Program<'info, System>,
@@ -559,8 +561,7 @@ pub struct UndelegateFromEr<'info> {
     #[account(mut)]
     pub delegation_record: AccountInfo<'info>,
 
-    /// CHECK: Delegation program
-    #[account(address = DELEGATION_PROGRAM_ID)]
+    /// CHECK: Delegation program - verified in instruction
     pub delegation_program: AccountInfo<'info>,
 }
 
