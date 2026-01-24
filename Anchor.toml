@@ -1,15 +1,16 @@
 [toolchain]
-package_manager = "yarn"
+anchor_version = "0.29.0"
+package_manager = "npm"
 
 [features]
 resolution = true
 skip-lint = false
 
 [programs.localnet]
-vestige = "2RuBcnnCXuY7VXxCKXShXw2T5rsGc8xnV6yvdsMwjCoF"
+vestige = "4aJM8a9pVjURSomWoLdmdp6eVCWt961c5GHVJnLKfdhf"
 
 [programs.devnet]
-vestige = "2RuBcnnCXuY7VXxCKXShXw2T5rsGc8xnV6yvdsMwjCoF"
+vestige = "4aJM8a9pVjURSomWoLdmdp6eVCWt961c5GHVJnLKfdhf"
 
 [registry]
 url = "https://api.apr.dev"
@@ -27,4 +28,4 @@ rpc = "https://devnet.magicblock.app"
 router = "https://devnet-router.magicblock.app"
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test = "npx ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

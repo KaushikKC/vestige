@@ -1,7 +1,7 @@
 [package]
 name = "vestige"
 version = "0.1.0"
-description = "Created with Anchor"
+description = "Privacy-Preserving Token Launch using MagicBlock Ephemeral Rollups"
 edition = "2021"
 
 [lib]
@@ -16,8 +16,6 @@ no-idl = []
 no-log-ix-name = []
 idl-build = ["anchor-lang/idl-build"]
 
-
 [dependencies]
-anchor-lang = "0.30.1"
-# ephemeral-rollups-sdk = "0.8" # Will add after initial build
-
+anchor-lang = "0.29.0"
+anchor-spl = "0.29.0"
