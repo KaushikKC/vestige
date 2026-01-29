@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ArrowDown, Wallet, Info, Lock } from 'lucide-react';
 import { ViewState } from '../types';
+import CreateLaunchForm from '../../components/CreateLaunchForm';
 
 interface CreatorProps {
   setView: (view: ViewState) => void;
@@ -11,9 +12,43 @@ interface CreatorProps {
 const Creator: React.FC<CreatorProps> = ({ setView }) => {
   const [fromAmount, setFromAmount] = useState('10.0');
   const [toAmount, setToAmount] = useState('9.95');
+  const [showBridge, setShowBridge] = useState(false);
 
   return (
-    <div className="flex justify-center items-start pt-10 animate-fade-slide-up">
+    <div className="space-y-6 pt-10 animate-fade-slide-up">
+      {/* Tab Switcher */}
+      <div className="flex justify-center gap-4 mb-8">
+        <button
+          onClick={() => setShowBridge(false)}
+          className={`px-6 py-3 rounded-xl font-bold transition-all border-2 ${
+            !showBridge
+              ? 'bg-[#C8FF2E] border-[#09090A] text-[#0B0D17]'
+              : 'bg-white border-[#E6E8EF] text-[#6B7280] hover:border-[#09090A]'
+          }`}
+        >
+          🚀 Create Launch
+        </button>
+        <button
+          onClick={() => setShowBridge(true)}
+          className={`px-6 py-3 rounded-xl font-bold transition-all border-2 ${
+            showBridge
+              ? 'bg-[#C8FF2E] border-[#09090A] text-[#0B0D17]'
+              : 'bg-white border-[#E6E8EF] text-[#6B7280] hover:border-[#09090A]'
+          }`}
+        >
+          🌉 Bridge to Privacy
+        </button>
+      </div>
+
+      {/* Conditional Rendering */}
+      {!showBridge ? (
+        <div className="flex justify-center">
+          <div className="w-full max-w-2xl">
+            <CreateLaunchForm />
+          </div>
+        </div>
+      ) : (
+        <div className="flex justify-center items-start">
         
         {/* Main Swap Container */}
         <div className="w-full max-w-lg relative">
@@ -94,6 +129,8 @@ const Creator: React.FC<CreatorProps> = ({ setView }) => {
                 </div>
             </div>
         </div>
+        </div>
+      )}
     </div>
   );
 };

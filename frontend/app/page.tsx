@@ -5,16 +5,21 @@ import Image from 'next/image';
 import { Menu, Globe, ChevronDown, Star, Clock, ListFilter } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import StatsPanel from '../components/StatusPanel';
+import WalletButton from '../components/WalletButton';
 import Discover from './discover/page';
 import LaunchDetail from './launch-detail/page';
 import Creator from './creator/page';
 import Allocation from './allocation/page';
 import { ViewState, Launch } from './types';
+import { useVestige } from '../lib/use-vestige';
 
 export default function App() {
   const [currentView, setView] = useState<ViewState>(ViewState.DISCOVER);
   const [selectedLaunch, setSelectedLaunch] = useState<Launch | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Wallet and Vestige state
+  const { balance, connected, publicKey } = useVestige();
 
   const renderView = () => {
     switch (currentView) {
@@ -89,22 +94,9 @@ export default function App() {
                 <div className="w-5 h-5 rounded-full border-2 border-black flex items-center justify-center text-[10px]">$</div>
                 USD <ChevronDown size={14} />
              </div>
-             
-             <div className="relative group cursor-pointer">
-                <div className="w-12 h-12 rounded-full bg-[#C8FF2E] border-2 border-[#0B0D17] p-0.5 shadow-md overflow-hidden relative">
-                   <Image 
-                     src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&backgroundColor=b6e3f4" 
-                     width={48}
-                     height={48}
-                     className="w-full h-full object-cover rounded-full" 
-                     alt="Profile"
-                     unoptimized
-                   />
-                </div>
-                <div className="absolute -bottom-1 -right-1 bg-[#ff00ff] text-white text-[9px] font-black px-1.5 py-0.5 rounded-md border border-white shadow-sm transform rotate-[-5deg]">
-                   PRO
-                </div>
-             </div>
+
+             {/* Wallet Connect Button */}
+             <WalletButton balance={balance} />
           </div>
         </header>
 

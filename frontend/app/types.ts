@@ -16,6 +16,15 @@ export enum ViewState {
     timeLeft: string;
     creator: string;
     color?: string;
+    // Real launch data (optional - for on-chain launches)
+    launchPda?: string;
+    tokenMint?: string;
+    graduationTarget?: number;
+    totalCommitted?: number;
+    totalParticipants?: number;
+    isDelegated?: boolean;
+    minCommitment?: number;
+    maxCommitment?: number;
   }
   
   export interface StatMetric {

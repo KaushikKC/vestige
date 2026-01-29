@@ -1,9 +1,12 @@
 "use client";
-import React, { useState } from 'react';
-import { ArrowLeft, Lock, Info, ExternalLink, CheckCircle2, AlertTriangle, EyeOff } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Lock, Info, ExternalLink, CheckCircle2, AlertTriangle, EyeOff, Loader2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { ViewState, Launch } from '../types';
 import { CHART_DATA, COLORS } from '../../constants';
+import { useVestige } from '../../lib/use-vestige';
+import { PublicKey } from '@solana/web3.js';
+import MagicBlockControls from '../../components/MagicBlockControls';
 
 interface LaunchDetailProps {
   setView: (view: ViewState) => void;
@@ -14,20 +17,69 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
   const [amount, setAmount] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
   const [committed, setCommitted] = useState(false);
+  const [txSignature, setTxSignature] = useState<string | null>(null);
+
+  // Vestige hook for real transactions
+  const {
+    connected,
+    balance,
+    commit,
+    loading,
+    error,
+    publicKey,
+    fetchLaunch
+  } = useVestige();
+
+  // Fetch real launch data for MagicBlock status
+  const [realLaunchData, setRealLaunchData] = useState<any>(null);
+  
+  useEffect(() => {
+    if (launch?.launchPda) {
+      fetchLaunch(new PublicKey(launch.launchPda)).then(setRealLaunchData);
+    }
+  }, [launch?.launchPda, fetchLaunch]);
+
+  const refreshLaunchData = async () => {
+    if (launch?.launchPda) {
+      const data = await fetchLaunch(new PublicKey(launch.launchPda));
+      setRealLaunchData(data);
+    }
+  };
 
   if (!launch) return null;
 
   const handleCommit = () => {
+    if (!connected) {
+      alert('Please connect your wallet first');
+      return;
+    }
     setShowConfirm(true);
   };
 
-  const confirmCommit = () => {
-    setShowConfirm(false);
-    setCommitted(true);
-    setTimeout(() => {
-        // In a real app, this would update state and maybe redirect
-        // For now, we simulate success state
-    }, 1000);
+  const confirmCommit = async () => {
+    if (!launch.launchPda) {
+      // For mock launches, simulate the commit
+      setShowConfirm(false);
+      setCommitted(true);
+      return;
+    }
+
+    try {
+      // Real commit using MagicBlock routing
+      const amountSol = parseFloat(amount);
+      const launchPda = new PublicKey(launch.launchPda);
+
+      const tx = await commit(launchPda, amountSol);
+
+      if (tx) {
+        setTxSignature(tx);
+        setShowConfirm(false);
+        setCommitted(true);
+      }
+    } catch (e: any) {
+      console.error('Commit failed:', e);
+      alert(`Commit failed: ${e.message}`);
+    }
   };
 
   return (
@@ -72,6 +124,14 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
             </button>
         </div>
       </div>
+
+      {/* MagicBlock Controls - Only visible to creator */}
+      {realLaunchData && launch.launchPda && (
+        <MagicBlockControls 
+          launch={realLaunchData} 
+          onRefresh={refreshLaunchData}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
@@ -181,7 +241,9 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
                   
                   <div className="flex justify-between text-xs">
                     <span className="text-[#6B7280]">Wallet Balance</span>
-                    <span className="font-bold text-[#0B0D17]">24,500.00 USDC</span>
+                    <span className="font-bold text-[#0B0D17]">
+                      {connected ? `${balance.toFixed(4)} SOL` : 'Connect Wallet'}
+                    </span>
                   </div>
                 </div>
 
@@ -195,15 +257,29 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
                     </div>
                 </div>
 
-                <button 
+                <button
                   onClick={handleCommit}
-                  disabled={!amount}
+                  disabled={!amount || loading || !connected}
                   className={`w-full py-4 rounded-xl font-bold text-[#0B0D17] transition-all transform active:scale-95 shadow-md flex items-center justify-center gap-2 border-2
-                    ${amount ? 'bg-[#C8FF2E] hover:bg-[#bce62b] border-[#09090A]' : 'bg-[#E6E8EF] cursor-not-allowed text-gray-400 border-[#E6E8EF]'}
+                    ${amount && connected ? 'bg-[#C8FF2E] hover:bg-[#bce62b] border-[#09090A]' : 'bg-[#E6E8EF] cursor-not-allowed text-gray-400 border-[#E6E8EF]'}
                   `}
                 >
-                  <Lock size={16} />
-                  Commit Privately
+                  {loading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Processing...
+                    </>
+                  ) : !connected ? (
+                    <>
+                      <Lock size={16} />
+                      Connect Wallet to Commit
+                    </>
+                  ) : (
+                    <>
+                      <Lock size={16} />
+                      Commit Privately
+                    </>
+                  )}
                 </button>
                 
                 <p className="text-[10px] text-center text-[#6B7280] mt-4 max-w-[200px] mx-auto">
@@ -216,10 +292,21 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
                       <CheckCircle2 size={32} />
                   </div>
                   <h3 className="text-xl font-bold text-[#0B0D17] mb-2">Commitment Queued</h3>
-                  <p className="text-sm text-[#6B7280] mb-6">
-                    Your {amount} USDC has been securely committed to the pool.
+                  <p className="text-sm text-[#6B7280] mb-4">
+                    Your {amount} SOL has been securely committed to the pool.
                   </p>
-                  <button 
+                  {txSignature && (
+                    <a
+                      href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-xs text-[#3A2BFF] hover:underline mb-4"
+                    >
+                      <ExternalLink size={12} />
+                      View Transaction
+                    </a>
+                  )}
+                  <button
                     onClick={() => setView(ViewState.ALLOCATION)}
                     className="w-full py-3 bg-[#F5F6FA] text-[#0B0D17] font-bold rounded-xl hover:bg-[#E6E8EF] transition-colors border-2 border-[#09090A]"
                   >

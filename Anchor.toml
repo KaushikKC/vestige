@@ -7,16 +7,16 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-vestige = "4aJM8a9pVjURSomWoLdmdp6eVCWt961c5GHVJnLKfdhf"
+vestige = "4RQMkiv5Lp4p862UeQxQs6YgWRPBud2fwLMR5GcSo1bf"
 
 [programs.devnet]
-vestige = "4aJM8a9pVjURSomWoLdmdp6eVCWt961c5GHVJnLKfdhf"
+vestige = "4RQMkiv5Lp4p862UeQxQs6YgWRPBud2fwLMR5GcSo1bf"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 # MagicBlock Ephemeral Rollup endpoints
