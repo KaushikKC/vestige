@@ -1,346 +1,47 @@
 {
-  "version": "0.1.0",
-  "name": "vestige",
-  "instructions": [
-    {
-      "name": "initializeLaunch",
-      "docs": [
-        "Phase 1: Initialize a new token launch",
-        "Creator sets parameters: token supply, duration, graduation target"
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "commitmentPool",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "vault",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "creator",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "tokenSupply",
-          "type": "u64"
-        },
-        {
-          "name": "startTime",
-          "type": "i64"
-        },
-        {
-          "name": "endTime",
-          "type": "i64"
-        },
-        {
-          "name": "graduationTarget",
-          "type": "u64"
-        },
-        {
-          "name": "minCommitment",
-          "type": "u64"
-        },
-        {
-          "name": "maxCommitment",
-          "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "delegateToEr",
-      "docs": [
-        "Delegate the commitment pool to MagicBlock Ephemeral Rollup for private execution",
-        "This enables private commits during the commitment phase"
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "commitmentPool",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "payer",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "buffer",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "delegationRecord",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "delegationMetadata",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "delegationProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "commit",
-      "docs": [
-        "Phase 2: Private commitment - Users commit SOL to the pool",
-        "When delegated, this runs in the Ephemeral Rollup for privacy",
-        "No one can see individual commitments until graduation"
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "commitmentPool",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "userCommitment",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "vault",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "user",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "amount",
-          "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "graduate",
-      "docs": [
-        "Phase 3: Graduate the launch - Settle state and calculate allocations",
-        "Can be called when target is reached OR time expires"
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "commitmentPool",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "undelegateFromEr",
-      "docs": [
-        "Undelegate the commitment pool from ER back to Solana mainnet",
-        "Called after graduation to settle all state publicly"
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "commitmentPool",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "payer",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "delegationRecord",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "delegationProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "calculateAllocation",
-      "docs": [
-        "Calculate user's token allocation based on weighted participation",
-        "Formula: weight = 1 + alpha * (1 - t/T)",
-        "Early participants get up to 50% bonus tokens"
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "userCommitment",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "user",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "claimTokens",
-      "docs": [
-        "Phase 4: Claim allocated tokens"
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "userCommitment",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenVault",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "userTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "user",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "withdrawFunds",
-      "docs": [
-        "Creator withdraws collected SOL after graduation"
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "vault",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "creator",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "getLaunchInfo",
-      "docs": [
-        "Get launch info (view function)"
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    }
-  ],
-  "accounts": [
-    {
-      "name": "Launch",
-      "type": {
-        "kind": "struct",
-        "fields": [
+    "address": "4RQMkiv5Lp4p862UeQxQs6YgWRPBud2fwLMR5GcSo1bf",
+    "version": "0.1.0",
+    "name": "vestige",
+    "instructions": [
+      {
+        "name": "initializeLaunch",
+        "docs": [
+          "Phase 1: Initialize a new token launch",
+          "Creator sets parameters: token supply, duration, graduation target"
+        ],
+        "accounts": [
           {
-            "name": "creator",
-            "type": "publicKey"
+            "name": "launch",
+            "isMut": true,
+            "isSigner": false
+          },
+          {
+            "name": "commitmentPool",
+            "isMut": true,
+            "isSigner": false
+          },
+          {
+            "name": "vault",
+            "isMut": true,
+            "isSigner": false
           },
           {
             "name": "tokenMint",
-            "type": "publicKey"
+            "isMut": false,
+            "isSigner": false
           },
+          {
+            "name": "creator",
+            "isMut": true,
+            "isSigner": true
+          },
+          {
+            "name": "systemProgram",
+            "isMut": false,
+            "isSigner": false
+          }
+        ],
+        "args": [
           {
             "name": "tokenSupply",
             "type": "u64"
@@ -364,187 +65,484 @@
           {
             "name": "maxCommitment",
             "type": "u64"
-          },
-          {
-            "name": "totalCommitted",
-            "type": "u64"
-          },
-          {
-            "name": "totalParticipants",
-            "type": "u64"
-          },
-          {
-            "name": "isGraduated",
-            "type": "bool"
-          },
-          {
-            "name": "isDelegated",
-            "type": "bool"
-          },
-          {
-            "name": "graduationTime",
-            "type": "i64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
           }
         ]
-      }
-    },
-    {
-      "name": "CommitmentPool",
-      "type": {
-        "kind": "struct",
-        "fields": [
+      },
+      {
+        "name": "delegateToEr",
+        "docs": [
+          "Delegate the commitment pool to MagicBlock Ephemeral Rollup for private execution",
+          "This enables private commits during the commitment phase"
+        ],
+        "accounts": [
           {
             "name": "launch",
-            "type": "publicKey"
+            "isMut": true,
+            "isSigner": false
           },
           {
-            "name": "totalCommitted",
-            "type": "u64"
+            "name": "commitmentPool",
+            "isMut": true,
+            "isSigner": false
           },
           {
-            "name": "totalParticipants",
-            "type": "u64"
+            "name": "payer",
+            "isMut": true,
+            "isSigner": true
           },
           {
-            "name": "bump",
-            "type": "u8"
+            "name": "buffer",
+            "isMut": true,
+            "isSigner": false
+          },
+          {
+            "name": "delegationRecord",
+            "isMut": true,
+            "isSigner": false
+          },
+          {
+            "name": "delegationMetadata",
+            "isMut": false,
+            "isSigner": false
+          },
+          {
+            "name": "delegationProgram",
+            "isMut": false,
+            "isSigner": false
+          },
+          {
+            "name": "systemProgram",
+            "isMut": false,
+            "isSigner": false
           }
-        ]
-      }
-    },
-    {
-      "name": "UserCommitment",
-      "type": {
-        "kind": "struct",
-        "fields": [
+        ],
+        "args": []
+      },
+      {
+        "name": "commit",
+        "docs": [
+          "Phase 2: Private commitment - Users commit SOL to the pool",
+          "When delegated, this runs in the Ephemeral Rollup for privacy",
+          "No one can see individual commitments until graduation"
+        ],
+        "accounts": [
+          {
+            "name": "launch",
+            "isMut": true,
+            "isSigner": false
+          },
+          {
+            "name": "commitmentPool",
+            "isMut": true,
+            "isSigner": false
+          },
+          {
+            "name": "userCommitment",
+            "isMut": true,
+            "isSigner": false
+          },
+          {
+            "name": "vault",
+            "isMut": true,
+            "isSigner": false
+          },
           {
             "name": "user",
-            "type": "publicKey"
+            "isMut": true,
+            "isSigner": true
           },
           {
-            "name": "launch",
-            "type": "publicKey"
-          },
+            "name": "systemProgram",
+            "isMut": false,
+            "isSigner": false
+          }
+        ],
+        "args": [
           {
             "name": "amount",
             "type": "u64"
-          },
-          {
-            "name": "commitTime",
-            "type": "i64"
-          },
-          {
-            "name": "weight",
-            "type": "u64"
-          },
-          {
-            "name": "tokensAllocated",
-            "type": "u64"
-          },
-          {
-            "name": "hasClaimed",
-            "type": "bool"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
           }
         ]
+      },
+      {
+        "name": "graduate",
+        "docs": [
+          "Phase 3: Graduate the launch - Settle state and calculate allocations",
+          "Can be called when target is reached OR time expires"
+        ],
+        "accounts": [
+          {
+            "name": "launch",
+            "isMut": true,
+            "isSigner": false
+          },
+          {
+            "name": "commitmentPool",
+            "isMut": false,
+            "isSigner": false
+          },
+          {
+            "name": "authority",
+            "isMut": false,
+            "isSigner": true
+          }
+        ],
+        "args": []
+      },
+      {
+        "name": "undelegateFromEr",
+        "docs": [
+          "Undelegate the commitment pool from ER back to Solana mainnet",
+          "Called after graduation to settle all state publicly"
+        ],
+        "accounts": [
+          {
+            "name": "launch",
+            "isMut": true,
+            "isSigner": false
+          },
+          {
+            "name": "commitmentPool",
+            "isMut": true,
+            "isSigner": false
+          },
+          {
+            "name": "payer",
+            "isMut": true,
+            "isSigner": true
+          },
+          {
+            "name": "delegationRecord",
+            "isMut": true,
+            "isSigner": false
+          },
+          {
+            "name": "delegationProgram",
+            "isMut": false,
+            "isSigner": false
+          }
+        ],
+        "args": []
+      },
+      {
+        "name": "calculateAllocation",
+        "docs": [
+          "Calculate user's token allocation based on weighted participation",
+          "Formula: weight = 1 + alpha * (1 - t/T)",
+          "Early participants get up to 50% bonus tokens"
+        ],
+        "accounts": [
+          {
+            "name": "launch",
+            "isMut": false,
+            "isSigner": false
+          },
+          {
+            "name": "userCommitment",
+            "isMut": true,
+            "isSigner": false
+          },
+          {
+            "name": "user",
+            "isMut": false,
+            "isSigner": true
+          }
+        ],
+        "args": []
+      },
+      {
+        "name": "claimTokens",
+        "docs": [
+          "Phase 4: Claim allocated tokens"
+        ],
+        "accounts": [
+          {
+            "name": "launch",
+            "isMut": false,
+            "isSigner": false
+          },
+          {
+            "name": "userCommitment",
+            "isMut": true,
+            "isSigner": false
+          },
+          {
+            "name": "tokenVault",
+            "isMut": true,
+            "isSigner": false
+          },
+          {
+            "name": "userTokenAccount",
+            "isMut": true,
+            "isSigner": false
+          },
+          {
+            "name": "user",
+            "isMut": false,
+            "isSigner": true
+          },
+          {
+            "name": "tokenProgram",
+            "isMut": false,
+            "isSigner": false
+          }
+        ],
+        "args": []
+      },
+      {
+        "name": "withdrawFunds",
+        "docs": [
+          "Creator withdraws collected SOL after graduation"
+        ],
+        "accounts": [
+          {
+            "name": "launch",
+            "isMut": false,
+            "isSigner": false
+          },
+          {
+            "name": "vault",
+            "isMut": true,
+            "isSigner": false
+          },
+          {
+            "name": "creator",
+            "isMut": true,
+            "isSigner": true
+          }
+        ],
+        "args": []
+      },
+      {
+        "name": "getLaunchInfo",
+        "docs": [
+          "Get launch info (view function)"
+        ],
+        "accounts": [
+          {
+            "name": "launch",
+            "isMut": false,
+            "isSigner": false
+          }
+        ],
+        "args": []
       }
-    }
-  ],
-  "errors": [
-    {
-      "code": 6000,
-      "name": "InvalidTimeRange",
-      "msg": "End time must be after start time"
-    },
-    {
-      "code": 6001,
-      "name": "InvalidTokenSupply",
-      "msg": "Token supply must be greater than zero"
-    },
-    {
-      "code": 6002,
-      "name": "InvalidGraduationTarget",
-      "msg": "Graduation target must be greater than zero"
-    },
-    {
-      "code": 6003,
-      "name": "LaunchNotStarted",
-      "msg": "Launch has not started yet"
-    },
-    {
-      "code": 6004,
-      "name": "LaunchEnded",
-      "msg": "Launch commitment period has ended"
-    },
-    {
-      "code": 6005,
-      "name": "AlreadyGraduated",
-      "msg": "Launch has already graduated"
-    },
-    {
-      "code": 6006,
-      "name": "BelowMinCommitment",
-      "msg": "Commitment below minimum"
-    },
-    {
-      "code": 6007,
-      "name": "AboveMaxCommitment",
-      "msg": "Commitment above maximum"
-    },
-    {
-      "code": 6008,
-      "name": "GraduationConditionsNotMet",
-      "msg": "Graduation conditions not met - need target reached or time expired"
-    },
-    {
-      "code": 6009,
-      "name": "NotGraduated",
-      "msg": "Launch has not graduated yet"
-    },
-    {
-      "code": 6010,
-      "name": "NoAllocation",
-      "msg": "No token allocation available"
-    },
-    {
-      "code": 6011,
-      "name": "AlreadyClaimed",
-      "msg": "Tokens already claimed"
-    },
-    {
-      "code": 6012,
-      "name": "AllocationAlreadyCalculated",
-      "msg": "Allocation already calculated"
-    },
-    {
-      "code": 6013,
-      "name": "Unauthorized",
-      "msg": "Unauthorized - only creator can perform this action"
-    },
-    {
-      "code": 6014,
-      "name": "AlreadyDelegated",
-      "msg": "Already delegated to Ephemeral Rollup"
-    },
-    {
-      "code": 6015,
-      "name": "NotDelegated",
-      "msg": "Not delegated to Ephemeral Rollup"
-    },
-    {
-      "code": 6016,
-      "name": "NoCommitment",
-      "msg": "No commitment found"
-    }
-  ],
-  "metadata": {
-      "address": "4RQMkiv5Lp4p862UeQxQs6YgWRPBud2fwLMR5GcSo1bf"
-    }
-}
+    ],
+    "accounts": [
+      {
+        "name": "Launch",
+        "type": {
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "creator",
+              "type": "publicKey"
+            },
+            {
+              "name": "tokenMint",
+              "type": "publicKey"
+            },
+            {
+              "name": "tokenSupply",
+              "type": "u64"
+            },
+            {
+              "name": "startTime",
+              "type": "i64"
+            },
+            {
+              "name": "endTime",
+              "type": "i64"
+            },
+            {
+              "name": "graduationTarget",
+              "type": "u64"
+            },
+            {
+              "name": "minCommitment",
+              "type": "u64"
+            },
+            {
+              "name": "maxCommitment",
+              "type": "u64"
+            },
+            {
+              "name": "totalCommitted",
+              "type": "u64"
+            },
+            {
+              "name": "totalParticipants",
+              "type": "u64"
+            },
+            {
+              "name": "isGraduated",
+              "type": "bool"
+            },
+            {
+              "name": "isDelegated",
+              "type": "bool"
+            },
+            {
+              "name": "graduationTime",
+              "type": "i64"
+            },
+            {
+              "name": "bump",
+              "type": "u8"
+            }
+          ]
+        }
+      },
+      {
+        "name": "CommitmentPool",
+        "type": {
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "launch",
+              "type": "publicKey"
+            },
+            {
+              "name": "totalCommitted",
+              "type": "u64"
+            },
+            {
+              "name": "totalParticipants",
+              "type": "u64"
+            },
+            {
+              "name": "bump",
+              "type": "u8"
+            }
+          ]
+        }
+      },
+      {
+        "name": "UserCommitment",
+        "type": {
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "user",
+              "type": "publicKey"
+            },
+            {
+              "name": "launch",
+              "type": "publicKey"
+            },
+            {
+              "name": "amount",
+              "type": "u64"
+            },
+            {
+              "name": "commitTime",
+              "type": "i64"
+            },
+            {
+              "name": "weight",
+              "type": "u64"
+            },
+            {
+              "name": "tokensAllocated",
+              "type": "u64"
+            },
+            {
+              "name": "hasClaimed",
+              "type": "bool"
+            },
+            {
+              "name": "bump",
+              "type": "u8"
+            }
+          ]
+        }
+      }
+    ],
+    "errors": [
+      {
+        "code": 6000,
+        "name": "InvalidTimeRange",
+        "msg": "End time must be after start time"
+      },
+      {
+        "code": 6001,
+        "name": "InvalidTokenSupply",
+        "msg": "Token supply must be greater than zero"
+      },
+      {
+        "code": 6002,
+        "name": "InvalidGraduationTarget",
+        "msg": "Graduation target must be greater than zero"
+      },
+      {
+        "code": 6003,
+        "name": "LaunchNotStarted",
+        "msg": "Launch has not started yet"
+      },
+      {
+        "code": 6004,
+        "name": "LaunchEnded",
+        "msg": "Launch commitment period has ended"
+      },
+      {
+        "code": 6005,
+        "name": "AlreadyGraduated",
+        "msg": "Launch has already graduated"
+      },
+      {
+        "code": 6006,
+        "name": "BelowMinCommitment",
+        "msg": "Commitment below minimum"
+      },
+      {
+        "code": 6007,
+        "name": "AboveMaxCommitment",
+        "msg": "Commitment above maximum"
+      },
+      {
+        "code": 6008,
+        "name": "GraduationConditionsNotMet",
+        "msg": "Graduation conditions not met - need target reached or time expired"
+      },
+      {
+        "code": 6009,
+        "name": "NotGraduated",
+        "msg": "Launch has not graduated yet"
+      },
+      {
+        "code": 6010,
+        "name": "NoAllocation",
+        "msg": "No token allocation available"
+      },
+      {
+        "code": 6011,
+        "name": "AlreadyClaimed",
+        "msg": "Tokens already claimed"
+      },
+      {
+        "code": 6012,
+        "name": "AllocationAlreadyCalculated",
+        "msg": "Allocation already calculated"
+      },
+      {
+        "code": 6013,
+        "name": "Unauthorized",
+        "msg": "Unauthorized - only creator can perform this action"
+      },
+      {
+        "code": 6014,
+        "name": "AlreadyDelegated",
+        "msg": "Already delegated to Ephemeral Rollup"
+      },
+      {
+        "code": 6015,
+        "name": "NotDelegated",
+        "msg": "Not delegated to Ephemeral Rollup"
+      },
+      {
+        "code": 6016,
+        "name": "NoCommitment",
+        "msg": "No commitment found"
+      }
+    ]
+  }

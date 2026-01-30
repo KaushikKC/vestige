@@ -8,17 +8,23 @@ import { AnchorProvider, Program, BN } from "@coral-xyz/anchor";
 import rawIdl from "./vestige.json";
 
 // Program ID from your deployed contract (matches IDL)
-// Handle both possible import shapes: default export vs direct object
+// Handle both formats: top-level "address" (Anchor output) or "metadata.address"
 type VestigeIdlShape = {
+  address?: string;
   metadata?: { address?: string };
   default?: { metadata?: { address?: string } };
 };
 const idlAny = rawIdl as VestigeIdlShape;
-const idlMetadata = idlAny.metadata ?? idlAny.default?.metadata;
-if (!idlMetadata?.address) {
-  throw new Error("Vestige IDL is missing metadata.address");
+const programIdStr =
+  idlAny.address ??
+  idlAny.metadata?.address ??
+  idlAny.default?.metadata?.address;
+if (!programIdStr) {
+  throw new Error(
+    "Vestige IDL is missing program address (address or metadata.address)",
+  );
 }
-export const PROGRAM_ID = new PublicKey(idlMetadata.address as string);
+export const PROGRAM_ID = new PublicKey(programIdStr);
 
 // MagicBlock Program IDs
 export const DELEGATION_PROGRAM_ID = new PublicKey(

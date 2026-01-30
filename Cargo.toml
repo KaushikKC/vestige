@@ -13,3 +13,7 @@ opt-level = 3
 incremental = false
 codegen-units = 1
 
+# Use vendored constant_time_eq 0.3.1 (edition 2021) so Cargo 1.84 can build; 0.4.x requires edition2024
+[patch.crates-io]
+constant_time_eq = { path = "third_party/constant_time_eq" }
+
