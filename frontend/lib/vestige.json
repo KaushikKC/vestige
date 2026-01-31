@@ -1,548 +1,2102 @@
 {
-    "address": "4RQMkiv5Lp4p862UeQxQs6YgWRPBud2fwLMR5GcSo1bf",
-    "version": "0.1.0",
+  "address": "4RQMkiv5Lp4p862UeQxQs6YgWRPBud2fwLMR5GcSo1bf",
+  "metadata": {
     "name": "vestige",
-    "instructions": [
-      {
-        "name": "initializeLaunch",
-        "docs": [
-          "Phase 1: Initialize a new token launch",
-          "Creator sets parameters: token supply, duration, graduation target"
-        ],
-        "accounts": [
-          {
-            "name": "launch",
-            "isMut": true,
-            "isSigner": false
-          },
-          {
-            "name": "commitmentPool",
-            "isMut": true,
-            "isSigner": false
-          },
-          {
-            "name": "vault",
-            "isMut": true,
-            "isSigner": false
-          },
-          {
-            "name": "tokenMint",
-            "isMut": false,
-            "isSigner": false
-          },
-          {
-            "name": "creator",
-            "isMut": true,
-            "isSigner": true
-          },
-          {
-            "name": "systemProgram",
-            "isMut": false,
-            "isSigner": false
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Privacy-Preserving Token Launch using MagicBlock Ephemeral Rollups"
+  },
+  "instructions": [
+    {
+      "name": "calculate_allocation",
+      "docs": [
+        "Calculate user's token allocation based on weighted participation",
+        "Formula: weight = 1 + alpha * (1 - t/T)",
+        "Early participants get up to 50% bonus tokens"
+      ],
+      "discriminator": [
+        237,
+        69,
+        141,
+        199,
+        177,
+        3,
+        173,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "launch"
+        },
+        {
+          "name": "user_commitment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
           }
-        ],
-        "args": [
+        },
+        {
+          "name": "user",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_tokens",
+      "docs": [
+        "Phase 4: Claim allocated tokens"
+      ],
+      "discriminator": [
+        108,
+        216,
+        210,
+        231,
+        0,
+        212,
+        42,
+        64
+      ],
+      "accounts": [
+        {
+          "name": "launch",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch.creator",
+                "account": "Launch"
+              },
+              {
+                "kind": "account",
+                "path": "launch.token_mint",
+                "account": "Launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_commitment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_vault",
+          "writable": true
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "commit",
+      "docs": [
+        "Phase 2 (combined): Commit SOL to a launch (for NON-DELEGATED pools only)",
+        "This does deposit + record in one transaction on Solana.",
+        "DO NOT use this for delegated pools - use deposit() then record_commit() separately."
+      ],
+      "discriminator": [
+        223,
+        140,
+        142,
+        165,
+        229,
+        208,
+        156,
+        74
+      ],
+      "accounts": [
+        {
+          "name": "launch",
+          "docs": [
+            "Read-only: we only read launch params"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch.creator",
+                "account": "Launch"
+              },
+              {
+                "kind": "account",
+                "path": "launch.token_mint",
+                "account": "Launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "commitment_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_commitment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "create_permission",
+      "docs": [
+        "Create permission for an account based on account type",
+        "This must be called before delegation for privacy features",
+        "Both permission AND permissioned_account must be delegated!"
+      ],
+      "discriminator": [
+        190,
+        182,
+        26,
+        164,
+        156,
+        221,
+        8,
+        0
+      ],
+      "accounts": [
+        {
+          "name": "permissioned_account"
+        },
+        {
+          "name": "permission",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "permission_program",
+          "address": "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "account_type",
+          "type": {
+            "defined": {
+              "name": "AccountType"
+            }
+          }
+        },
+        {
+          "name": "members",
+          "type": {
+            "option": {
+              "vec": {
+                "defined": {
+                  "name": "Member"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "delegate_pda",
+      "docs": [
+        "Delegate a PDA to MagicBlock Private Ephemeral Rollup",
+        "Uses SDK's #[delegate] macro for proper delegation",
+        "Set specific validator based on ER (TEE for privacy)"
+      ],
+      "discriminator": [
+        248,
+        217,
+        193,
+        46,
+        124,
+        191,
+        64,
+        135
+      ],
+      "accounts": [
+        {
+          "name": "buffer_pda",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pda"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                50,
+                211,
+                105,
+                53,
+                144,
+                108,
+                57,
+                170,
+                153,
+                67,
+                76,
+                136,
+                253,
+                187,
+                1,
+                65,
+                17,
+                12,
+                145,
+                252,
+                16,
+                148,
+                236,
+                195,
+                59,
+                133,
+                198,
+                223,
+                33,
+                52,
+                90,
+                58
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_pda",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pda"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_pda",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pda"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "pda",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "validator",
+          "optional": true
+        },
+        {
+          "name": "owner_program",
+          "address": "4RQMkiv5Lp4p862UeQxQs6YgWRPBud2fwLMR5GcSo1bf"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "account_type",
+          "type": {
+            "defined": {
+              "name": "AccountType"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "deposit",
+      "docs": [
+        "Phase 2a: Deposit SOL to vault (runs on BASE LAYER - Solana)",
+        "This transfers SOL from user to vault. Must run on Solana because",
+        "user wallets cannot be delegated to ER.",
+        "Call this BEFORE record_commit when pool is delegated."
+      ],
+      "discriminator": [
+        242,
+        35,
+        198,
+        137,
+        82,
+        225,
+        242,
+        182
+      ],
+      "accounts": [
+        {
+          "name": "launch",
+          "docs": [
+            "Read-only: we only read launch params"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch.creator",
+                "account": "Launch"
+              },
+              {
+                "kind": "account",
+                "path": "launch.token_mint",
+                "account": "Launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "fund_ephemeral",
+      "docs": [
+        "Step 2: Fund the ephemeral SOL account (deposit SOL)",
+        "This is visible on Solana but only shows \"User deposited to their ephemeral account\"",
+        "It does NOT reveal which launch they're committing to (that happens privately later)",
+        "Run on: Solana Base Layer"
+      ],
+      "discriminator": [
+        49,
+        221,
+        149,
+        34,
+        194,
+        130,
+        138,
+        97
+      ],
+      "accounts": [
+        {
+          "name": "launch",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch.creator",
+                "account": "Launch"
+              },
+              {
+                "kind": "account",
+                "path": "launch.token_mint",
+                "account": "Launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ephemeral_sol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  112,
+                  104,
+                  101,
+                  109,
+                  101,
+                  114,
+                  97,
+                  108,
+                  95,
+                  115,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "get_launch_info",
+      "docs": [
+        "Get launch info (view function)"
+      ],
+      "discriminator": [
+        12,
+        194,
+        47,
+        67,
+        226,
+        68,
+        103,
+        126
+      ],
+      "accounts": [
+        {
+          "name": "launch"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "graduate",
+      "docs": [
+        "Phase 3: Graduate the launch (for non-delegated pools)"
+      ],
+      "discriminator": [
+        45,
+        235,
+        225,
+        181,
+        17,
+        218,
+        64,
+        130
+      ],
+      "accounts": [
+        {
+          "name": "launch",
+          "writable": true
+        },
+        {
+          "name": "commitment_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "graduate_and_undelegate",
+      "docs": [
+        "Graduate and undelegate in one transaction (for delegated pools)",
+        "Uses SDK's commit_and_undelegate for atomic settlement",
+        "IMPORTANT: This must be called on the ER!"
+      ],
+      "discriminator": [
+        254,
+        158,
+        64,
+        205,
+        61,
+        250,
+        197,
+        155
+      ],
+      "accounts": [
+        {
+          "name": "launch",
+          "writable": true
+        },
+        {
+          "name": "commitment_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "permission_pool",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "permission_program",
+          "address": "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1"
+        },
+        {
+          "name": "magic_program",
+          "address": "Magic11111111111111111111111111111111111111"
+        },
+        {
+          "name": "magic_context",
+          "writable": true,
+          "address": "MagicContext1111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "init_ephemeral_sol",
+      "docs": [
+        "Step 1: Initialize user's ephemeral SOL account for a specific launch",
+        "This creates a PDA owned by our program that can be delegated to TEE",
+        "Run on: Solana Base Layer"
+      ],
+      "discriminator": [
+        216,
+        113,
+        247,
+        171,
+        128,
+        164,
+        146,
+        33
+      ],
+      "accounts": [
+        {
+          "name": "launch",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch.creator",
+                "account": "Launch"
+              },
+              {
+                "kind": "account",
+                "path": "launch.token_mint",
+                "account": "Launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ephemeral_sol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  112,
+                  104,
+                  101,
+                  109,
+                  101,
+                  114,
+                  97,
+                  108,
+                  95,
+                  115,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "init_user_commitment",
+      "docs": [
+        "Initialize user_commitment PDA so it can be delegated before first commit on ER.",
+        "Per MagicBlock: \"All writable accounts must be delegated\" - user_commitment is writable in commit.",
+        "Call this (on base layer) then delegate user_commitment, then commit can run on ER."
+      ],
+      "discriminator": [
+        252,
+        50,
+        154,
+        81,
+        244,
+        235,
+        207,
+        210
+      ],
+      "accounts": [
+        {
+          "name": "launch",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch.creator",
+                "account": "Launch"
+              },
+              {
+                "kind": "account",
+                "path": "launch.token_mint",
+                "account": "Launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_commitment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_launch",
+      "docs": [
+        "Phase 1: Initialize a new token launch",
+        "Creator sets parameters: token supply, duration, graduation target"
+      ],
+      "discriminator": [
+        90,
+        201,
+        220,
+        142,
+        112,
+        253,
+        100,
+        13
+      ],
+      "accounts": [
+        {
+          "name": "launch",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "commitment_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_mint"
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "token_supply",
+          "type": "u64"
+        },
+        {
+          "name": "start_time",
+          "type": "i64"
+        },
+        {
+          "name": "end_time",
+          "type": "i64"
+        },
+        {
+          "name": "graduation_target",
+          "type": "u64"
+        },
+        {
+          "name": "min_commitment",
+          "type": "u64"
+        },
+        {
+          "name": "max_commitment",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "mark_delegated",
+      "docs": [
+        "Helper to mark launch as delegated (after delegating commitment pool)"
+      ],
+      "discriminator": [
+        232,
+        62,
+        80,
+        189,
+        79,
+        140,
+        204,
+        23
+      ],
+      "accounts": [
+        {
+          "name": "launch",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "private_commit",
+      "docs": [
+        "Step 3: Private Commit - Transfer from ephemeral to vault AND record commitment",
+        "THIS IS THE FULLY PRIVATE OPERATION - runs entirely on TEE",
+        "All accounts (ephemeral_sol, vault, commitment_pool, user_commitment) must be delegated",
+        "Observers cannot see: which launch, how much, timing weights",
+        "Run on: MagicBlock TEE (Private Ephemeral Rollup)"
+      ],
+      "discriminator": [
+        205,
+        167,
+        145,
+        210,
+        97,
+        75,
+        100,
+        228
+      ],
+      "accounts": [
+        {
+          "name": "launch",
+          "docs": [
+            "Read-only: launch parameters (does not need to be delegated)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch.creator",
+                "account": "Launch"
+              },
+              {
+                "kind": "account",
+                "path": "launch.token_mint",
+                "account": "Launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ephemeral_sol",
+          "docs": [
+            "Ephemeral SOL account - MUST be delegated to TEE"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  112,
+                  104,
+                  101,
+                  109,
+                  101,
+                  114,
+                  97,
+                  108,
+                  95,
+                  115,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "Vault - MUST be delegated to TEE"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "commitment_pool",
+          "docs": [
+            "Commitment pool - MUST be delegated to TEE"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_commitment",
+          "docs": [
+            "User commitment - MUST be delegated to TEE"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "docs": [
+            "User (signer only, NOT writable - so this CAN run on TEE!)"
+          ],
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "process_undelegation",
+      "discriminator": [
+        196,
+        28,
+        41,
+        206,
+        48,
+        37,
+        51,
+        167
+      ],
+      "accounts": [
+        {
+          "name": "base_account",
+          "writable": true
+        },
+        {
+          "name": "buffer"
+        },
+        {
+          "name": "payer",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "account_seeds",
+          "type": {
+            "vec": "bytes"
+          }
+        }
+      ]
+    },
+    {
+      "name": "record_commit",
+      "docs": [
+        "Phase 2b: Record commitment privately (runs on TEE/ER when delegated)",
+        "This only updates PDAs - no SOL transfer. All accounts here can be delegated.",
+        "For delegated pools: call deposit() on Solana first, then record_commit() on ER.",
+        "For non-delegated pools: use commit() which does both in one transaction."
+      ],
+      "discriminator": [
+        229,
+        233,
+        165,
+        181,
+        135,
+        196,
+        42,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "launch",
+          "docs": [
+            "Read-only: we only read launch params; no need to delegate for ER"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch.creator",
+                "account": "Launch"
+              },
+              {
+                "kind": "account",
+                "path": "launch.token_mint",
+                "account": "Launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "commitment_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_commitment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "docs": [
+            "The user signing (read-only for verification, NOT writable)"
+          ],
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_funds",
+      "docs": [
+        "Creator withdraws collected SOL after graduation"
+      ],
+      "discriminator": [
+        241,
+        36,
+        29,
+        111,
+        208,
+        31,
+        104,
+        217
+      ],
+      "accounts": [
+        {
+          "name": "launch",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch.creator",
+                "account": "Launch"
+              },
+              {
+                "kind": "account",
+                "path": "launch.token_mint",
+                "account": "Launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "CommitmentPool",
+      "discriminator": [
+        113,
+        107,
+        145,
+        23,
+        248,
+        248,
+        179,
+        88
+      ]
+    },
+    {
+      "name": "EphemeralSol",
+      "discriminator": [
+        57,
+        117,
+        5,
+        86,
+        5,
+        93,
+        246,
+        60
+      ]
+    },
+    {
+      "name": "Launch",
+      "discriminator": [
+        144,
+        51,
+        51,
+        163,
+        206,
+        85,
+        213,
+        38
+      ]
+    },
+    {
+      "name": "UserCommitment",
+      "discriminator": [
+        163,
+        79,
+        14,
+        230,
+        58,
+        105,
+        84,
+        24
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidTimeRange",
+      "msg": "End time must be after start time"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidTokenSupply",
+      "msg": "Token supply must be greater than zero"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidGraduationTarget",
+      "msg": "Graduation target must be greater than zero"
+    },
+    {
+      "code": 6003,
+      "name": "LaunchNotStarted",
+      "msg": "Launch has not started yet"
+    },
+    {
+      "code": 6004,
+      "name": "LaunchEnded",
+      "msg": "Launch commitment period has ended"
+    },
+    {
+      "code": 6005,
+      "name": "AlreadyGraduated",
+      "msg": "Launch has already graduated"
+    },
+    {
+      "code": 6006,
+      "name": "BelowMinCommitment",
+      "msg": "Commitment below minimum"
+    },
+    {
+      "code": 6007,
+      "name": "AboveMaxCommitment",
+      "msg": "Commitment above maximum"
+    },
+    {
+      "code": 6008,
+      "name": "GraduationConditionsNotMet",
+      "msg": "Graduation conditions not met - need target reached or time expired"
+    },
+    {
+      "code": 6009,
+      "name": "NotGraduated",
+      "msg": "Launch has not graduated yet"
+    },
+    {
+      "code": 6010,
+      "name": "NoAllocation",
+      "msg": "No token allocation available"
+    },
+    {
+      "code": 6011,
+      "name": "AlreadyClaimed",
+      "msg": "Tokens already claimed"
+    },
+    {
+      "code": 6012,
+      "name": "AllocationAlreadyCalculated",
+      "msg": "Allocation already calculated"
+    },
+    {
+      "code": 6013,
+      "name": "Unauthorized",
+      "msg": "Unauthorized - only creator can perform this action"
+    },
+    {
+      "code": 6014,
+      "name": "AlreadyDelegated",
+      "msg": "Already delegated to Ephemeral Rollup"
+    },
+    {
+      "code": 6015,
+      "name": "NotDelegated",
+      "msg": "Not delegated to Ephemeral Rollup"
+    },
+    {
+      "code": 6016,
+      "name": "NoCommitment",
+      "msg": "No commitment found"
+    },
+    {
+      "code": 6017,
+      "name": "InsufficientEphemeralBalance",
+      "msg": "Insufficient balance in ephemeral SOL account"
+    }
+  ],
+  "types": [
+    {
+      "name": "AccountType",
+      "docs": [
+        "Account types for delegation and permission management",
+        "Per MagicBlock: \"All writable accounts in a tx must be delegated\" for ER execution"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
           {
-            "name": "tokenSupply",
-            "type": "u64"
+            "name": "CommitmentPool",
+            "fields": [
+              {
+                "name": "launch",
+                "type": "pubkey"
+              }
+            ]
           },
           {
-            "name": "startTime",
-            "type": "i64"
+            "name": "UserCommitment",
+            "fields": [
+              {
+                "name": "launch",
+                "type": "pubkey"
+              },
+              {
+                "name": "user",
+                "type": "pubkey"
+              }
+            ]
           },
           {
-            "name": "endTime",
-            "type": "i64"
+            "name": "Vault",
+            "fields": [
+              {
+                "name": "launch",
+                "type": "pubkey"
+              }
+            ]
           },
           {
-            "name": "graduationTarget",
-            "type": "u64"
-          },
-          {
-            "name": "minCommitment",
-            "type": "u64"
-          },
-          {
-            "name": "maxCommitment",
-            "type": "u64"
+            "name": "EphemeralSol",
+            "fields": [
+              {
+                "name": "launch",
+                "type": "pubkey"
+              },
+              {
+                "name": "user",
+                "type": "pubkey"
+              }
+            ]
           }
         ]
-      },
-      {
-        "name": "delegateToEr",
-        "docs": [
-          "Delegate the commitment pool to MagicBlock Ephemeral Rollup for private execution",
-          "This enables private commits during the commitment phase"
-        ],
-        "accounts": [
+      }
+    },
+    {
+      "name": "CommitmentPool",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
             "name": "launch",
-            "isMut": true,
-            "isSigner": false
+            "type": "pubkey"
           },
           {
-            "name": "commitmentPool",
-            "isMut": true,
-            "isSigner": false
+            "name": "total_committed",
+            "type": "u64"
           },
           {
-            "name": "payer",
-            "isMut": true,
-            "isSigner": true
+            "name": "total_participants",
+            "type": "u64"
           },
           {
-            "name": "buffer",
-            "isMut": true,
-            "isSigner": false
-          },
-          {
-            "name": "delegationRecord",
-            "isMut": true,
-            "isSigner": false
-          },
-          {
-            "name": "delegationMetadata",
-            "isMut": false,
-            "isSigner": false
-          },
-          {
-            "name": "delegationProgram",
-            "isMut": false,
-            "isSigner": false
-          },
-          {
-            "name": "systemProgram",
-            "isMut": false,
-            "isSigner": false
+            "name": "bump",
+            "type": "u8"
           }
-        ],
-        "args": []
-      },
-      {
-        "name": "commit",
-        "docs": [
-          "Phase 2: Private commitment - Users commit SOL to the pool",
-          "When delegated, this runs in the Ephemeral Rollup for privacy",
-          "No one can see individual commitments until graduation"
-        ],
-        "accounts": [
-          {
-            "name": "launch",
-            "isMut": true,
-            "isSigner": false
-          },
-          {
-            "name": "commitmentPool",
-            "isMut": true,
-            "isSigner": false
-          },
-          {
-            "name": "userCommitment",
-            "isMut": true,
-            "isSigner": false
-          },
-          {
-            "name": "vault",
-            "isMut": true,
-            "isSigner": false
-          },
+        ]
+      }
+    },
+    {
+      "name": "EphemeralSol",
+      "docs": [
+        "Ephemeral SOL Account - User's private SOL holding for a specific launch",
+        "Following MagicBlock's \"ephemeral ATA\" pattern but for native SOL",
+        "This account is delegated to TEE for private operations"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
             "name": "user",
-            "isMut": true,
-            "isSigner": true
+            "type": "pubkey"
           },
           {
-            "name": "systemProgram",
-            "isMut": false,
-            "isSigner": false
+            "name": "launch",
+            "type": "pubkey"
+          },
+          {
+            "name": "balance",
+            "type": "u64"
+          },
+          {
+            "name": "is_delegated",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
-        ],
-        "args": [
+        ]
+      }
+    },
+    {
+      "name": "Launch",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_supply",
+            "type": "u64"
+          },
+          {
+            "name": "start_time",
+            "type": "i64"
+          },
+          {
+            "name": "end_time",
+            "type": "i64"
+          },
+          {
+            "name": "graduation_target",
+            "type": "u64"
+          },
+          {
+            "name": "min_commitment",
+            "type": "u64"
+          },
+          {
+            "name": "max_commitment",
+            "type": "u64"
+          },
+          {
+            "name": "total_committed",
+            "type": "u64"
+          },
+          {
+            "name": "total_participants",
+            "type": "u64"
+          },
+          {
+            "name": "is_graduated",
+            "type": "bool"
+          },
+          {
+            "name": "is_delegated",
+            "type": "bool"
+          },
+          {
+            "name": "graduation_time",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Member",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "flags",
+            "type": "u8"
+          },
+          {
+            "name": "pubkey",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UserCommitment",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "launch",
+            "type": "pubkey"
+          },
           {
             "name": "amount",
             "type": "u64"
+          },
+          {
+            "name": "commit_time",
+            "type": "i64"
+          },
+          {
+            "name": "weight",
+            "type": "u64"
+          },
+          {
+            "name": "tokens_allocated",
+            "type": "u64"
+          },
+          {
+            "name": "has_claimed",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
-      },
-      {
-        "name": "graduate",
-        "docs": [
-          "Phase 3: Graduate the launch - Settle state and calculate allocations",
-          "Can be called when target is reached OR time expires"
-        ],
-        "accounts": [
-          {
-            "name": "launch",
-            "isMut": true,
-            "isSigner": false
-          },
-          {
-            "name": "commitmentPool",
-            "isMut": false,
-            "isSigner": false
-          },
-          {
-            "name": "authority",
-            "isMut": false,
-            "isSigner": true
-          }
-        ],
-        "args": []
-      },
-      {
-        "name": "undelegateFromEr",
-        "docs": [
-          "Undelegate the commitment pool from ER back to Solana mainnet",
-          "Called after graduation to settle all state publicly"
-        ],
-        "accounts": [
-          {
-            "name": "launch",
-            "isMut": true,
-            "isSigner": false
-          },
-          {
-            "name": "commitmentPool",
-            "isMut": true,
-            "isSigner": false
-          },
-          {
-            "name": "payer",
-            "isMut": true,
-            "isSigner": true
-          },
-          {
-            "name": "delegationRecord",
-            "isMut": true,
-            "isSigner": false
-          },
-          {
-            "name": "delegationProgram",
-            "isMut": false,
-            "isSigner": false
-          }
-        ],
-        "args": []
-      },
-      {
-        "name": "calculateAllocation",
-        "docs": [
-          "Calculate user's token allocation based on weighted participation",
-          "Formula: weight = 1 + alpha * (1 - t/T)",
-          "Early participants get up to 50% bonus tokens"
-        ],
-        "accounts": [
-          {
-            "name": "launch",
-            "isMut": false,
-            "isSigner": false
-          },
-          {
-            "name": "userCommitment",
-            "isMut": true,
-            "isSigner": false
-          },
-          {
-            "name": "user",
-            "isMut": false,
-            "isSigner": true
-          }
-        ],
-        "args": []
-      },
-      {
-        "name": "claimTokens",
-        "docs": [
-          "Phase 4: Claim allocated tokens"
-        ],
-        "accounts": [
-          {
-            "name": "launch",
-            "isMut": false,
-            "isSigner": false
-          },
-          {
-            "name": "userCommitment",
-            "isMut": true,
-            "isSigner": false
-          },
-          {
-            "name": "tokenVault",
-            "isMut": true,
-            "isSigner": false
-          },
-          {
-            "name": "userTokenAccount",
-            "isMut": true,
-            "isSigner": false
-          },
-          {
-            "name": "user",
-            "isMut": false,
-            "isSigner": true
-          },
-          {
-            "name": "tokenProgram",
-            "isMut": false,
-            "isSigner": false
-          }
-        ],
-        "args": []
-      },
-      {
-        "name": "withdrawFunds",
-        "docs": [
-          "Creator withdraws collected SOL after graduation"
-        ],
-        "accounts": [
-          {
-            "name": "launch",
-            "isMut": false,
-            "isSigner": false
-          },
-          {
-            "name": "vault",
-            "isMut": true,
-            "isSigner": false
-          },
-          {
-            "name": "creator",
-            "isMut": true,
-            "isSigner": true
-          }
-        ],
-        "args": []
-      },
-      {
-        "name": "getLaunchInfo",
-        "docs": [
-          "Get launch info (view function)"
-        ],
-        "accounts": [
-          {
-            "name": "launch",
-            "isMut": false,
-            "isSigner": false
-          }
-        ],
-        "args": []
       }
-    ],
-    "accounts": [
-      {
-        "name": "Launch",
-        "type": {
-          "kind": "struct",
-          "fields": [
-            {
-              "name": "creator",
-              "type": "publicKey"
-            },
-            {
-              "name": "tokenMint",
-              "type": "publicKey"
-            },
-            {
-              "name": "tokenSupply",
-              "type": "u64"
-            },
-            {
-              "name": "startTime",
-              "type": "i64"
-            },
-            {
-              "name": "endTime",
-              "type": "i64"
-            },
-            {
-              "name": "graduationTarget",
-              "type": "u64"
-            },
-            {
-              "name": "minCommitment",
-              "type": "u64"
-            },
-            {
-              "name": "maxCommitment",
-              "type": "u64"
-            },
-            {
-              "name": "totalCommitted",
-              "type": "u64"
-            },
-            {
-              "name": "totalParticipants",
-              "type": "u64"
-            },
-            {
-              "name": "isGraduated",
-              "type": "bool"
-            },
-            {
-              "name": "isDelegated",
-              "type": "bool"
-            },
-            {
-              "name": "graduationTime",
-              "type": "i64"
-            },
-            {
-              "name": "bump",
-              "type": "u8"
-            }
-          ]
-        }
-      },
-      {
-        "name": "CommitmentPool",
-        "type": {
-          "kind": "struct",
-          "fields": [
-            {
-              "name": "launch",
-              "type": "publicKey"
-            },
-            {
-              "name": "totalCommitted",
-              "type": "u64"
-            },
-            {
-              "name": "totalParticipants",
-              "type": "u64"
-            },
-            {
-              "name": "bump",
-              "type": "u8"
-            }
-          ]
-        }
-      },
-      {
-        "name": "UserCommitment",
-        "type": {
-          "kind": "struct",
-          "fields": [
-            {
-              "name": "user",
-              "type": "publicKey"
-            },
-            {
-              "name": "launch",
-              "type": "publicKey"
-            },
-            {
-              "name": "amount",
-              "type": "u64"
-            },
-            {
-              "name": "commitTime",
-              "type": "i64"
-            },
-            {
-              "name": "weight",
-              "type": "u64"
-            },
-            {
-              "name": "tokensAllocated",
-              "type": "u64"
-            },
-            {
-              "name": "hasClaimed",
-              "type": "bool"
-            },
-            {
-              "name": "bump",
-              "type": "u8"
-            }
-          ]
-        }
-      }
-    ],
-    "errors": [
-      {
-        "code": 6000,
-        "name": "InvalidTimeRange",
-        "msg": "End time must be after start time"
-      },
-      {
-        "code": 6001,
-        "name": "InvalidTokenSupply",
-        "msg": "Token supply must be greater than zero"
-      },
-      {
-        "code": 6002,
-        "name": "InvalidGraduationTarget",
-        "msg": "Graduation target must be greater than zero"
-      },
-      {
-        "code": 6003,
-        "name": "LaunchNotStarted",
-        "msg": "Launch has not started yet"
-      },
-      {
-        "code": 6004,
-        "name": "LaunchEnded",
-        "msg": "Launch commitment period has ended"
-      },
-      {
-        "code": 6005,
-        "name": "AlreadyGraduated",
-        "msg": "Launch has already graduated"
-      },
-      {
-        "code": 6006,
-        "name": "BelowMinCommitment",
-        "msg": "Commitment below minimum"
-      },
-      {
-        "code": 6007,
-        "name": "AboveMaxCommitment",
-        "msg": "Commitment above maximum"
-      },
-      {
-        "code": 6008,
-        "name": "GraduationConditionsNotMet",
-        "msg": "Graduation conditions not met - need target reached or time expired"
-      },
-      {
-        "code": 6009,
-        "name": "NotGraduated",
-        "msg": "Launch has not graduated yet"
-      },
-      {
-        "code": 6010,
-        "name": "NoAllocation",
-        "msg": "No token allocation available"
-      },
-      {
-        "code": 6011,
-        "name": "AlreadyClaimed",
-        "msg": "Tokens already claimed"
-      },
-      {
-        "code": 6012,
-        "name": "AllocationAlreadyCalculated",
-        "msg": "Allocation already calculated"
-      },
-      {
-        "code": 6013,
-        "name": "Unauthorized",
-        "msg": "Unauthorized - only creator can perform this action"
-      },
-      {
-        "code": 6014,
-        "name": "AlreadyDelegated",
-        "msg": "Already delegated to Ephemeral Rollup"
-      },
-      {
-        "code": 6015,
-        "name": "NotDelegated",
-        "msg": "Not delegated to Ephemeral Rollup"
-      },
-      {
-        "code": 6016,
-        "name": "NoCommitment",
-        "msg": "No commitment found"
-      }
-    ]
-  }
+    }
+  ]
+}

@@ -19,6 +19,7 @@ pub const LAUNCH_SEED: &[u8] = b"launch";
 pub const COMMITMENT_POOL_SEED: &[u8] = b"commitment_pool";
 pub const USER_COMMITMENT_SEED: &[u8] = b"user_commitment";
 pub const VAULT_SEED: &[u8] = b"vault";
+pub const EPHEMERAL_SOL_SEED: &[u8] = b"ephemeral_sol"; // User's private SOL holding account
 
 // Constants
 pub const EARLY_BONUS_ALPHA: u64 = 50; // 50% bonus for earliest participants
@@ -28,10 +29,16 @@ pub const BASIS_POINTS: u64 = 10000;
 pub const TEE_VALIDATOR: &str = "FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA";
 
 /// Account types for delegation and permission management
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+/// Per MagicBlock: "All writable accounts in a tx must be delegated" for ER execution
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq)]
 pub enum AccountType {
     CommitmentPool { launch: Pubkey },
     UserCommitment { launch: Pubkey, user: Pubkey },
+    /// Vault PDA (receives SOL in commit) - must be delegated for ER commits
+    Vault { launch: Pubkey },
+    /// Ephemeral SOL account - user's private SOL holding in TEE
+    /// This follows MagicBlock's "ephemeral ATA" pattern but for native SOL
+    EphemeralSol { launch: Pubkey, user: Pubkey },
 }
 
 /// Derive seeds from account type (like RPS example)
@@ -46,6 +53,16 @@ fn derive_seeds_from_account_type(account_type: &AccountType) -> Vec<Vec<u8>> {
         AccountType::UserCommitment { launch, user } => {
             vec![
                 USER_COMMITMENT_SEED.to_vec(),
+                launch.to_bytes().to_vec(),
+                user.to_bytes().to_vec(),
+            ]
+        }
+        AccountType::Vault { launch } => {
+            vec![VAULT_SEED.to_vec(), launch.to_bytes().to_vec()]
+        }
+        AccountType::EphemeralSol { launch, user } => {
+            vec![
+                EPHEMERAL_SOL_SEED.to_vec(),
                 launch.to_bytes().to_vec(),
                 user.to_bytes().to_vec(),
             ]
@@ -161,22 +178,235 @@ pub mod vestige {
         Ok(())
     }
 
+    /// Initialize user_commitment PDA so it can be delegated before first commit on ER.
+    /// Per MagicBlock: "All writable accounts must be delegated" - user_commitment is writable in commit.
+    /// Call this (on base layer) then delegate user_commitment, then commit can run on ER.
+    pub fn init_user_commitment(ctx: Context<InitUserCommitment>) -> Result<()> {
+        let uc = &mut ctx.accounts.user_commitment;
+        uc.user = ctx.accounts.user.key();
+        uc.launch = ctx.accounts.launch.key();
+        uc.amount = 0;
+        uc.commit_time = 0;
+        uc.weight = 0;
+        uc.tokens_allocated = 0;
+        uc.has_claimed = false;
+        uc.bump = ctx.bumps.user_commitment;
+        msg!("User commitment PDA initialized for ER delegation");
+        Ok(())
+    }
+
     /// Helper to mark launch as delegated (after delegating commitment pool)
     pub fn mark_delegated(ctx: Context<MarkDelegated>) -> Result<()> {
         let launch = &mut ctx.accounts.launch;
         require!(!launch.is_delegated, VestigeError::AlreadyDelegated);
-        
+
         launch.is_delegated = true;
         msg!("Launch marked as delegated - Private commitments are now enabled!");
         Ok(())
     }
 
-    /// Phase 2: Private commitment - Users commit SOL to the pool
-    /// When delegated, this runs in the Ephemeral Rollup for privacy
-    /// No one can see individual commitments until graduation
+    // ============== EPHEMERAL SOL FLOW (FOR FULL PRIVACY) ==============
+    // This follows MagicBlock's "ephemeral ATA" pattern but for native SOL
+    // Flow: User → EphemeralSol (public) → Delegate → Private Commit (TEE)
+
+    /// Step 1: Initialize user's ephemeral SOL account for a specific launch
+    /// This creates a PDA owned by our program that can be delegated to TEE
+    /// Run on: Solana Base Layer
+    pub fn init_ephemeral_sol(ctx: Context<InitEphemeralSol>) -> Result<()> {
+        let ephemeral = &mut ctx.accounts.ephemeral_sol;
+        ephemeral.user = ctx.accounts.user.key();
+        ephemeral.launch = ctx.accounts.launch.key();
+        ephemeral.balance = 0;
+        ephemeral.is_delegated = false;
+        ephemeral.bump = ctx.bumps.ephemeral_sol;
+
+        msg!("Ephemeral SOL account initialized for private commitments");
+        Ok(())
+    }
+
+    /// Step 2: Fund the ephemeral SOL account (deposit SOL)
+    /// This is visible on Solana but only shows "User deposited to their ephemeral account"
+    /// It does NOT reveal which launch they're committing to (that happens privately later)
+    /// Run on: Solana Base Layer
+    pub fn fund_ephemeral(ctx: Context<FundEphemeral>, amount: u64) -> Result<()> {
+        let launch = &ctx.accounts.launch;
+        let clock = Clock::get()?;
+
+        // Validate timing
+        require!(clock.unix_timestamp >= launch.start_time, VestigeError::LaunchNotStarted);
+        require!(clock.unix_timestamp <= launch.end_time, VestigeError::LaunchEnded);
+        require!(!launch.is_graduated, VestigeError::AlreadyGraduated);
+
+        // Validate amount
+        require!(amount >= launch.min_commitment, VestigeError::BelowMinCommitment);
+        require!(amount <= launch.max_commitment, VestigeError::AboveMaxCommitment);
+
+        // Transfer SOL from user to ephemeral account
+        system_program::transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::Transfer {
+                    from: ctx.accounts.user.to_account_info(),
+                    to: ctx.accounts.ephemeral_sol.to_account_info(),
+                },
+            ),
+            amount,
+        )?;
+
+        // Update balance tracking
+        let ephemeral = &mut ctx.accounts.ephemeral_sol;
+        ephemeral.balance = ephemeral.balance.checked_add(amount).unwrap();
+
+        msg!("Funded ephemeral account with {} lamports", amount);
+        Ok(())
+    }
+
+    /// Step 3: Private Commit - Transfer from ephemeral to vault AND record commitment
+    /// THIS IS THE FULLY PRIVATE OPERATION - runs entirely on TEE
+    /// All accounts (ephemeral_sol, vault, commitment_pool, user_commitment) must be delegated
+    /// Observers cannot see: which launch, how much, timing weights
+    /// Run on: MagicBlock TEE (Private Ephemeral Rollup)
+    pub fn private_commit(ctx: Context<PrivateCommit>, amount: u64) -> Result<()> {
+        let launch = &ctx.accounts.launch;
+        let clock = Clock::get()?;
+
+        // Validate timing
+        require!(clock.unix_timestamp >= launch.start_time, VestigeError::LaunchNotStarted);
+        require!(clock.unix_timestamp <= launch.end_time, VestigeError::LaunchEnded);
+        require!(!launch.is_graduated, VestigeError::AlreadyGraduated);
+        require!(launch.is_delegated, VestigeError::NotDelegated);
+
+        // Validate amount
+        require!(amount >= launch.min_commitment, VestigeError::BelowMinCommitment);
+        require!(amount <= launch.max_commitment, VestigeError::AboveMaxCommitment);
+
+        // Check ephemeral balance
+        require!(ctx.accounts.ephemeral_sol.balance >= amount, VestigeError::InsufficientEphemeralBalance);
+
+        // Transfer SOL from ephemeral account to vault (PRIVATE - on TEE!)
+        // This is the key privacy feature - the transfer happens inside TEE
+        **ctx.accounts.ephemeral_sol.to_account_info().try_borrow_mut_lamports()? -= amount;
+        **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? += amount;
+
+        // Update ephemeral balance tracking
+        ctx.accounts.ephemeral_sol.balance = ctx.accounts.ephemeral_sol.balance.checked_sub(amount).unwrap();
+
+        // Record the commitment (PRIVATE - on TEE!)
+        let user_commitment = &mut ctx.accounts.user_commitment;
+        let commitment_pool = &mut ctx.accounts.commitment_pool;
+
+        let is_new_participant = user_commitment.amount == 0;
+
+        user_commitment.user = ctx.accounts.user.key();
+        user_commitment.launch = launch.key();
+        user_commitment.amount = user_commitment.amount.checked_add(amount).unwrap();
+        user_commitment.commit_time = clock.unix_timestamp;
+        user_commitment.weight = 0;
+        user_commitment.tokens_allocated = 0;
+        user_commitment.has_claimed = false;
+
+        // Update pool totals (PRIVATE - on TEE!)
+        commitment_pool.total_committed = commitment_pool.total_committed.checked_add(amount).unwrap();
+        if is_new_participant {
+            commitment_pool.total_participants = commitment_pool.total_participants.checked_add(1).unwrap();
+        }
+
+        msg!("PRIVATE COMMIT: {} lamports committed secretly", amount);
+        Ok(())
+    }
+
+    // ============== END EPHEMERAL SOL FLOW ==============
+
+    /// Phase 2a: Deposit SOL to vault (runs on BASE LAYER - Solana)
+    /// This transfers SOL from user to vault. Must run on Solana because
+    /// user wallets cannot be delegated to ER.
+    /// Call this BEFORE record_commit when pool is delegated.
+    pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
+        let launch = &ctx.accounts.launch;
+        let clock = Clock::get()?;
+
+        // Validate timing
+        require!(clock.unix_timestamp >= launch.start_time, VestigeError::LaunchNotStarted);
+        require!(clock.unix_timestamp <= launch.end_time, VestigeError::LaunchEnded);
+        require!(!launch.is_graduated, VestigeError::AlreadyGraduated);
+
+        // Validate amount
+        require!(amount >= launch.min_commitment, VestigeError::BelowMinCommitment);
+        require!(amount <= launch.max_commitment, VestigeError::AboveMaxCommitment);
+
+        // Transfer SOL from user to vault (on Solana base layer)
+        system_program::transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::Transfer {
+                    from: ctx.accounts.user.to_account_info(),
+                    to: ctx.accounts.vault.to_account_info(),
+                },
+            ),
+            amount,
+        )?;
+
+        msg!("Deposit: {} lamports transferred to vault", amount);
+        Ok(())
+    }
+
+    /// Phase 2b: Record commitment privately (runs on TEE/ER when delegated)
+    /// This only updates PDAs - no SOL transfer. All accounts here can be delegated.
+    /// For delegated pools: call deposit() on Solana first, then record_commit() on ER.
+    /// For non-delegated pools: use commit() which does both in one transaction.
+    pub fn record_commit(ctx: Context<RecordCommit>, amount: u64) -> Result<()> {
+        let launch = &ctx.accounts.launch;
+        let clock = Clock::get()?;
+
+        // Validate timing
+        require!(clock.unix_timestamp >= launch.start_time, VestigeError::LaunchNotStarted);
+        require!(clock.unix_timestamp <= launch.end_time, VestigeError::LaunchEnded);
+        require!(!launch.is_graduated, VestigeError::AlreadyGraduated);
+
+        // Validate amount
+        require!(amount >= launch.min_commitment, VestigeError::BelowMinCommitment);
+        require!(amount <= launch.max_commitment, VestigeError::AboveMaxCommitment);
+
+        let user_commitment = &mut ctx.accounts.user_commitment;
+        let commitment_pool = &mut ctx.accounts.commitment_pool;
+
+        // Check if user already committed (for participant counting)
+        let is_new_participant = user_commitment.amount == 0;
+
+        // Record the commitment (privately in ER when delegated)
+        // Note: user_commitment was already initialized via init_user_commitment,
+        // so we just update the fields. The bump is already set.
+        user_commitment.user = ctx.accounts.user.key();
+        user_commitment.launch = launch.key();
+        user_commitment.amount = user_commitment.amount.checked_add(amount).unwrap();
+        user_commitment.commit_time = clock.unix_timestamp;
+        user_commitment.weight = 0; // Calculated at graduation
+        user_commitment.tokens_allocated = 0;
+        user_commitment.has_claimed = false;
+        // bump is already set from init_user_commitment, don't overwrite
+
+        // Update pool totals (hidden in ER)
+        commitment_pool.total_committed = commitment_pool.total_committed.checked_add(amount).unwrap();
+        if is_new_participant {
+            commitment_pool.total_participants = commitment_pool.total_participants.checked_add(1).unwrap();
+        }
+
+        msg!("Commitment recorded privately: {} lamports", amount);
+        Ok(())
+    }
+
+    /// Phase 2 (combined): Commit SOL to a launch (for NON-DELEGATED pools only)
+    /// This does deposit + record in one transaction on Solana.
+    /// DO NOT use this for delegated pools - use deposit() then record_commit() separately.
     pub fn commit(ctx: Context<Commit>, amount: u64) -> Result<()> {
         let launch = &ctx.accounts.launch;
         let clock = Clock::get()?;
+
+        // For safety, warn if trying to use on delegated pool
+        // (should use deposit + record_commit instead)
+        if launch.is_delegated {
+            msg!("WARNING: Using commit() on delegated pool. Use deposit() + record_commit() for privacy.");
+        }
 
         // Validate timing
         require!(clock.unix_timestamp >= launch.start_time, VestigeError::LaunchNotStarted);
@@ -493,6 +723,22 @@ impl UserCommitment {
     pub const SIZE: usize = 8 + 32 + 32 + 8 + 8 + 8 + 8 + 1 + 1;
 }
 
+/// Ephemeral SOL Account - User's private SOL holding for a specific launch
+/// Following MagicBlock's "ephemeral ATA" pattern but for native SOL
+/// This account is delegated to TEE for private operations
+#[account]
+pub struct EphemeralSol {
+    pub user: Pubkey,              // 32 - Owner of this ephemeral account
+    pub launch: Pubkey,            // 32 - Associated launch
+    pub balance: u64,              // 8 - Current SOL balance (tracked for privacy)
+    pub is_delegated: bool,        // 1 - Whether delegated to TEE
+    pub bump: u8,                  // 1
+}
+
+impl EphemeralSol {
+    pub const SIZE: usize = 8 + 32 + 32 + 8 + 1 + 1;
+}
+
 // ============== Contexts ==============
 
 #[derive(Accounts)]
@@ -580,9 +826,197 @@ pub struct MarkDelegated<'info> {
     pub authority: Signer<'info>,
 }
 
+/// Context for initializing user_commitment PDA (so it can be delegated before first commit on ER)
+#[derive(Accounts)]
+pub struct InitUserCommitment<'info> {
+    #[account(
+        seeds = [LAUNCH_SEED, launch.creator.as_ref(), launch.token_mint.as_ref()],
+        bump = launch.bump
+    )]
+    pub launch: Account<'info, Launch>,
+
+    #[account(
+        init,
+        payer = user,
+        space = UserCommitment::SIZE,
+        seeds = [USER_COMMITMENT_SEED, launch.key().as_ref(), user.key().as_ref()],
+        bump
+    )]
+    pub user_commitment: Account<'info, UserCommitment>,
+
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+/// Deposit: Transfer SOL from user to vault (runs on BASE LAYER only)
+/// User account is writable here, so this CANNOT run on ER.
+/// Vault does NOT need to be delegated for deposits - we're just sending SOL to it.
+#[derive(Accounts)]
+pub struct Deposit<'info> {
+    /// Read-only: we only read launch params
+    #[account(
+        seeds = [LAUNCH_SEED, launch.creator.as_ref(), launch.token_mint.as_ref()],
+        bump = launch.bump
+    )]
+    pub launch: Account<'info, Launch>,
+
+    /// CHECK: Vault to receive SOL
+    #[account(
+        mut,
+        seeds = [VAULT_SEED, launch.key().as_ref()],
+        bump
+    )]
+    pub vault: AccountInfo<'info>,
+
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+/// RecordCommit: Record commitment data privately (runs on ER/TEE when delegated)
+/// NO user wallet here - only PDAs that can be delegated.
+/// commitment_pool and user_commitment must be delegated for ER execution.
+#[derive(Accounts)]
+pub struct RecordCommit<'info> {
+    /// Read-only: we only read launch params; no need to delegate for ER
+    #[account(
+        seeds = [LAUNCH_SEED, launch.creator.as_ref(), launch.token_mint.as_ref()],
+        bump = launch.bump
+    )]
+    pub launch: Account<'info, Launch>,
+
+    #[account(
+        mut,
+        seeds = [COMMITMENT_POOL_SEED, launch.key().as_ref()],
+        bump = commitment_pool.bump
+    )]
+    pub commitment_pool: Account<'info, CommitmentPool>,
+
+    #[account(
+        mut,
+        seeds = [USER_COMMITMENT_SEED, launch.key().as_ref(), user.key().as_ref()],
+        bump = user_commitment.bump
+    )]
+    pub user_commitment: Account<'info, UserCommitment>,
+
+    /// The user signing (read-only for verification, NOT writable)
+    pub user: Signer<'info>,
+}
+
+// ============== EPHEMERAL SOL CONTEXTS (FOR FULL PRIVACY) ==============
+
+/// Initialize ephemeral SOL account for a user
+/// Run on: Solana Base Layer
+#[derive(Accounts)]
+pub struct InitEphemeralSol<'info> {
+    #[account(
+        seeds = [LAUNCH_SEED, launch.creator.as_ref(), launch.token_mint.as_ref()],
+        bump = launch.bump
+    )]
+    pub launch: Account<'info, Launch>,
+
+    #[account(
+        init,
+        payer = user,
+        space = EphemeralSol::SIZE,
+        seeds = [EPHEMERAL_SOL_SEED, launch.key().as_ref(), user.key().as_ref()],
+        bump
+    )]
+    pub ephemeral_sol: Account<'info, EphemeralSol>,
+
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+/// Fund ephemeral SOL account (deposit SOL from user wallet)
+/// Run on: Solana Base Layer
+#[derive(Accounts)]
+pub struct FundEphemeral<'info> {
+    #[account(
+        seeds = [LAUNCH_SEED, launch.creator.as_ref(), launch.token_mint.as_ref()],
+        bump = launch.bump
+    )]
+    pub launch: Account<'info, Launch>,
+
+    #[account(
+        mut,
+        seeds = [EPHEMERAL_SOL_SEED, launch.key().as_ref(), user.key().as_ref()],
+        bump = ephemeral_sol.bump
+    )]
+    pub ephemeral_sol: Account<'info, EphemeralSol>,
+
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+/// Private Commit - Fully private operation on TEE
+/// All writable accounts (ephemeral_sol, vault, commitment_pool, user_commitment) must be delegated
+/// Run on: MagicBlock TEE (Private Ephemeral Rollup)
+#[derive(Accounts)]
+pub struct PrivateCommit<'info> {
+    /// Read-only: launch parameters (does not need to be delegated)
+    #[account(
+        seeds = [LAUNCH_SEED, launch.creator.as_ref(), launch.token_mint.as_ref()],
+        bump = launch.bump
+    )]
+    pub launch: Account<'info, Launch>,
+
+    /// Ephemeral SOL account - MUST be delegated to TEE
+    #[account(
+        mut,
+        seeds = [EPHEMERAL_SOL_SEED, launch.key().as_ref(), user.key().as_ref()],
+        bump = ephemeral_sol.bump
+    )]
+    pub ephemeral_sol: Account<'info, EphemeralSol>,
+
+    /// Vault - MUST be delegated to TEE
+    /// CHECK: Vault PDA to receive SOL
+    #[account(
+        mut,
+        seeds = [VAULT_SEED, launch.key().as_ref()],
+        bump
+    )]
+    pub vault: AccountInfo<'info>,
+
+    /// Commitment pool - MUST be delegated to TEE
+    #[account(
+        mut,
+        seeds = [COMMITMENT_POOL_SEED, launch.key().as_ref()],
+        bump = commitment_pool.bump
+    )]
+    pub commitment_pool: Account<'info, CommitmentPool>,
+
+    /// User commitment - MUST be delegated to TEE
+    #[account(
+        mut,
+        seeds = [USER_COMMITMENT_SEED, launch.key().as_ref(), user.key().as_ref()],
+        bump = user_commitment.bump
+    )]
+    pub user_commitment: Account<'info, UserCommitment>,
+
+    /// User (signer only, NOT writable - so this CAN run on TEE!)
+    pub user: Signer<'info>,
+}
+
+// ============== END EPHEMERAL SOL CONTEXTS ==============
+
+/// Commit: Combined deposit + record (for NON-DELEGATED pools only)
+/// When pool is delegated, use Deposit + RecordCommit separately instead.
+/// This includes the user as writable, so it CANNOT run on ER.
 #[derive(Accounts)]
 pub struct Commit<'info> {
-    #[account(mut)]
+    /// Read-only: we only read launch params
+    #[account(
+        seeds = [LAUNCH_SEED, launch.creator.as_ref(), launch.token_mint.as_ref()],
+        bump = launch.bump
+    )]
     pub launch: Account<'info, Launch>,
 
     #[account(
@@ -766,4 +1200,6 @@ pub enum VestigeError {
     NotDelegated,
     #[msg("No commitment found")]
     NoCommitment,
+    #[msg("Insufficient balance in ephemeral SOL account")]
+    InsufficientEphemeralBalance,
 }

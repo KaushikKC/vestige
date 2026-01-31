@@ -21,7 +21,7 @@ wallet = "~/.config/solana/id.json"
 
 # MagicBlock Ephemeral Rollup endpoints
 [clusters.devnet]
-rpc = "https://api.devnet.solana.com"
+rpc = "https://solana-devnet.api.onfinality.io/public"
 
 [clusters.magicblock]
 rpc = "https://devnet.magicblock.app"

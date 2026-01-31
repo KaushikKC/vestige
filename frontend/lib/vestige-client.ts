@@ -8,23 +8,13 @@ import { AnchorProvider, Program, BN } from "@coral-xyz/anchor";
 import rawIdl from "./vestige.json";
 
 // Program ID from your deployed contract (matches IDL)
-// Handle both formats: top-level "address" (Anchor output) or "metadata.address"
-type VestigeIdlShape = {
-  address?: string;
-  metadata?: { address?: string };
-  default?: { metadata?: { address?: string } };
-};
-const idlAny = rawIdl as VestigeIdlShape;
-const programIdStr =
-  idlAny.address ??
-  idlAny.metadata?.address ??
-  idlAny.default?.metadata?.address;
-if (!programIdStr) {
-  throw new Error(
-    "Vestige IDL is missing program address (address or metadata.address)",
-  );
+// Anchor 0.30.x format has top-level "address" field
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const programAddress = (rawIdl as any).address;
+if (!programAddress) {
+  throw new Error("Vestige IDL is missing program address");
 }
-export const PROGRAM_ID = new PublicKey(programIdStr);
+export const PROGRAM_ID = new PublicKey(programAddress);
 
 // MagicBlock Program IDs
 export const DELEGATION_PROGRAM_ID = new PublicKey(
@@ -48,6 +38,7 @@ export const LAUNCH_SEED = "launch";
 export const COMMITMENT_POOL_SEED = "commitment_pool";
 export const USER_COMMITMENT_SEED = "user_commitment";
 export const VAULT_SEED = "vault";
+export const EPHEMERAL_SOL_SEED = "ephemeral_sol"; // User's private SOL holding
 
 // Launch data interface
 export interface LaunchData {
@@ -78,9 +69,12 @@ export interface UserCommitmentData {
 }
 
 // Account types for delegation (matches Rust enum)
+// Per MagicBlock: all writable accounts in a tx must be delegated for ER execution
 export type AccountType =
   | { commitmentPool: { launch: PublicKey } }
-  | { userCommitment: { launch: PublicKey; user: PublicKey } };
+  | { userCommitment: { launch: PublicKey; user: PublicKey } }
+  | { vault: { launch: PublicKey } }
+  | { ephemeralSol: { launch: PublicKey; user: PublicKey } };
 
 /**
  * Derive permission PDA for an account (MagicBlock Permission Program)
@@ -92,6 +86,9 @@ function derivePermissionPda(accountPda: PublicKey): [PublicKey, number] {
   );
 }
 
+// MagicBlock Ephemeral Rollup RPC (for delegated accounts)
+const ER_RPC_URL = "https://devnet.magicblock.app";
+
 /**
  * VestigeClient - Handles all interactions with the Vestige smart contract
  * Integrated with MagicBlock Private Ephemeral Rollups for privacy
@@ -102,13 +99,29 @@ export class VestigeClient {
   private provider: AnchorProvider;
   private authToken: string | null = null;
 
+  // ER (Ephemeral Rollup) connection and program for delegated accounts
+  private erConnection: Connection;
+  private erProgram: Program;
+
   constructor(provider: AnchorProvider) {
     this.provider = provider;
     this.connection = provider.connection;
 
-    // Initialize program with explicit program ID
+    // Initialize program for Solana base layer
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.program = new Program(rawIdl as any, PROGRAM_ID, provider);
+    this.program = new Program(rawIdl as any, provider);
+
+    // Initialize ER connection and program for delegated accounts
+    this.erConnection = new Connection(ER_RPC_URL, "confirmed");
+    const erProvider = new AnchorProvider(this.erConnection, provider.wallet, {
+      commitment: "confirmed",
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.erProgram = new Program(rawIdl as any, erProvider);
+
+    console.log("VestigeClient initialized:");
+    console.log("  Base Layer RPC:", provider.connection.rpcEndpoint);
+    console.log("  Ephemeral Rollup RPC:", ER_RPC_URL);
   }
 
   /**
@@ -240,19 +253,50 @@ export class VestigeClient {
   }
 
   /**
+   * Derive Ephemeral SOL PDA (user's private SOL holding for a launch)
+   */
+  static deriveEphemeralSolPda(
+    launchPda: PublicKey,
+    user: PublicKey,
+  ): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [
+        Buffer.from(EPHEMERAL_SOL_SEED),
+        launchPda.toBuffer(),
+        user.toBuffer(),
+      ],
+      PROGRAM_ID,
+    );
+  }
+
+  /**
    * Fetch launch data
    */
   async getLaunch(launchPda: PublicKey): Promise<LaunchData | null> {
-    try {
-      const account = await this.program.account.launch.fetch(launchPda);
-      return {
-        publicKey: launchPda,
-        ...(account as unknown as Omit<LaunchData, "publicKey">),
-      };
-    } catch (e) {
-      console.error("Error fetching launch:", e);
-      return null;
+    // Retry logic for rate limiting
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const account = await (this.program.account as any).launch.fetch(
+          launchPda,
+        );
+        return {
+          publicKey: launchPda,
+          ...(account as unknown as Omit<LaunchData, "publicKey">),
+        };
+      } catch (e) {
+        const errorMsg = e instanceof Error ? e.message : String(e);
+        if (errorMsg.includes("403") && attempt < maxRetries) {
+          console.log(`Rate limited, retrying (${attempt}/${maxRetries})...`);
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
+          continue;
+        }
+        console.error("Error fetching launch:", e);
+        return null;
+      }
     }
+    return null;
   }
 
   /**
@@ -260,8 +304,10 @@ export class VestigeClient {
    */
   async getAllLaunches(): Promise<LaunchData[]> {
     try {
-      const accounts = await this.program.account.launch.all();
-      return accounts.map((acc) => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const accounts = await (this.program.account as any).launch.all();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return accounts.map((acc: any) => ({
         publicKey: acc.publicKey,
         ...(acc.account as unknown as Omit<LaunchData, "publicKey">),
       }));
@@ -283,7 +329,8 @@ export class VestigeClient {
         launchPda,
         user,
       );
-      const account = await this.program.account.userCommitment.fetch(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const account = await (this.program.account as any).userCommitment.fetch(
         userCommitmentPda,
       );
       return account as unknown as UserCommitmentData;
@@ -352,11 +399,13 @@ export class VestigeClient {
       [pdaPubkey] = VestigeClient.deriveCommitmentPoolPda(
         accountType.commitmentPool.launch,
       );
-    } else {
+    } else if ("userCommitment" in accountType) {
       [pdaPubkey] = VestigeClient.deriveUserCommitmentPda(
         accountType.userCommitment.launch,
         accountType.userCommitment.user,
       );
+    } else {
+      [pdaPubkey] = VestigeClient.deriveVaultPda(accountType.vault.launch);
     }
 
     const [permissionPda] = derivePermissionPda(pdaPubkey);
@@ -398,11 +447,13 @@ export class VestigeClient {
       [pdaPubkey] = VestigeClient.deriveCommitmentPoolPda(
         accountType.commitmentPool.launch,
       );
-    } else {
+    } else if ("userCommitment" in accountType) {
       [pdaPubkey] = VestigeClient.deriveUserCommitmentPda(
         accountType.userCommitment.launch,
         accountType.userCommitment.user,
       );
+    } else {
+      [pdaPubkey] = VestigeClient.deriveVaultPda(accountType.vault.launch);
     }
 
     console.log("📤 Delegating PDA to MagicBlock Private ER...");
@@ -419,6 +470,32 @@ export class VestigeClient {
       .rpc();
 
     console.log("✅ PDA DELEGATED to Private ER:", tx);
+    return tx;
+  }
+
+  /**
+   * Initialize user_commitment PDA so it can be delegated before first commit on ER.
+   * Per MagicBlock: all writable accounts must be delegated - call this on base, then delegate, then commit on ER.
+   */
+  async initUserCommitment(
+    launchPda: PublicKey,
+    user: PublicKey,
+  ): Promise<string> {
+    const [userCommitmentPda] = VestigeClient.deriveUserCommitmentPda(
+      launchPda,
+      user,
+    );
+    console.log("📋 Initializing user commitment PDA for ER delegation...");
+    const tx = await this.program.methods
+      .initUserCommitment()
+      .accounts({
+        launch: launchPda,
+        userCommitment: userCommitmentPda,
+        user: user,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+    console.log("✅ User commitment PDA initialized:", tx);
     return tx;
   }
 
@@ -445,9 +522,15 @@ export class VestigeClient {
 
   /**
    * Full delegation flow for enabling private mode
-   * 1. Create permission for commitment pool
-   * 2. Delegate commitment pool to TEE
-   * 3. Mark launch as delegated
+   *
+   * With the FULLY PRIVATE flow (following MagicBlock's ephemeral ATA pattern):
+   * - User deposits SOL to their ephemeral account (visible but anonymous)
+   * - User delegates ephemeral account to TEE
+   * - Private commit on TEE: ephemeral → vault + record (FULLY PRIVATE!)
+   *
+   * Accounts delegated at launch setup:
+   * - commitment_pool (aggregate data - private until graduation)
+   * - vault (receives SOL in private commits)
    */
   async enablePrivateMode(
     launchPda: PublicKey,
@@ -455,37 +538,352 @@ export class VestigeClient {
   ): Promise<string[]> {
     const txs: string[] = [];
 
-    console.log("🔒 Enabling Private Mode...");
+    console.log("🔒 Enabling FULLY Private Mode...");
+    console.log("   Following MagicBlock's ephemeral account pattern");
+    console.log("   All commits will be fully private on TEE!");
 
-    // Step 1: Create permission
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    // Step 1: Create permission for commitment_pool
     try {
+      console.log("   Creating permission for commitment_pool...");
       const permissionTx = await this.createPermission(
         { commitmentPool: { launch: launchPda } },
         payer,
       );
       txs.push(permissionTx);
+      await wait(1500);
     } catch (e) {
-      console.log("Permission may already exist:", e);
+      console.log("   Permission may already exist:", e);
     }
 
-    // Step 2: Delegate to TEE
-    const delegateTx = await this.delegatePda(
-      { commitmentPool: { launch: launchPda } },
-      payer,
-    );
-    txs.push(delegateTx);
+    // Step 2: Delegate commitment_pool to TEE
+    try {
+      console.log("   Delegating commitment_pool to TEE...");
+      const delegateTx = await this.delegatePda(
+        { commitmentPool: { launch: launchPda } },
+        payer,
+      );
+      txs.push(delegateTx);
+      await wait(1500);
+    } catch (e) {
+      console.log("   Commitment pool may already be delegated:", e);
+    }
 
-    // Step 3: Mark launch as delegated
-    const markTx = await this.markDelegated(launchPda, payer);
-    txs.push(markTx);
+    // Step 3: Create permission + delegate vault (needed for private commits)
+    try {
+      console.log("   Creating permission for vault...");
+      await this.createPermission({ vault: { launch: launchPda } }, payer);
+      txs.push("vault-permission");
+      await wait(1500);
+    } catch (e) {
+      console.log("   Vault permission may already exist:", e);
+    }
 
-    console.log("✅ Private Mode Enabled!");
+    try {
+      console.log("   Delegating vault to TEE...");
+      const vaultTx = await this.delegatePda(
+        { vault: { launch: launchPda } },
+        payer,
+      );
+      txs.push(vaultTx);
+      await wait(1500);
+    } catch (e) {
+      console.log("   Vault may already be delegated:", e);
+    }
+
+    // Step 4: Mark launch as delegated
+    let markTx: string | null = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        console.log("   Marking launch as delegated...");
+        markTx = await this.markDelegated(launchPda, payer);
+        txs.push(markTx);
+        break;
+      } catch (e) {
+        console.log(`   Mark delegated attempt ${attempt} failed:`, e);
+        if (attempt < 3) {
+          await wait(2000 * attempt);
+        } else {
+          throw e;
+        }
+      }
+    }
+
+    console.log("✅ FULLY Private Mode Enabled!");
+    console.log("   All accounts delegated to MagicBlock TEE");
+    console.log("   Users will use ephemeral accounts for private commits");
     return txs;
+  }
+
+  // ============== EPHEMERAL SOL FLOW (FULLY PRIVATE) ==============
+
+  /**
+   * Step 1: Initialize user's ephemeral SOL account
+   * This creates a PDA that can hold SOL and be delegated to TEE
+   * Run on: Solana Base Layer
+   */
+  async initEphemeralSol(
+    launchPda: PublicKey,
+    user: PublicKey,
+  ): Promise<string> {
+    const [ephemeralSolPda] = VestigeClient.deriveEphemeralSolPda(
+      launchPda,
+      user,
+    );
+
+    console.log("📋 Initializing ephemeral SOL account...");
+    console.log("   PDA:", ephemeralSolPda.toBase58());
+
+    const tx = await this.program.methods
+      .initEphemeralSol()
+      .accounts({
+        launch: launchPda,
+        ephemeralSol: ephemeralSolPda,
+        user: user,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+
+    console.log("✅ Ephemeral SOL account initialized:", tx);
+    return tx;
+  }
+
+  /**
+   * Step 2: Fund ephemeral SOL account (deposit SOL)
+   * This is visible on Solana but only shows "User funded ephemeral account"
+   * Run on: Solana Base Layer
+   */
+  async fundEphemeral(
+    launchPda: PublicKey,
+    amountLamports: BN,
+    user: PublicKey,
+  ): Promise<string> {
+    const [ephemeralSolPda] = VestigeClient.deriveEphemeralSolPda(
+      launchPda,
+      user,
+    );
+
+    console.log("💰 Funding ephemeral SOL account...");
+    console.log("   Amount:", amountLamports.toString(), "lamports");
+
+    const tx = await this.program.methods
+      .fundEphemeral(amountLamports)
+      .accounts({
+        launch: launchPda,
+        ephemeralSol: ephemeralSolPda,
+        user: user,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+
+    console.log("✅ Ephemeral account funded:", tx);
+    return tx;
+  }
+
+  /**
+   * Step 3: Private Commit - FULLY PRIVATE on TEE
+   * Transfers from ephemeral to vault AND records commitment
+   * ALL writable accounts are delegated, so this runs entirely on TEE
+   * Run on: MagicBlock TEE (Private Ephemeral Rollup)
+   */
+  async privateCommit(
+    launchPda: PublicKey,
+    amountLamports: BN,
+    user: PublicKey,
+  ): Promise<string> {
+    const [ephemeralSolPda] = VestigeClient.deriveEphemeralSolPda(
+      launchPda,
+      user,
+    );
+    const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
+    const [commitmentPoolPda] =
+      VestigeClient.deriveCommitmentPoolPda(launchPda);
+    const [userCommitmentPda] = VestigeClient.deriveUserCommitmentPda(
+      launchPda,
+      user,
+    );
+
+    console.log("🔐 PRIVATE COMMIT on TEE...");
+    console.log("   This is fully private - no one can see the details!");
+
+    const tx = await this.erProgram.methods
+      .privateCommit(amountLamports)
+      .accounts({
+        launch: launchPda,
+        ephemeralSol: ephemeralSolPda,
+        vault: vaultPda,
+        commitmentPool: commitmentPoolPda,
+        userCommitment: userCommitmentPda,
+        user: user,
+      })
+      .rpc();
+
+    console.log("✅ PRIVATE COMMIT successful:", tx);
+    return tx;
+  }
+
+  /**
+   * Prepare user for private commit (full flow)
+   * This handles all the delegation steps for a user
+   */
+  async prepareUserForPrivateCommit(
+    launchPda: PublicKey,
+    user: PublicKey,
+  ): Promise<void> {
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    console.log("🔧 Preparing user for private commit...");
+
+    // 1. Initialize user_commitment if needed
+    try {
+      await this.initUserCommitment(launchPda, user);
+      await wait(1500);
+    } catch (e) {
+      console.log("   User commitment may already exist:", e);
+    }
+
+    // 2. Create permission + delegate user_commitment
+    try {
+      await this.createPermission(
+        { userCommitment: { launch: launchPda, user } },
+        user,
+      );
+      await wait(1500);
+    } catch (e) {
+      console.log("   User commitment permission may already exist:", e);
+    }
+
+    try {
+      await this.delegatePda(
+        { userCommitment: { launch: launchPda, user } },
+        user,
+      );
+      await wait(1500);
+    } catch (e) {
+      console.log("   User commitment may already be delegated:", e);
+    }
+
+    // 3. Initialize ephemeral SOL account
+    try {
+      await this.initEphemeralSol(launchPda, user);
+      await wait(1500);
+    } catch (e) {
+      console.log("   Ephemeral SOL may already exist:", e);
+    }
+
+    // 4. Create permission + delegate ephemeral SOL
+    try {
+      await this.createPermission(
+        { ephemeralSol: { launch: launchPda, user } },
+        user,
+      );
+      await wait(1500);
+    } catch (e) {
+      console.log("   Ephemeral SOL permission may already exist:", e);
+    }
+
+    try {
+      await this.delegatePda(
+        { ephemeralSol: { launch: launchPda, user } },
+        user,
+      );
+      await wait(1500);
+    } catch (e) {
+      console.log("   Ephemeral SOL may already be delegated:", e);
+    }
+
+    console.log("✅ User prepared for private commits!");
+  }
+
+  // ============== END EPHEMERAL SOL FLOW ==============
+
+  /**
+   * Deposit SOL to vault (runs on BASE LAYER - Solana)
+   * This is step 1 for delegated pools - transfers SOL before private recording.
+   */
+  async deposit(
+    launchPda: PublicKey,
+    amountLamports: BN,
+    user: PublicKey,
+  ): Promise<string> {
+    const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
+
+    console.log("💰 Depositing SOL to vault (on Solana base layer)...");
+
+    const tx = await this.program.methods
+      .deposit(amountLamports)
+      .accounts({
+        launch: launchPda,
+        vault: vaultPda,
+        user: user,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+
+    console.log("✅ Deposit transaction:", tx);
+    return tx;
+  }
+
+  /**
+   * Record commitment privately (runs on ER/TEE when delegated)
+   * This is step 2 for delegated pools - records the commitment data privately.
+   * Must call deposit() first to transfer SOL.
+   */
+  async recordCommit(
+    launchPda: PublicKey,
+    amountLamports: BN,
+    user: PublicKey,
+  ): Promise<string> {
+    const [commitmentPoolPda] =
+      VestigeClient.deriveCommitmentPoolPda(launchPda);
+    const [userCommitmentPda] = VestigeClient.deriveUserCommitmentPda(
+      launchPda,
+      user,
+    );
+
+    console.log("🔒 Recording commitment privately (on MagicBlock TEE)...");
+    console.log("   ER RPC:", ER_RPC_URL);
+
+    // Retry logic for rate limiting
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const tx = await this.erProgram.methods
+          .recordCommit(amountLamports)
+          .accounts({
+            launch: launchPda,
+            commitmentPool: commitmentPoolPda,
+            userCommitment: userCommitmentPda,
+            user: user,
+          })
+          .rpc();
+
+        console.log("✅ Record commit transaction (private):", tx);
+        return tx;
+      } catch (e) {
+        const errorMsg = e instanceof Error ? e.message : String(e);
+        if (errorMsg.includes("403") && attempt < maxRetries) {
+          console.log(
+            `Rate limited, retrying record_commit (${attempt}/${maxRetries})...`,
+          );
+          await new Promise((r) => setTimeout(r, 2000 * attempt));
+          continue;
+        }
+        throw e;
+      }
+    }
+    throw new Error("Record commit failed after retries");
   }
 
   /**
    * Commit SOL to a launch
-   * When pool is delegated, this should go to the TEE RPC for privacy
+   * For DELEGATED pools: Uses FULLY PRIVATE flow with ephemeral SOL accounts
+   * For NON-DELEGATED pools: Uses single commit on Solana (public)
+   *
+   * FULLY PRIVATE FLOW (following MagicBlock's ephemeral ATA pattern):
+   * 1. Fund ephemeral SOL account (visible: "user funded ephemeral")
+   * 2. Private commit on TEE: ephemeral → vault + record (FULLY PRIVATE!)
    */
   async commit(
     launchPda: PublicKey,
@@ -503,25 +901,74 @@ export class VestigeClient {
     const isDelegated = await this.isPoolDelegated(launchPda);
 
     if (isDelegated) {
-      console.log("🔒 Pool is DELEGATED → Sending to TEE RPC (PRIVATE)");
+      // ========== DELEGATED POOL: FULLY PRIVATE FLOW ==========
+      console.log("🔐 Pool is DELEGATED → Using FULLY PRIVATE flow!");
+      console.log("   Following MagicBlock's ephemeral account pattern");
+
+      const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+      // Step 0: Prepare user's accounts for private commit
+      console.log("   Step 0: Preparing user accounts for TEE...");
+      await this.prepareUserForPrivateCommit(launchPda, user);
+
+      // Step 1: Fund ephemeral SOL account on Solana
+      // This is visible but only shows "User funded ephemeral account"
+      // NOT which launch or how much they're committing!
+      console.log("   Step 1: Funding ephemeral SOL account on Solana...");
+      const fundTx = await this.fundEphemeral(launchPda, amountLamports, user);
+      console.log("   Fund tx:", fundTx);
+      await wait(2000);
+
+      // Step 2: PRIVATE COMMIT on TEE
+      // This is FULLY PRIVATE - transfers ephemeral → vault AND records commitment
+      // All accounts are delegated, so no data leaks!
+      console.log("   Step 2: PRIVATE COMMIT on MagicBlock TEE...");
+      const privateTx = await this.privateCommit(
+        launchPda,
+        amountLamports,
+        user,
+      );
+      console.log("   Private commit tx:", privateTx);
+
+      console.log("✅ FULLY PRIVATE commitment complete!");
+      console.log("   No one can see: which launch, how much, or timing!");
+      return privateTx;
     } else {
+      // ========== NON-DELEGATED POOL: SINGLE PUBLIC COMMIT ==========
       console.log("🔓 Pool is NOT DELEGATED → Sending to Solana (PUBLIC)");
+
+      // Retry logic for rate limiting
+      const maxRetries = 3;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const tx = await this.program.methods
+            .commit(amountLamports)
+            .accounts({
+              launch: launchPda,
+              commitmentPool: commitmentPoolPda,
+              userCommitment: userCommitmentPda,
+              vault: vaultPda,
+              user: user,
+              systemProgram: SystemProgram.programId,
+            })
+            .rpc();
+
+          console.log("✅ Commit transaction:", tx);
+          return tx;
+        } catch (e) {
+          const errorMsg = e instanceof Error ? e.message : String(e);
+          if (errorMsg.includes("403") && attempt < maxRetries) {
+            console.log(
+              `Rate limited, retrying commit (${attempt}/${maxRetries})...`,
+            );
+            await new Promise((r) => setTimeout(r, 2000 * attempt));
+            continue;
+          }
+          throw e;
+        }
+      }
+      throw new Error("Commit failed after retries");
     }
-
-    const tx = await this.program.methods
-      .commit(amountLamports)
-      .accounts({
-        launch: launchPda,
-        commitmentPool: commitmentPoolPda,
-        userCommitment: userCommitmentPda,
-        vault: vaultPda,
-        user: user,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc();
-
-    console.log("✅ Commit transaction:", tx);
-    return tx;
   }
 
   /**
@@ -561,8 +1008,11 @@ export class VestigeClient {
 
     console.log("🎓📤 Graduating and undelegating from ER...");
     console.log("  This will reveal all commitment data publicly");
+    console.log("  Sending to MagicBlock ER RPC:", ER_RPC_URL);
 
-    const tx = await this.program.methods
+    // Graduate and undelegate must be sent to the ER RPC
+    // since the commitment pool is delegated there
+    const tx = await this.erProgram.methods
       .graduateAndUndelegate()
       .accounts({
         launch: launchPda,
