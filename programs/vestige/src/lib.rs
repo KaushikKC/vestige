@@ -20,6 +20,7 @@ pub const COMMITMENT_POOL_SEED: &[u8] = b"commitment_pool";
 pub const USER_COMMITMENT_SEED: &[u8] = b"user_commitment";
 pub const VAULT_SEED: &[u8] = b"vault";
 pub const EPHEMERAL_SOL_SEED: &[u8] = b"ephemeral_sol"; // User's private SOL holding account
+pub const SWEPT_SEED: &[u8] = b"swept"; // Marks that user has swept ephemeral SOL to vault
 
 // Constants
 pub const EARLY_BONUS_ALPHA: u64 = 50; // 50% bonus for earliest participants
@@ -261,10 +262,11 @@ pub mod vestige {
         Ok(())
     }
 
-    /// Step 3: Private Commit - Transfer from ephemeral to vault AND record commitment
+    /// Step 3: Private Commit - Record commitment only (no vault transfer)
+    /// Vault cannot be delegated (system-owned). SOL stays in ephemeral_sol; transfer to vault
+    /// later via sweep_ephemeral_to_vault on Solana.
     /// THIS IS THE FULLY PRIVATE OPERATION - runs entirely on TEE
-    /// All accounts (ephemeral_sol, vault, commitment_pool, user_commitment) must be delegated
-    /// Observers cannot see: which launch, how much, timing weights
+    /// All writable accounts (ephemeral_sol, commitment_pool, user_commitment) must be delegated
     /// Run on: MagicBlock TEE (Private Ephemeral Rollup)
     pub fn private_commit(ctx: Context<PrivateCommit>, amount: u64) -> Result<()> {
         let launch = &ctx.accounts.launch;
@@ -280,15 +282,10 @@ pub mod vestige {
         require!(amount >= launch.min_commitment, VestigeError::BelowMinCommitment);
         require!(amount <= launch.max_commitment, VestigeError::AboveMaxCommitment);
 
-        // Check ephemeral balance
+        // Check ephemeral balance (SOL stays here until sweep on Solana)
         require!(ctx.accounts.ephemeral_sol.balance >= amount, VestigeError::InsufficientEphemeralBalance);
 
-        // Transfer SOL from ephemeral account to vault (PRIVATE - on TEE!)
-        // This is the key privacy feature - the transfer happens inside TEE
-        **ctx.accounts.ephemeral_sol.to_account_info().try_borrow_mut_lamports()? -= amount;
-        **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? += amount;
-
-        // Update ephemeral balance tracking
+        // Update ephemeral balance tracking (lamports stay in ephemeral_sol; sweep to vault later)
         ctx.accounts.ephemeral_sol.balance = ctx.accounts.ephemeral_sol.balance.checked_sub(amount).unwrap();
 
         // Record the commitment (PRIVATE - on TEE!)
@@ -311,7 +308,29 @@ pub mod vestige {
             commitment_pool.total_participants = commitment_pool.total_participants.checked_add(1).unwrap();
         }
 
-        msg!("PRIVATE COMMIT: {} lamports committed secretly", amount);
+        msg!("PRIVATE COMMIT: {} lamports committed secretly (sweep to vault on Solana later)", amount);
+        Ok(())
+    }
+
+    /// Sweep committed SOL from ephemeral_sol to vault (runs on Solana base layer)
+    /// Vault is not delegated; only program-owned accounts are delegated. Call this after
+    /// private_commit once ephemeral_sol is undelegated (e.g. after graduation or when user finalizes).
+    pub fn sweep_ephemeral_to_vault(ctx: Context<SweepEphemeralToVault>) -> Result<()> {
+        let amount = ctx.accounts.user_commitment.amount;
+        require!(amount > 0, VestigeError::NothingToSweep);
+
+        let ephemeral_info = ctx.accounts.ephemeral_sol.to_account_info();
+        let vault_info = ctx.accounts.vault.to_account_info();
+        let lamports = ephemeral_info.lamports();
+        let rent = Rent::get()?.minimum_balance(0);
+        let available = lamports.checked_sub(rent).unwrap_or(0);
+        require!(available >= amount, VestigeError::InsufficientEphemeralBalance);
+
+        // Transfer SOL from ephemeral_sol to vault (on Solana - vault is not delegated)
+        **ephemeral_info.try_borrow_mut_lamports()? -= amount;
+        **vault_info.try_borrow_mut_lamports()? += amount;
+
+        msg!("Swept {} lamports from ephemeral to vault", amount);
         Ok(())
     }
 
@@ -956,8 +975,8 @@ pub struct FundEphemeral<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// Private Commit - Fully private operation on TEE
-/// All writable accounts (ephemeral_sol, vault, commitment_pool, user_commitment) must be delegated
+/// Private Commit - Fully private operation on TEE (no vault - vault is not delegated)
+/// All writable accounts (ephemeral_sol, commitment_pool, user_commitment) must be delegated
 /// Run on: MagicBlock TEE (Private Ephemeral Rollup)
 #[derive(Accounts)]
 pub struct PrivateCommit<'info> {
@@ -975,15 +994,6 @@ pub struct PrivateCommit<'info> {
         bump = ephemeral_sol.bump
     )]
     pub ephemeral_sol: Account<'info, EphemeralSol>,
-
-    /// Vault - MUST be delegated to TEE
-    /// CHECK: Vault PDA to receive SOL
-    #[account(
-        mut,
-        seeds = [VAULT_SEED, launch.key().as_ref()],
-        bump
-    )]
-    pub vault: AccountInfo<'info>,
 
     /// Commitment pool - MUST be delegated to TEE
     #[account(
@@ -1003,6 +1013,43 @@ pub struct PrivateCommit<'info> {
 
     /// User (signer only, NOT writable - so this CAN run on TEE!)
     pub user: Signer<'info>,
+}
+
+/// Sweep committed SOL from ephemeral_sol to vault (runs on Solana - vault is not delegated)
+#[derive(Accounts)]
+pub struct SweepEphemeralToVault<'info> {
+    #[account(
+        seeds = [LAUNCH_SEED, launch.creator.as_ref(), launch.token_mint.as_ref()],
+        bump = launch.bump
+    )]
+    pub launch: Account<'info, Launch>,
+
+    /// Ephemeral SOL account (must be undelegated so Vestige owns it on Solana)
+    #[account(
+        mut,
+        seeds = [EPHEMERAL_SOL_SEED, launch.key().as_ref(), user.key().as_ref()],
+        bump = ephemeral_sol.bump
+    )]
+    pub ephemeral_sol: Account<'info, EphemeralSol>,
+
+    /// CHECK: Vault PDA to receive SOL (system-owned, not delegated)
+    #[account(
+        mut,
+        seeds = [VAULT_SEED, launch.key().as_ref()],
+        bump
+    )]
+    pub vault: AccountInfo<'info>,
+
+    #[account(
+        seeds = [USER_COMMITMENT_SEED, launch.key().as_ref(), user.key().as_ref()],
+        bump = user_commitment.bump
+    )]
+    pub user_commitment: Account<'info, UserCommitment>,
+
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
 }
 
 // ============== END EPHEMERAL SOL CONTEXTS ==============
@@ -1202,4 +1249,6 @@ pub enum VestigeError {
     NoCommitment,
     #[msg("Insufficient balance in ephemeral SOL account")]
     InsufficientEphemeralBalance,
+    #[msg("Nothing to sweep to vault")]
+    NothingToSweep,
 }

@@ -16,6 +16,11 @@ import {
 } from "@solana/spl-token";
 import { expect } from "chai";
 
+/**
+ * Vestige tests: PUBLIC (non-delegated) flow only.
+ * Commit/graduate/allocation run on Solana. For the PRIVATE (TEE) flow
+ * (ephemeral SOL → vault + commitment on MagicBlock ER), see TESTING.md.
+ */
 describe("vestige", () => {
   // Configure the client to use the local cluster
   const provider = anchor.AnchorProvider.env();
@@ -61,7 +66,7 @@ describe("vestige", () => {
     ]);
 
     // Wait for airdrops to confirm
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // Create token mint
     tokenMint = await createMint(
@@ -69,7 +74,7 @@ describe("vestige", () => {
       creator,
       creator.publicKey,
       null,
-      9 // 9 decimals
+      9, // 9 decimals
     );
 
     console.log("Token Mint:", tokenMint.toBase58());
@@ -82,18 +87,23 @@ describe("vestige", () => {
     it("should initialize a new token launch", async () => {
       // Derive PDAs
       [launchPda, launchBump] = PublicKey.findProgramAddressSync(
-        [Buffer.from("launch"), creator.publicKey.toBuffer(), tokenMint.toBuffer()],
-        program.programId
+        [
+          Buffer.from("launch"),
+          creator.publicKey.toBuffer(),
+          tokenMint.toBuffer(),
+        ],
+        program.programId,
       );
 
-      [commitmentPoolPda, commitmentPoolBump] = PublicKey.findProgramAddressSync(
-        [Buffer.from("commitment_pool"), launchPda.toBuffer()],
-        program.programId
-      );
+      [commitmentPoolPda, commitmentPoolBump] =
+        PublicKey.findProgramAddressSync(
+          [Buffer.from("commitment_pool"), launchPda.toBuffer()],
+          program.programId,
+        );
 
       [vaultPda, vaultBump] = PublicKey.findProgramAddressSync(
         [Buffer.from("vault"), launchPda.toBuffer()],
-        program.programId
+        program.programId,
       );
 
       // Set launch timing (start now, end in 1 hour)
@@ -113,7 +123,7 @@ describe("vestige", () => {
           endTime,
           GRADUATION_TARGET,
           MIN_COMMITMENT,
-          MAX_COMMITMENT
+          MAX_COMMITMENT,
         )
         .accounts({
           launch: launchPda,
@@ -130,12 +140,22 @@ describe("vestige", () => {
 
       // Verify launch state
       const launchAccount = await program.account.launch.fetch(launchPda);
-      expect(launchAccount.creator.toBase58()).to.equal(creator.publicKey.toBase58());
+      expect(launchAccount.creator.toBase58()).to.equal(
+        creator.publicKey.toBase58(),
+      );
       expect(launchAccount.tokenMint.toBase58()).to.equal(tokenMint.toBase58());
-      expect(launchAccount.tokenSupply.toString()).to.equal(TOKEN_SUPPLY.toString());
-      expect(launchAccount.graduationTarget.toString()).to.equal(GRADUATION_TARGET.toString());
-      expect(launchAccount.minCommitment.toString()).to.equal(MIN_COMMITMENT.toString());
-      expect(launchAccount.maxCommitment.toString()).to.equal(MAX_COMMITMENT.toString());
+      expect(launchAccount.tokenSupply.toString()).to.equal(
+        TOKEN_SUPPLY.toString(),
+      );
+      expect(launchAccount.graduationTarget.toString()).to.equal(
+        GRADUATION_TARGET.toString(),
+      );
+      expect(launchAccount.minCommitment.toString()).to.equal(
+        MIN_COMMITMENT.toString(),
+      );
+      expect(launchAccount.maxCommitment.toString()).to.equal(
+        MAX_COMMITMENT.toString(),
+      );
       expect(launchAccount.totalCommitted.toString()).to.equal("0");
       expect(launchAccount.totalParticipants.toString()).to.equal("0");
       expect(launchAccount.isGraduated).to.equal(false);
@@ -150,22 +170,26 @@ describe("vestige", () => {
         creator,
         creator.publicKey,
         null,
-        9
+        9,
       );
 
       const [newLaunchPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("launch"), creator.publicKey.toBuffer(), newTokenMint.toBuffer()],
-        program.programId
+        [
+          Buffer.from("launch"),
+          creator.publicKey.toBuffer(),
+          newTokenMint.toBuffer(),
+        ],
+        program.programId,
       );
 
       const [newCommitmentPoolPda] = PublicKey.findProgramAddressSync(
         [Buffer.from("commitment_pool"), newLaunchPda.toBuffer()],
-        program.programId
+        program.programId,
       );
 
       const [newVaultPda] = PublicKey.findProgramAddressSync(
         [Buffer.from("vault"), newLaunchPda.toBuffer()],
-        program.programId
+        program.programId,
       );
 
       const now = Math.floor(Date.now() / 1000);
@@ -180,7 +204,7 @@ describe("vestige", () => {
             endTime,
             GRADUATION_TARGET,
             MIN_COMMITMENT,
-            MAX_COMMITMENT
+            MAX_COMMITMENT,
           )
           .accounts({
             launch: newLaunchPda,
@@ -205,8 +229,12 @@ describe("vestige", () => {
     it("should allow user1 to commit SOL", async () => {
       // Derive user1's commitment PDA
       [user1CommitmentPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("user_commitment"), launchPda.toBuffer(), user1.publicKey.toBuffer()],
-        program.programId
+        [
+          Buffer.from("user_commitment"),
+          launchPda.toBuffer(),
+          user1.publicKey.toBuffer(),
+        ],
+        program.programId,
       );
 
       const commitAmount = new anchor.BN(1 * LAMPORTS_PER_SOL); // 1 SOL
@@ -231,14 +259,22 @@ describe("vestige", () => {
       console.log("User1 Commit TX:", tx);
 
       // Verify user commitment
-      const userCommitment = await program.account.userCommitment.fetch(user1CommitmentPda);
-      expect(userCommitment.user.toBase58()).to.equal(user1.publicKey.toBase58());
+      const userCommitment = await program.account.userCommitment.fetch(
+        user1CommitmentPda,
+      );
+      expect(userCommitment.user.toBase58()).to.equal(
+        user1.publicKey.toBase58(),
+      );
       expect(userCommitment.launch.toBase58()).to.equal(launchPda.toBase58());
-      expect(userCommitment.amount.toString()).to.equal(commitAmount.toString());
+      expect(userCommitment.amount.toString()).to.equal(
+        commitAmount.toString(),
+      );
       expect(userCommitment.hasClaimed).to.equal(false);
 
       // Verify pool totals
-      const pool = await program.account.commitmentPool.fetch(commitmentPoolPda);
+      const pool = await program.account.commitmentPool.fetch(
+        commitmentPoolPda,
+      );
       expect(pool.totalCommitted.toString()).to.equal(commitAmount.toString());
       expect(pool.totalParticipants.toString()).to.equal("1");
 
@@ -248,8 +284,12 @@ describe("vestige", () => {
     it("should allow user2 to commit SOL", async () => {
       // Derive user2's commitment PDA
       [user2CommitmentPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("user_commitment"), launchPda.toBuffer(), user2.publicKey.toBuffer()],
-        program.programId
+        [
+          Buffer.from("user_commitment"),
+          launchPda.toBuffer(),
+          user2.publicKey.toBuffer(),
+        ],
+        program.programId,
       );
 
       const commitAmount = new anchor.BN(2 * LAMPORTS_PER_SOL); // 2 SOL
@@ -273,8 +313,12 @@ describe("vestige", () => {
       console.log("User2 Commit TX:", tx);
 
       // Verify pool totals
-      const pool = await program.account.commitmentPool.fetch(commitmentPoolPda);
-      expect(pool.totalCommitted.toString()).to.equal((3 * LAMPORTS_PER_SOL).toString()); // 1 + 2 SOL
+      const pool = await program.account.commitmentPool.fetch(
+        commitmentPoolPda,
+      );
+      expect(pool.totalCommitted.toString()).to.equal(
+        (3 * LAMPORTS_PER_SOL).toString(),
+      ); // 1 + 2 SOL
       expect(pool.totalParticipants.toString()).to.equal("2");
 
       console.log("User2 commitment successful!");
@@ -282,12 +326,19 @@ describe("vestige", () => {
 
     it("should fail commitment below minimum", async () => {
       const user3 = Keypair.generate();
-      await provider.connection.requestAirdrop(user3.publicKey, 10 * LAMPORTS_PER_SOL);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await provider.connection.requestAirdrop(
+        user3.publicKey,
+        10 * LAMPORTS_PER_SOL,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       const [user3CommitmentPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("user_commitment"), launchPda.toBuffer(), user3.publicKey.toBuffer()],
-        program.programId
+        [
+          Buffer.from("user_commitment"),
+          launchPda.toBuffer(),
+          user3.publicKey.toBuffer(),
+        ],
+        program.programId,
       );
 
       const tooSmallAmount = new anchor.BN(0.01 * LAMPORTS_PER_SOL); // 0.01 SOL (below min)
@@ -315,12 +366,19 @@ describe("vestige", () => {
 
     it("should fail commitment above maximum", async () => {
       const user4 = Keypair.generate();
-      await provider.connection.requestAirdrop(user4.publicKey, 20 * LAMPORTS_PER_SOL);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await provider.connection.requestAirdrop(
+        user4.publicKey,
+        20 * LAMPORTS_PER_SOL,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       const [user4CommitmentPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("user_commitment"), launchPda.toBuffer(), user4.publicKey.toBuffer()],
-        program.programId
+        [
+          Buffer.from("user_commitment"),
+          launchPda.toBuffer(),
+          user4.publicKey.toBuffer(),
+        ],
+        program.programId,
       );
 
       const tooLargeAmount = new anchor.BN(10 * LAMPORTS_PER_SOL); // 10 SOL (above max)
@@ -349,7 +407,9 @@ describe("vestige", () => {
     it("should allow additional commitment from existing user", async () => {
       const additionalAmount = new anchor.BN(0.5 * LAMPORTS_PER_SOL); // 0.5 SOL
 
-      const poolBefore = await program.account.commitmentPool.fetch(commitmentPoolPda);
+      const poolBefore = await program.account.commitmentPool.fetch(
+        commitmentPoolPda,
+      );
       const participantsBefore = poolBefore.totalParticipants;
 
       const tx = await program.methods
@@ -368,13 +428,23 @@ describe("vestige", () => {
       console.log("Additional Commit TX:", tx);
 
       // Verify user commitment increased
-      const userCommitment = await program.account.userCommitment.fetch(user1CommitmentPda);
-      expect(userCommitment.amount.toString()).to.equal((1.5 * LAMPORTS_PER_SOL).toString());
+      const userCommitment = await program.account.userCommitment.fetch(
+        user1CommitmentPda,
+      );
+      expect(userCommitment.amount.toString()).to.equal(
+        (1.5 * LAMPORTS_PER_SOL).toString(),
+      );
 
       // Verify participant count didn't increase
-      const poolAfter = await program.account.commitmentPool.fetch(commitmentPoolPda);
-      expect(poolAfter.totalParticipants.toString()).to.equal(participantsBefore.toString());
-      expect(poolAfter.totalCommitted.toString()).to.equal((3.5 * LAMPORTS_PER_SOL).toString());
+      const poolAfter = await program.account.commitmentPool.fetch(
+        commitmentPoolPda,
+      );
+      expect(poolAfter.totalParticipants.toString()).to.equal(
+        participantsBefore.toString(),
+      );
+      expect(poolAfter.totalCommitted.toString()).to.equal(
+        (3.5 * LAMPORTS_PER_SOL).toString(),
+      );
 
       console.log("Additional commitment successful!");
     });
@@ -397,15 +467,22 @@ describe("vestige", () => {
         const user = Keypair.generate();
         additionalUsers.push(user);
 
-        await provider.connection.requestAirdrop(user.publicKey, 10 * LAMPORTS_PER_SOL);
+        await provider.connection.requestAirdrop(
+          user.publicKey,
+          10 * LAMPORTS_PER_SOL,
+        );
       }
 
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       for (let i = 0; i < 3; i++) {
         const [commitmentPda] = PublicKey.findProgramAddressSync(
-          [Buffer.from("user_commitment"), launchPda.toBuffer(), additionalUsers[i].publicKey.toBuffer()],
-          program.programId
+          [
+            Buffer.from("user_commitment"),
+            launchPda.toBuffer(),
+            additionalUsers[i].publicKey.toBuffer(),
+          ],
+          program.programId,
         );
         additionalCommitmentPdas.push(commitmentPda);
 
@@ -426,9 +503,15 @@ describe("vestige", () => {
       }
 
       // Now total should be 3.5 + (3 * 2.5) = 11 SOL, which exceeds 10 SOL target
-      const pool = await program.account.commitmentPool.fetch(commitmentPoolPda);
+      const pool = await program.account.commitmentPool.fetch(
+        commitmentPoolPda,
+      );
       console.log("\n--- Pre-Graduation State ---");
-      console.log("Total Committed:", pool.totalCommitted.toString(), "lamports");
+      console.log(
+        "Total Committed:",
+        pool.totalCommitted.toString(),
+        "lamports",
+      );
       console.log("Total Participants:", pool.totalParticipants.toString());
 
       // Graduate the launch
@@ -448,12 +531,19 @@ describe("vestige", () => {
       // Verify launch is graduated
       const launchAccount = await program.account.launch.fetch(launchPda);
       expect(launchAccount.isGraduated).to.equal(true);
-      expect(launchAccount.totalCommitted.toString()).to.equal(pool.totalCommitted.toString());
-      expect(launchAccount.totalParticipants.toString()).to.equal(pool.totalParticipants.toString());
+      expect(launchAccount.totalCommitted.toString()).to.equal(
+        pool.totalCommitted.toString(),
+      );
+      expect(launchAccount.totalParticipants.toString()).to.equal(
+        pool.totalParticipants.toString(),
+      );
       expect(launchAccount.graduationTime.toNumber()).to.be.greaterThan(0);
 
       console.log("Launch graduated successfully!");
-      console.log("Graduation Time:", new Date(launchAccount.graduationTime.toNumber() * 1000).toISOString());
+      console.log(
+        "Graduation Time:",
+        new Date(launchAccount.graduationTime.toNumber() * 1000).toISOString(),
+      );
     });
 
     it("should fail to graduate already graduated launch", async () => {
@@ -493,12 +583,17 @@ describe("vestige", () => {
       console.log("Calculate Allocation TX:", tx);
 
       // Verify allocation was calculated
-      const userCommitment = await program.account.userCommitment.fetch(user1CommitmentPda);
+      const userCommitment = await program.account.userCommitment.fetch(
+        user1CommitmentPda,
+      );
       expect(userCommitment.tokensAllocated.toNumber()).to.be.greaterThan(0);
       expect(userCommitment.weight.toNumber()).to.be.greaterThan(0);
 
       console.log("User1 Weight:", userCommitment.weight.toString());
-      console.log("User1 Tokens Allocated:", userCommitment.tokensAllocated.toString());
+      console.log(
+        "User1 Tokens Allocated:",
+        userCommitment.tokensAllocated.toString(),
+      );
     });
 
     it("should calculate allocation for user2", async () => {
@@ -516,9 +611,14 @@ describe("vestige", () => {
 
       console.log("Calculate Allocation TX:", tx);
 
-      const userCommitment = await program.account.userCommitment.fetch(user2CommitmentPda);
+      const userCommitment = await program.account.userCommitment.fetch(
+        user2CommitmentPda,
+      );
       console.log("User2 Weight:", userCommitment.weight.toString());
-      console.log("User2 Tokens Allocated:", userCommitment.tokensAllocated.toString());
+      console.log(
+        "User2 Tokens Allocated:",
+        userCommitment.tokensAllocated.toString(),
+      );
     });
 
     it("should fail to recalculate allocation", async () => {
@@ -557,9 +657,15 @@ describe("vestige", () => {
       console.log("Creator:", launchAccount.creator.toBase58());
       console.log("Token Mint:", launchAccount.tokenMint.toBase58());
       console.log("Token Supply:", launchAccount.tokenSupply.toString());
-      console.log("Graduation Target:", launchAccount.graduationTarget.toString());
+      console.log(
+        "Graduation Target:",
+        launchAccount.graduationTarget.toString(),
+      );
       console.log("Total Committed:", launchAccount.totalCommitted.toString());
-      console.log("Total Participants:", launchAccount.totalParticipants.toString());
+      console.log(
+        "Total Participants:",
+        launchAccount.totalParticipants.toString(),
+      );
       console.log("Is Graduated:", launchAccount.isGraduated);
       console.log("Is Delegated:", launchAccount.isDelegated);
     });
@@ -572,32 +678,68 @@ describe("vestige", () => {
       console.log("========================================\n");
 
       const launchAccount = await program.account.launch.fetch(launchPda);
-      const poolAccount = await program.account.commitmentPool.fetch(commitmentPoolPda);
-      const user1Commitment = await program.account.userCommitment.fetch(user1CommitmentPda);
-      const user2Commitment = await program.account.userCommitment.fetch(user2CommitmentPda);
+      const poolAccount = await program.account.commitmentPool.fetch(
+        commitmentPoolPda,
+      );
+      const user1Commitment = await program.account.userCommitment.fetch(
+        user1CommitmentPda,
+      );
+      const user2Commitment = await program.account.userCommitment.fetch(
+        user2CommitmentPda,
+      );
 
       console.log("LAUNCH DETAILS:");
       console.log("-".repeat(40));
-      console.log(`  Token Supply: ${launchAccount.tokenSupply.toString()} tokens`);
-      console.log(`  Graduation Target: ${launchAccount.graduationTarget.toNumber() / LAMPORTS_PER_SOL} SOL`);
-      console.log(`  Total Raised: ${launchAccount.totalCommitted.toNumber() / LAMPORTS_PER_SOL} SOL`);
-      console.log(`  Total Participants: ${launchAccount.totalParticipants.toString()}`);
+      console.log(
+        `  Token Supply: ${launchAccount.tokenSupply.toString()} tokens`,
+      );
+      console.log(
+        `  Graduation Target: ${
+          launchAccount.graduationTarget.toNumber() / LAMPORTS_PER_SOL
+        } SOL`,
+      );
+      console.log(
+        `  Total Raised: ${
+          launchAccount.totalCommitted.toNumber() / LAMPORTS_PER_SOL
+        } SOL`,
+      );
+      console.log(
+        `  Total Participants: ${launchAccount.totalParticipants.toString()}`,
+      );
       console.log(`  Is Graduated: ${launchAccount.isGraduated}`);
       console.log(`  Is Delegated (Private): ${launchAccount.isDelegated}`);
 
       console.log("\nUSER COMMITMENTS:");
       console.log("-".repeat(40));
-      console.log(`  User1: ${user1Commitment.amount.toNumber() / LAMPORTS_PER_SOL} SOL`);
-      console.log(`    - Weight: ${user1Commitment.weight.toString()} (${(user1Commitment.weight.toNumber() / 100).toFixed(2)}%)`);
-      console.log(`    - Tokens: ${user1Commitment.tokensAllocated.toString()}`);
-      console.log(`  User2: ${user2Commitment.amount.toNumber() / LAMPORTS_PER_SOL} SOL`);
-      console.log(`    - Weight: ${user2Commitment.weight.toString()} (${(user2Commitment.weight.toNumber() / 100).toFixed(2)}%)`);
-      console.log(`    - Tokens: ${user2Commitment.tokensAllocated.toString()}`);
+      console.log(
+        `  User1: ${user1Commitment.amount.toNumber() / LAMPORTS_PER_SOL} SOL`,
+      );
+      console.log(
+        `    - Weight: ${user1Commitment.weight.toString()} (${(
+          user1Commitment.weight.toNumber() / 100
+        ).toFixed(2)}%)`,
+      );
+      console.log(
+        `    - Tokens: ${user1Commitment.tokensAllocated.toString()}`,
+      );
+      console.log(
+        `  User2: ${user2Commitment.amount.toNumber() / LAMPORTS_PER_SOL} SOL`,
+      );
+      console.log(
+        `    - Weight: ${user2Commitment.weight.toString()} (${(
+          user2Commitment.weight.toNumber() / 100
+        ).toFixed(2)}%)`,
+      );
+      console.log(
+        `    - Tokens: ${user2Commitment.tokensAllocated.toString()}`,
+      );
 
       console.log("\nPRIVACY FEATURES:");
       console.log("-".repeat(40));
       console.log("  - Commitment pool can be delegated to MagicBlock ER");
-      console.log("  - When delegated, all commits are private until graduation");
+      console.log(
+        "  - When delegated, all commits are private until graduation",
+      );
       console.log("  - Token allocations revealed only after graduation");
 
       console.log("\n========================================");

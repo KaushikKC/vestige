@@ -1274,10 +1274,11 @@
     {
       "name": "private_commit",
       "docs": [
-        "Step 3: Private Commit - Transfer from ephemeral to vault AND record commitment",
+        "Step 3: Private Commit - Record commitment only (no vault transfer)",
+        "Vault cannot be delegated (system-owned). SOL stays in ephemeral_sol; transfer to vault",
+        "later via sweep_ephemeral_to_vault on Solana.",
         "THIS IS THE FULLY PRIVATE OPERATION - runs entirely on TEE",
-        "All accounts (ephemeral_sol, vault, commitment_pool, user_commitment) must be delegated",
-        "Observers cannot see: which launch, how much, timing weights",
+        "All writable accounts (ephemeral_sol, commitment_pool, user_commitment) must be delegated",
         "Run on: MagicBlock TEE (Private Ephemeral Rollup)"
       ],
       "discriminator": [
@@ -1355,31 +1356,6 @@
               {
                 "kind": "account",
                 "path": "user"
-              }
-            ]
-          }
-        },
-        {
-          "name": "vault",
-          "docs": [
-            "Vault - MUST be delegated to TEE"
-          ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
               }
             ]
           }
@@ -1644,6 +1620,158 @@
       ]
     },
     {
+      "name": "sweep_ephemeral_to_vault",
+      "docs": [
+        "Sweep committed SOL from ephemeral_sol to vault (runs on Solana base layer)",
+        "Vault is not delegated; only program-owned accounts are delegated. Call this after",
+        "private_commit once ephemeral_sol is undelegated (e.g. after graduation or when user finalizes)."
+      ],
+      "discriminator": [
+        111,
+        44,
+        21,
+        180,
+        122,
+        87,
+        15,
+        197
+      ],
+      "accounts": [
+        {
+          "name": "launch",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch.creator",
+                "account": "Launch"
+              },
+              {
+                "kind": "account",
+                "path": "launch.token_mint",
+                "account": "Launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ephemeral_sol",
+          "docs": [
+            "Ephemeral SOL account (must be undelegated so Vestige owns it on Solana)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  112,
+                  104,
+                  101,
+                  109,
+                  101,
+                  114,
+                  97,
+                  108,
+                  95,
+                  115,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_commitment",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "withdraw_funds",
       "docs": [
         "Creator withdraws collected SOL after graduation"
@@ -1862,6 +1990,11 @@
       "code": 6017,
       "name": "InsufficientEphemeralBalance",
       "msg": "Insufficient balance in ephemeral SOL account"
+    },
+    {
+      "code": 6018,
+      "name": "NothingToSweep",
+      "msg": "Nothing to sweep to vault"
     }
   ],
   "types": [

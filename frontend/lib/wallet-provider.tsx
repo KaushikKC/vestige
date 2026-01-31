@@ -18,9 +18,22 @@ import "@solana/wallet-adapter-react-ui/styles.css";
 // Network configuration
 export const NETWORK = "devnet";
 
-// Use Solana's public devnet RPC
-// Note: Has rate limits (403 errors), use with retry logic in client
-export const RPC_ENDPOINT = "https://api.devnet.solana.com";
+/**
+ * RPC Endpoint Configuration
+ *
+ * The public Solana RPC has strict rate limits (403 errors).
+ * For better reliability, set NEXT_PUBLIC_SOLANA_RPC_URL in your .env.local:
+ *
+ * Free RPC providers:
+ * - Helius (Recommended): https://dev.helius.xyz/ → https://devnet.helius-rpc.com/?api-key=YOUR_KEY
+ * - QuickNode: https://www.quicknode.com/
+ * - Alchemy: https://www.alchemy.com/
+ *
+ * Example .env.local:
+ * NEXT_PUBLIC_SOLANA_RPC_URL=https://devnet.helius-rpc.com/?api-key=your-api-key
+ */
+export const RPC_ENDPOINT =
+  process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.devnet.solana.com";
 
 // MagicBlock endpoints
 export const MAGICBLOCK_RPC = "https://devnet.magicblock.app";
