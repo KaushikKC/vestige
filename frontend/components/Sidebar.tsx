@@ -142,7 +142,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         {/* Footer - Copyright */}
         <div className="p-8 pt-0 flex-shrink-0">
           <p className="text-[10px] text-white/30 font-medium">
-            © 2024 Vestige Labs.
+            © 2026 Vestige Labs.
           </p>
         </div>
       </div>
