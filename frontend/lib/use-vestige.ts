@@ -271,6 +271,32 @@ export function useVestige() {
     [client, wallet.publicKey],
   );
 
+  // Undelegate ephemeral_sol from ER so user can sweep to vault on Solana (run before Sweep)
+  const undelegateEphemeralSol = useCallback(
+    async (launchPda: PublicKey): Promise<string | null> => {
+      if (!client || !wallet.publicKey) {
+        setError("Wallet not connected");
+        return null;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const tx = await client.undelegateEphemeralSol(
+          launchPda,
+          wallet.publicKey,
+        );
+        return tx;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Unknown error");
+        console.error("Undelegate ephemeral SOL error:", e);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [client, wallet.publicKey],
+  );
+
   // Graduate launch
   const graduate = useCallback(
     async (launchPda: PublicKey): Promise<string | null> => {
@@ -473,6 +499,7 @@ export function useVestige() {
     graduateAndUndelegate,
     finalizeGraduation,
     undelegateUserCommitment,
+    undelegateEphemeralSol,
     graduate,
     calculateAllocation,
     claimTokens,

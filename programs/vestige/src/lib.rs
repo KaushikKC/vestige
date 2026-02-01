@@ -117,6 +117,29 @@ pub mod vestige {
         pool.graduation_time = 0;
         pool.bump = ctx.bumps.commitment_pool;
 
+        // Create vault PDA (owned by this program) so SOL can be swept to it and later withdrawn
+        let vault = &ctx.accounts.vault;
+        let (_, vault_bump) = Pubkey::find_program_address(
+            &[VAULT_SEED, launch.key().as_ref()],
+            ctx.program_id,
+        );
+        let rent = Rent::get()?;
+        let space: u64 = 0;
+        let lamports = rent.minimum_balance(space as usize);
+        system_program::create_account(
+            CpiContext::new_with_signer(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::CreateAccount {
+                    from: ctx.accounts.creator.to_account_info(),
+                    to: vault.to_account_info(),
+                },
+                &[&[VAULT_SEED, launch.key().as_ref(), &[vault_bump]]],
+            ),
+            lamports,
+            space,
+            &crate::ID,
+        )?;
+
         msg!("Vestige Launch Initialized!");
         msg!("Token Supply: {}", token_supply);
         msg!("Graduation Target: {} lamports", graduation_target);
@@ -587,6 +610,21 @@ pub mod vestige {
         Ok(())
     }
 
+    /// Participant (or creator) calls this ON THE ER to undelegate their ephemeral_sol so it syncs
+    /// back to Solana. After this, they can run sweep_ephemeral_to_vault on Solana to move SOL to vault.
+    pub fn undelegate_ephemeral_sol(ctx: Context<UndelegateEphemeralSol>) -> Result<()> {
+        let ephemeral_sol = &ctx.accounts.ephemeral_sol;
+        ephemeral_sol.exit(&crate::ID)?;
+        commit_and_undelegate_accounts(
+            &ctx.accounts.payer,
+            vec![&ephemeral_sol.to_account_info()],
+            &ctx.accounts.magic_context,
+            &ctx.accounts.magic_program,
+        )?;
+        msg!("Ephemeral SOL undelegated and synced to Solana");
+        Ok(())
+    }
+
     /// Calculate user's token allocation based on weighted participation
     /// Formula: weight = 1 + alpha * (1 - t/T)
     /// Early participants get up to 50% bonus tokens
@@ -687,12 +725,14 @@ pub mod vestige {
         require!(launch.is_graduated, VestigeError::NotGraduated);
         require!(ctx.accounts.creator.key() == launch.creator, VestigeError::Unauthorized);
 
-        let vault_balance = ctx.accounts.vault.lamports();
+        let vault_info = ctx.accounts.vault.to_account_info();
+        let vault_balance = vault_info.lamports();
         let rent = Rent::get()?.minimum_balance(0);
         let withdrawable = vault_balance.saturating_sub(rent);
+        require!(withdrawable > 0, VestigeError::NothingToSweep);
 
-        // Transfer SOL from vault to creator
-        **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? -= withdrawable;
+        // Transfer SOL from vault to creator (vault PDA must be owned by this program)
+        **vault_info.try_borrow_mut_lamports()? -= withdrawable;
         **ctx.accounts.creator.to_account_info().try_borrow_mut_lamports()? += withdrawable;
 
         msg!("=== FUNDS WITHDRAWN ===");
@@ -1202,6 +1242,26 @@ pub struct UndelegateUserCommitment<'info> {
     pub payer: Signer<'info>,
 }
 
+/// Context for undelegate_ephemeral_sol (runs on ER so ephemeral_sol syncs to Solana; then user can sweep)
+#[commit]
+#[derive(Accounts)]
+pub struct UndelegateEphemeralSol<'info> {
+    #[account(
+        mut,
+        seeds = [EPHEMERAL_SOL_SEED, launch.key().as_ref(), user.key().as_ref()],
+        bump = ephemeral_sol.bump
+    )]
+    pub ephemeral_sol: Account<'info, EphemeralSol>,
+
+    #[account(seeds = [LAUNCH_SEED, launch.creator.as_ref(), launch.token_mint.as_ref()], bump = launch.bump)]
+    pub launch: Account<'info, Launch>,
+
+    pub user: Signer<'info>,
+
+    #[account(mut)]
+    pub payer: Signer<'info>,
+}
+
 #[derive(Accounts)]
 pub struct CalculateAllocation<'info> {
     pub launch: Account<'info, Launch>,
@@ -1257,13 +1317,15 @@ pub struct WithdrawFunds<'info> {
     )]
     pub launch: Account<'info, Launch>,
 
-    /// CHECK: Vault holding SOL
+    /// CHECK: Vault holding SOL (PDA; may be owned by program or system after first transfer)
     #[account(
         mut,
-        seeds = [VAULT_SEED, launch.key().as_ref()],
-        bump
+        constraint = vault.key() == Pubkey::find_program_address(
+            &[VAULT_SEED, launch.key().as_ref()],
+            &crate::ID
+        ).0
     )]
-    pub vault: AccountInfo<'info>,
+    pub vault: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub creator: Signer<'info>,

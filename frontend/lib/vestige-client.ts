@@ -1687,8 +1687,12 @@ export class VestigeClient {
 
     console.log("🎓📤 Graduating and undelegating from ER...");
     console.log("  commitment_pool will be synced to Solana");
-    console.log("  launch is READ-ONLY (not delegated) - update via finalize_graduation");
-    console.log("  Including magic_program and magic_context for commit_and_undelegate");
+    console.log(
+      "  launch is READ-ONLY (not delegated) - update via finalize_graduation",
+    );
+    console.log(
+      "  Including magic_program and magic_context for commit_and_undelegate",
+    );
 
     // Build instruction manually to ensure payer is NOT writable (ER requirement)
     // launch is read-only (not delegated), only commitment_pool is writable
@@ -1738,11 +1742,21 @@ export class VestigeClient {
       { skipPreflight: true, preflightCommitment: "confirmed" },
     );
 
-    const confirmation = await sendConnection.confirmTransaction(txSig, "confirmed");
+    const confirmation = await sendConnection.confirmTransaction(
+      txSig,
+      "confirmed",
+    );
 
     if (confirmation.value.err) {
-      console.error("❌ Graduate and undelegate FAILED:", confirmation.value.err);
-      throw new Error(`Graduate and undelegate failed: ${JSON.stringify(confirmation.value.err)}`);
+      console.error(
+        "❌ Graduate and undelegate FAILED:",
+        confirmation.value.err,
+      );
+      throw new Error(
+        `Graduate and undelegate failed: ${JSON.stringify(
+          confirmation.value.err,
+        )}`,
+      );
     }
 
     console.log("✅ Launch GRADUATED & UNDELEGATED:", txSig);
@@ -1750,24 +1764,38 @@ export class VestigeClient {
 
     // Wait for commitment_pool state to sync from ER to Solana
     console.log("  ⏳ Waiting 15s for commitment_pool to sync to Solana...");
-    await new Promise(r => setTimeout(r, 15000));
+    await new Promise((r) => setTimeout(r, 15000));
 
     // Verify commitment_pool on Solana has the data
     console.log("  🔍 Verifying commitment_pool state on Solana...");
     try {
-      const poolAccountInfo = await this.connection.getAccountInfo(commitmentPoolPda);
+      const poolAccountInfo = await this.connection.getAccountInfo(
+        commitmentPoolPda,
+      );
       if (poolAccountInfo) {
         console.log("    Owner:", poolAccountInfo.owner.toBase58());
         console.log("    Lamports:", poolAccountInfo.lamports);
         if (poolAccountInfo.data.length >= 24) {
-          const dataView = new DataView(poolAccountInfo.data.buffer, poolAccountInfo.data.byteOffset);
+          const dataView = new DataView(
+            poolAccountInfo.data.buffer,
+            poolAccountInfo.data.byteOffset,
+          );
           const totalCommittedLow = dataView.getUint32(8, true);
           const totalCommittedHigh = dataView.getUint32(12, true);
-          const totalCommitted = totalCommittedLow + totalCommittedHigh * 0x100000000;
-          console.log("    total_committed:", totalCommitted / LAMPORTS_PER_SOL, "SOL");
+          const totalCommitted =
+            totalCommittedLow + totalCommittedHigh * 0x100000000;
+          console.log(
+            "    total_committed:",
+            totalCommitted / LAMPORTS_PER_SOL,
+            "SOL",
+          );
           if (totalCommitted === 0) {
-            console.warn("    ⚠️ WARNING: total_committed is still 0 on Solana!");
-            console.warn("    The undelegation may not have completed. Wait longer or check ER status.");
+            console.warn(
+              "    ⚠️ WARNING: total_committed is still 0 on Solana!",
+            );
+            console.warn(
+              "    The undelegation may not have completed. Wait longer or check ER status.",
+            );
           } else {
             console.log("    ✅ Commitment data synced to Solana!");
           }
@@ -1797,22 +1825,33 @@ export class VestigeClient {
     // Debug: Check commitment_pool state on Solana before calling finalize
     console.log("📋 Checking commitment_pool on Solana before finalize...");
     try {
-      const poolAccountInfo = await this.connection.getAccountInfo(commitmentPoolPda);
+      const poolAccountInfo = await this.connection.getAccountInfo(
+        commitmentPoolPda,
+      );
       if (poolAccountInfo) {
         console.log("   Owner:", poolAccountInfo.owner.toBase58());
         console.log("   Lamports:", poolAccountInfo.lamports);
         console.log("   Data length:", poolAccountInfo.data.length);
-        // Try to read the data manually (skip 8-byte discriminator)
-        if (poolAccountInfo.data.length >= 24) {
-          const dataView = new DataView(poolAccountInfo.data.buffer, poolAccountInfo.data.byteOffset);
-          // After 8-byte discriminator, we have total_committed (u64) and total_participants (u64)
-          const totalCommittedLow = dataView.getUint32(8, true);
-          const totalCommittedHigh = dataView.getUint32(12, true);
-          const totalCommitted = totalCommittedLow + totalCommittedHigh * 0x100000000;
-          const totalParticipantsLow = dataView.getUint32(16, true);
-          const totalParticipantsHigh = dataView.getUint32(20, true);
-          const totalParticipants = totalParticipantsLow + totalParticipantsHigh * 0x100000000;
-          console.log("   Raw data - total_committed:", totalCommitted / LAMPORTS_PER_SOL, "SOL");
+        // Try to read the data manually (skip 8-byte discriminator + launch pubkey 32 bytes)
+        // Layout: disc(8) + launch(32) + total_committed(8) + total_participants(8) + ...
+        if (poolAccountInfo.data.length >= 56) {
+          const dataView = new DataView(
+            poolAccountInfo.data.buffer,
+            poolAccountInfo.data.byteOffset,
+          );
+          const totalCommittedLow = dataView.getUint32(40, true);
+          const totalCommittedHigh = dataView.getUint32(44, true);
+          const totalCommitted =
+            totalCommittedLow + totalCommittedHigh * 0x100000000;
+          const totalParticipantsLow = dataView.getUint32(48, true);
+          const totalParticipantsHigh = dataView.getUint32(52, true);
+          const totalParticipants =
+            totalParticipantsLow + totalParticipantsHigh * 0x100000000;
+          console.log(
+            "   Raw data - total_committed:",
+            totalCommitted / LAMPORTS_PER_SOL,
+            "SOL",
+          );
           console.log("   Raw data - total_participants:", totalParticipants);
         }
       } else {
@@ -1848,7 +1887,9 @@ export class VestigeClient {
       user,
     );
     console.log("📤 Undelegating user_commitment...");
-    console.log("  Including magic_program and magic_context for commit_and_undelegate");
+    console.log(
+      "  Including magic_program and magic_context for commit_and_undelegate",
+    );
 
     const instruction = await this.erProgram.methods
       .undelegateUserCommitment()
@@ -1885,6 +1926,64 @@ export class VestigeClient {
     );
     await sendConnection.confirmTransaction(txSig, "confirmed");
     console.log("✅ User commitment undelegated (synced to Solana):", txSig);
+    return txSig;
+  }
+
+  /**
+   * Undelegate ephemeral_sol from ER so it syncs back to Solana. Run this BEFORE sweepEphemeralToVault.
+   * Sends via Magic Router (ER). After this, ephemeral_sol is owned by Vestige on Solana and sweep will work.
+   */
+  async undelegateEphemeralSol(
+    launchPda: PublicKey,
+    user: PublicKey,
+  ): Promise<string> {
+    const [ephemeralSolPda] = VestigeClient.deriveEphemeralSolPda(
+      launchPda,
+      user,
+    );
+    console.log("📤 Undelegating ephemeral_sol...");
+    console.log(
+      "  Including magic_program and magic_context for commit_and_undelegate",
+    );
+
+    const instruction = await this.erProgram.methods
+      .undelegateEphemeralSol()
+      .accounts({
+        ephemeralSol: ephemeralSolPda,
+        launch: launchPda,
+        user: user,
+        payer: user,
+        magicProgram: MAGIC_PROGRAM,
+        magicContext: MAGIC_CONTEXT,
+      })
+      .instruction();
+    const modifiedKeys = instruction.keys.map((key) =>
+      key.pubkey.equals(user) && key.isSigner
+        ? { ...key, isWritable: false }
+        : key,
+    );
+    const modifiedInstruction = new TransactionInstruction({
+      keys: modifiedKeys,
+      programId: instruction.programId,
+      data: instruction.data,
+    });
+    const transaction = new Transaction().add(modifiedInstruction);
+    transaction.feePayer = user;
+    transaction.recentBlockhash = (
+      await this.erConnection.getLatestBlockhash()
+    ).blockhash;
+    const signedTx = await this.provider.wallet.signTransaction(transaction);
+    const sendConnection = new Connection(ER_ROUTER_URL, "confirmed");
+    console.log("  Sending undelegate_ephemeral_sol via Magic Router");
+    const txSig = await sendConnection.sendRawTransaction(
+      signedTx.serialize(),
+      { skipPreflight: true, preflightCommitment: "confirmed" },
+    );
+    await sendConnection.confirmTransaction(txSig, "confirmed");
+    console.log(
+      "✅ Ephemeral SOL undelegated (sync to Solana); you can now Sweep to vault:",
+      txSig,
+    );
     return txSig;
   }
 

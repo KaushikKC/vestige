@@ -13,13 +13,23 @@ import { ViewState } from "../types";
 import { useVestige } from "../../lib/use-vestige";
 import { PublicKey } from "@solana/web3.js";
 import { VestigeClient } from "../../lib/vestige-client";
+import {
+  getAssociatedTokenAddressSync,
+  getAccount,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
+import { useConnection } from "@solana/wallet-adapter-react";
 
 interface AllocationProps {
   setView: (view: ViewState) => void;
 }
 
 const Allocation: React.FC<AllocationProps> = ({ setView }) => {
+  const { connection } = useConnection();
   const {
+    client,
+    fetchLaunch,
     fetchUserCommitment,
     calculateAllocation,
     claimTokens,
@@ -68,16 +78,51 @@ const Allocation: React.FC<AllocationProps> = ({ setView }) => {
   };
 
   const handleClaim = async () => {
-    if (!publicKey || !launchPda || !userCommitment) return;
+    if (!publicKey || !launchPda || !userCommitment || !client) return;
 
     setClaiming(true);
     try {
       const pda = new PublicKey(launchPda);
-      // TODO: You need to provide token vault and user token account
-      // For now, this is a placeholder
-      alert("Token claiming requires token vault and user token account setup");
-    } catch (error: any) {
-      alert(`Failed to claim: ${error.message}`);
+      const launch = await fetchLaunch(pda);
+      if (!launch) {
+        alert("Could not load launch. Check the launch PDA.");
+        return;
+      }
+      const tokenMint = launch.tokenMint;
+      const creator = launch.creator;
+      const tokenVault = getAssociatedTokenAddressSync(
+        tokenMint,
+        creator,
+        false,
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+      );
+      const userTokenAccount = getAssociatedTokenAddressSync(
+        tokenMint,
+        publicKey,
+        false,
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+      );
+      try {
+        await getAccount(connection, userTokenAccount);
+      } catch {
+        alert(
+          "Your token account for this launch does not exist yet. The creator must have set up the token vault and you may need to create your token account (e.g. from the launch detail page).",
+        );
+        return;
+      }
+      const tx = await claimTokens(pda, tokenVault, userTokenAccount);
+      if (tx) {
+        setTxSignature(tx);
+        await loadUserCommitment();
+        alert(`Tokens claimed! Tx: ${tx.slice(0, 8)}...`);
+      } else {
+        alert("Claim failed. Check console for details.");
+      }
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      alert(`Failed to claim: ${msg}`);
     } finally {
       setClaiming(false);
     }

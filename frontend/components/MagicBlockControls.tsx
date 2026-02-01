@@ -64,6 +64,7 @@ export default function MagicBlockControls({
     graduateAndUndelegate,
     finalizeGraduation,
     undelegateUserCommitment,
+    undelegateEphemeralSol,
     withdrawFunds,
     sweepToVault,
     queryCommitmentFromER,
@@ -200,6 +201,32 @@ export default function MagicBlockControls({
       const msg = error instanceof Error ? error.message : "Unknown error";
       setTxStatus(`Error: ${msg}`);
       console.error("Withdraw error:", error);
+    }
+  };
+
+  const handleUndelegateEphemeralSol = async () => {
+    if (!publicKey) {
+      setTxStatus("Please connect your wallet");
+      return;
+    }
+    try {
+      setTxStatus(
+        "Undelegating ephemeral SOL from ER (required before sweep)...",
+      );
+      const tx = await undelegateEphemeralSol(launch.publicKey);
+      if (tx) {
+        setTxStatus(
+          `Ephemeral SOL synced to Solana. You can now Sweep to vault. Tx: ${tx.slice(
+            0,
+            8,
+          )}...`,
+        );
+        setTimeout(() => onRefresh?.(), 2000);
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      setTxStatus(`Error: ${msg}`);
+      console.error("Undelegate ephemeral SOL error:", error);
     }
   };
 
@@ -401,20 +428,41 @@ export default function MagicBlockControls({
           </button>
         )}
 
-        {/* USER ACTIONS - Sweep button (available to users after graduation) */}
+        {/* USER ACTIONS - Undelegate ephemeral SOL first (required before sweep; creator or participant who committed in private) */}
         {!launch.isDelegated && launch.isGraduated && (
           <button
-            onClick={handleSweepToVault}
+            onClick={handleUndelegateEphemeralSol}
             disabled={loading}
-            className="w-full bg-[#F5F6FA] hover:bg-[#E6E8EF] disabled:bg-[#E6E8EF] text-[#0B0D17] font-bold py-3 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 border-2 border-[#E6E8EF]"
+            className="w-full bg-[#3A2BFF]/10 hover:bg-[#3A2BFF]/20 disabled:bg-[#E6E8EF] text-[#3A2BFF] font-bold py-3 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 border-2 border-[#3A2BFF]"
           >
             {loading ? (
               <Loader2 size={18} className="animate-spin" />
             ) : (
-              <Trash2 size={18} />
+              <Upload size={18} />
             )}
-            <span>Sweep My Ephemeral SOL to Vault</span>
+            <span>1. Undelegate my ephemeral SOL (sync to Solana)</span>
           </button>
+        )}
+        {/* USER ACTIONS - Sweep button (run after undelegate ephemeral SOL) */}
+        {!launch.isDelegated && launch.isGraduated && (
+          <>
+            <button
+              onClick={handleSweepToVault}
+              disabled={loading}
+              className="w-full bg-[#F5F6FA] hover:bg-[#E6E8EF] disabled:bg-[#E6E8EF] text-[#0B0D17] font-bold py-3 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 border-2 border-[#E6E8EF]"
+            >
+              {loading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Trash2 size={18} />
+              )}
+              <span>2. Sweep my ephemeral SOL to vault</span>
+            </button>
+            <p className="text-xs text-[#6B7280] mt-1 text-center">
+              If sweep fails with &quot;AccountOwnedByWrongProgram&quot;, run
+              step 1 first.
+            </p>
+          </>
         )}
 
         {/* Privacy Demo Button - Available to everyone when delegated */}
@@ -559,6 +607,12 @@ export default function MagicBlockControls({
           <Lightbulb size={18} className="text-[#3A2BFF]" />
           MagicBlock Private ER Flow
         </div>
+        <p className="text-xs text-[#6B7280] mb-2">
+          <strong>Public vs Private:</strong> See the &quot;Delegation
+          Status&quot; at the top: <strong>Private Mode Active (TEE)</strong> =
+          commitments hidden on ER; <strong>Public Mode</strong> = commitments
+          visible on Solana.
+        </p>
         <ol className="list-decimal list-inside space-y-1 text-[#6B7280]">
           <li>
             <strong className="text-[#0B0D17]">Enable Private Mode</strong> —
