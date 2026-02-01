@@ -20,8 +20,31 @@ export default function CreateLaunchForm() {
     graduationTarget: '100',
     minCommitment: '0.1',
     maxCommitment: '10',
-    durationHours: '24',
+    durationMinutes: '1440', // 24 hours in minutes
   });
+  const [testMode, setTestMode] = useState(false);
+
+  // Quick test mode settings (3 minute duration, low targets)
+  const applyTestMode = (enabled: boolean) => {
+    setTestMode(enabled);
+    if (enabled) {
+      setFormData({
+        tokenSupply: '1000',
+        graduationTarget: '0.5', // 0.5 SOL target (easy to reach)
+        minCommitment: '0.1',
+        maxCommitment: '1',
+        durationMinutes: '3', // 3 minutes for testing
+      });
+    } else {
+      setFormData({
+        tokenSupply: '1000000',
+        graduationTarget: '100',
+        minCommitment: '0.1',
+        maxCommitment: '10',
+        durationMinutes: '1440', // 24 hours
+      });
+    }
+  };
 
   const handleCreate = async () => {
     if (!client || !publicKey) {
@@ -81,9 +104,11 @@ export default function CreateLaunchForm() {
 
       // Calculate times (must be BN for i64)
       const now = Math.floor(Date.now() / 1000);
-      const durationSeconds = parseInt(formData.durationHours) * 3600;
+      const durationSeconds = parseInt(formData.durationMinutes) * 60; // minutes to seconds
       const startTime = new BN(now);
       const endTime = new BN(now + durationSeconds);
+
+      console.log(`⏱️ Launch duration: ${formData.durationMinutes} minutes (${durationSeconds} seconds)`);
 
       // Convert to proper units (BN for u64)
       const tokenSupply = VestigeClient.solToLamports(parseFloat(formData.tokenSupply));
@@ -156,12 +181,13 @@ export default function CreateLaunchForm() {
         <button
           onClick={() => {
             setTxSignature(null);
+            setTestMode(false);
             setFormData({
               tokenSupply: '1000000',
               graduationTarget: '100',
               minCommitment: '0.1',
               maxCommitment: '10',
-              durationHours: '24',
+              durationMinutes: '1440',
             });
           }}
           className="mt-6 w-full py-3 bg-[#F5F6FA] rounded-xl font-bold hover:bg-[#E6E8EF]"
@@ -175,6 +201,24 @@ export default function CreateLaunchForm() {
   return (
     <div className="bg-white rounded-2xl p-8 shadow-lg border border-[#E6E8EF]">
       <h2 className="text-2xl font-bold mb-6">Create New Launch</h2>
+
+      {/* Quick Test Mode Toggle */}
+      <div className="mb-6 p-4 bg-yellow-50 rounded-xl border-2 border-yellow-200">
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={testMode}
+            onChange={(e) => applyTestMode(e.target.checked)}
+            className="w-5 h-5 rounded border-2 border-yellow-400 accent-yellow-500"
+          />
+          <div>
+            <span className="font-bold text-yellow-800">🧪 Quick Test Mode</span>
+            <p className="text-xs text-yellow-600 mt-1">
+              3-minute duration, 0.5 SOL target - perfect for demo!
+            </p>
+          </div>
+        </label>
+      </div>
 
       <div className="space-y-4">
         <div>
@@ -233,15 +277,20 @@ export default function CreateLaunchForm() {
 
         <div>
           <label className="block text-sm font-bold text-[#6B7280] mb-2">
-            Duration (Hours)
+            Duration (Minutes)
           </label>
           <input
             type="number"
-            value={formData.durationHours}
-            onChange={(e) => setFormData({ ...formData, durationHours: e.target.value })}
+            value={formData.durationMinutes}
+            onChange={(e) => setFormData({ ...formData, durationMinutes: e.target.value })}
             className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#3A2BFF] outline-none"
-            placeholder="24"
+            placeholder="1440"
           />
+          <p className="text-xs text-[#6B7280] mt-1">
+            {parseInt(formData.durationMinutes) >= 60
+              ? `≈ ${(parseInt(formData.durationMinutes) / 60).toFixed(1)} hours`
+              : `${formData.durationMinutes} minutes`}
+          </p>
         </div>
 
         <button

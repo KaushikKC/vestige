@@ -5,7 +5,7 @@ import {
   ConnectionProvider,
   WalletProvider,
 } from "@solana/wallet-adapter-react";
-import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
+import { DedupedWalletModalProvider } from "@/components/DedupedWalletModal";
 import {
   PhantomWalletAdapter,
   SolflareWalletAdapter,
@@ -46,20 +46,24 @@ interface WalletContextProviderProps {
 export const WalletContextProvider: FC<WalletContextProviderProps> = ({
   children,
 }) => {
-  // Initialize wallet adapters
-  const wallets = useMemo(
-    () => [
+  // Initialize wallet adapters - dedupe by name to avoid "two children with the same key" (e.g. MetaMask)
+  const wallets = useMemo(() => {
+    const list = [
       new PhantomWalletAdapter(),
       new SolflareWalletAdapter(),
       new TorusWalletAdapter(),
-    ],
-    [],
-  );
+    ];
+    const byName = new Map<string, (typeof list)[0]>();
+    list.forEach((w) => {
+      if (!byName.has(w.name)) byName.set(w.name, w);
+    });
+    return Array.from(byName.values());
+  }, []);
 
   return (
     <ConnectionProvider endpoint={RPC_ENDPOINT}>
       <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>{children}</WalletModalProvider>
+        <DedupedWalletModalProvider>{children}</DedupedWalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>
   );

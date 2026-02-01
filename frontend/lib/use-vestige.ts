@@ -335,6 +335,69 @@ export function useVestige() {
     [client, wallet.publicKey, refreshBalance],
   );
 
+  // Sweep ephemeral SOL to vault (after graduation)
+  const sweepToVault = useCallback(
+    async (launchPda: PublicKey): Promise<string | null> => {
+      if (!client || !wallet.publicKey) {
+        setError("Wallet not connected");
+        return null;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const tx = await client.sweepEphemeralToVault(launchPda, wallet.publicKey);
+        return tx;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Unknown error");
+        console.error("Sweep to vault error:", e);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [client, wallet.publicKey],
+  );
+
+  // Query commitment data from ER (for privacy demo)
+  const queryCommitmentFromER = useCallback(
+    async (launchPda: PublicKey): Promise<{ pool: any; userCommitment: any } | null> => {
+      if (!client || !wallet.publicKey) {
+        setError("Wallet not connected");
+        return null;
+      }
+
+      try {
+        const data = await client.queryFromER(launchPda, wallet.publicKey);
+        return data;
+      } catch (e) {
+        console.error("Query from ER error:", e);
+        return null;
+      }
+    },
+    [client, wallet.publicKey],
+  );
+
+  // Query commitment data from Solana base layer (for comparison)
+  const queryCommitmentFromSolana = useCallback(
+    async (launchPda: PublicKey): Promise<{ pool: any; userCommitment: any } | null> => {
+      if (!client || !wallet.publicKey) {
+        setError("Wallet not connected");
+        return null;
+      }
+
+      try {
+        const data = await client.queryFromSolana(launchPda, wallet.publicKey);
+        return data;
+      } catch (e) {
+        console.error("Query from Solana error:", e);
+        return null;
+      }
+    },
+    [client, wallet.publicKey],
+  );
+
   return {
     // State
     client,
@@ -356,6 +419,9 @@ export function useVestige() {
     calculateAllocation,
     claimTokens,
     withdrawFunds,
+    sweepToVault,
+    queryCommitmentFromER,
+    queryCommitmentFromSolana,
     refreshBalance,
 
     // Wallet methods (pass-through)
