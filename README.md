@@ -27,8 +27,6 @@ In the traditional model, early entrants get high reward but everyone can see wh
 
 ![Vestige ideology: Inverted pump.fun — Risk vs Reward over Time of Entry](docs/ideology-diagram.png)
 
-*(Add your diagram as `docs/ideology-diagram.png` to display it above.)*
-
 ---
 
 ## What we built
