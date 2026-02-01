@@ -17,13 +17,22 @@ import {
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useVestige } from "@/lib/use-vestige";
 import { VestigeClient } from "@/lib/vestige-client";
-import { Loader2, Rocket } from "lucide-react";
+import { Loader2, Rocket, ExternalLink, Copy } from "lucide-react";
+import toast from "react-hot-toast";
 
-export default function CreateLaunchForm() {
+interface CreateLaunchFormProps {
+  /** Called with launch PDA when user wants to go to launch detail (e.g. after creation) */
+  onGoToLaunch?: (launchPda: string) => void;
+}
+
+export default function CreateLaunchForm({
+  onGoToLaunch,
+}: CreateLaunchFormProps) {
   const { client, publicKey, connected } = useVestige();
   const wallet = useWallet();
   const [creating, setCreating] = useState(false);
   const [txSignature, setTxSignature] = useState<string | null>(null);
+  const [launchPdaCreated, setLaunchPdaCreated] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     tokenSupply: "1000000",
@@ -58,7 +67,7 @@ export default function CreateLaunchForm() {
 
   const handleCreate = async () => {
     if (!client || !publicKey) {
-      alert("Please connect your wallet");
+      toast.error("Connect your wallet first.");
       return;
     }
 
@@ -165,13 +174,13 @@ export default function CreateLaunchForm() {
 
       console.log("✅ Launch created! Transaction:", tx);
       setTxSignature(tx);
+      setLaunchPdaCreated(launchPda.toBase58());
 
-      alert(
-        `Launch Created Successfully!\n\nLaunch PDA: ${launchPda.toBase58()}\nToken Mint: ${tokenMint.toBase58()}\n\nYou can now delegate to MagicBlock ER!`,
-      );
-    } catch (error: any) {
+      toast.success("Launch created. You can now enable private mode.");
+    } catch (error: unknown) {
       console.error("Launch creation failed:", error);
-      alert(`Failed to create launch: ${error.message}`);
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(`Launch failed: ${msg}`);
     } finally {
       setCreating(false);
     }
@@ -185,7 +194,13 @@ export default function CreateLaunchForm() {
     );
   }
 
-  if (txSignature) {
+  const copyPda = () => {
+    if (!launchPdaCreated) return;
+    navigator.clipboard.writeText(launchPdaCreated);
+    toast.success("Launch PDA copied to clipboard");
+  };
+
+  if (txSignature && launchPdaCreated) {
     return (
       <div className="bg-white rounded-2xl p-8 shadow-lg border border-[#E6E8EF] text-center">
         <div className="w-16 h-16 bg-[#F5F6FA] rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-[#E6E8EF]">
@@ -197,17 +212,51 @@ export default function CreateLaunchForm() {
         <p className="text-sm text-[#6B7280] mb-4">
           Your launch has been deployed to Solana
         </p>
-        <a
-          href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[#3A2BFF] hover:underline text-sm"
-        >
-          View Transaction →
-        </a>
+
+        {/* Launch PDA - visible in UI for demo */}
+        <div className="mb-4 p-4 bg-[#F5F6FA] rounded-xl border border-[#E6E8EF] text-left">
+          <p className="text-xs font-bold text-[#6B7280] mb-2 uppercase tracking-wide">
+            Launch PDA (use this to open or share your launch)
+          </p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <code className="text-sm text-[#0B0D17] break-all font-mono flex-1 min-w-0">
+              {launchPdaCreated}
+            </code>
+            <button
+              type="button"
+              onClick={copyPda}
+              className="shrink-0 p-2 rounded-lg bg-white border border-[#E6E8EF] hover:bg-[#E6E8EF] text-[#6B7280]"
+              title="Copy PDA"
+            >
+              <Copy size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          {onGoToLaunch && (
+            <button
+              onClick={() => onGoToLaunch(launchPdaCreated)}
+              className="py-3 px-6 bg-[#3A2BFF] text-white rounded-xl font-bold hover:bg-[#2A1BDF] flex items-center justify-center gap-2"
+            >
+              <ExternalLink size={18} />
+              Open launch page
+            </button>
+          )}
+          <a
+            href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="py-3 px-6 border-2 border-[#E6E8EF] rounded-xl font-bold text-[#0B0D17] hover:bg-[#F5F6FA] inline-flex items-center justify-center gap-2"
+          >
+            View transaction on Explorer
+          </a>
+        </div>
+
         <button
           onClick={() => {
             setTxSignature(null);
+            setLaunchPdaCreated(null);
             setTestMode(false);
             setFormData({
               tokenSupply: "1000000",
@@ -217,7 +266,7 @@ export default function CreateLaunchForm() {
               durationMinutes: "1440",
             });
           }}
-          className="mt-6 w-full py-3 bg-[#F5F6FA] rounded-xl font-bold hover:bg-[#E6E8EF]"
+          className="mt-6 w-full py-3 bg-[#F5F6FA] rounded-xl font-bold hover:bg-[#E6E8EF] text-[#6B7280]"
         >
           Create Another Launch
         </button>

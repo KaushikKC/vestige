@@ -37,7 +37,9 @@ export default function App() {
       case ViewState.LAUNCH_DETAIL:
         return <LaunchDetail setView={setView} launch={selectedLaunch} />;
       case ViewState.CREATOR:
-        return <Creator setView={setView} />;
+        return (
+          <Creator setView={setView} setSelectedLaunch={setSelectedLaunch} />
+        );
       case ViewState.ALLOCATION:
         return <Allocation setView={setView} />;
       case ViewState.DOCS:

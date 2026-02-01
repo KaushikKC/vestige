@@ -16,6 +16,7 @@ import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { ViewState, Launch } from "../types";
 import { useVestige } from "../../lib/use-vestige";
 import { VestigeClient, LaunchData } from "../../lib/vestige-client";
+import toast from "react-hot-toast";
 
 interface DiscoverProps {
   setView: (view: ViewState) => void;
@@ -101,7 +102,7 @@ const Discover: React.FC<DiscoverProps> = ({ setView, setSelectedLaunch }) => {
   const handleOpenByPda = () => {
     const trimmed = launchPdaInput.trim();
     if (!trimmed) {
-      alert("Paste a Launch PDA address");
+      toast.error("Enter a Launch PDA address.");
       return;
     }
     setSelectedLaunch({

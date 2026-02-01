@@ -1,32 +1,34 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   PartyPopper,
   Check,
   ArrowUp,
-  Info,
   Loader2,
   ExternalLink,
+  Wallet,
 } from "lucide-react";
 import { ViewState } from "../types";
 import { useVestige } from "../../lib/use-vestige";
-import { PublicKey } from "@solana/web3.js";
-import { VestigeClient } from "../../lib/vestige-client";
+import { PublicKey, Transaction } from "@solana/web3.js";
 import {
   getAssociatedTokenAddressSync,
   getAccount,
+  createAssociatedTokenAccountInstruction,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { useConnection } from "@solana/wallet-adapter-react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import toast from "react-hot-toast";
 
 interface AllocationProps {
   setView: (view: ViewState) => void;
 }
 
-const Allocation: React.FC<AllocationProps> = ({ setView }) => {
+const Allocation: React.FC<AllocationProps> = () => {
   const { connection } = useConnection();
+  const { sendTransaction } = useWallet();
   const {
     client,
     fetchLaunch,
@@ -36,17 +38,20 @@ const Allocation: React.FC<AllocationProps> = ({ setView }) => {
     publicKey,
     connected,
     loading,
-    lamportsToSol,
   } = useVestige();
 
-  const [userCommitment, setUserCommitment] = useState<any>(null);
-  const [launchPda, setLaunchPda] = useState<string>("");
+  const [userCommitment, setUserCommitment] = useState<{
+    amount: { toNumber: () => number };
+    tokensAllocated: { toNumber: () => number; toLocaleString?: () => string };
+    hasClaimed: boolean;
+    weight?: number | { toNumber: () => number };
+  } | null>(null);
+  const [launchPda, setLaunchPda] = useState("");
   const [claiming, setClaiming] = useState(false);
   const [calculating, setCalculating] = useState(false);
+  const [creatingAccount, setCreatingAccount] = useState(false);
+  const [needsTokenAccount, setNeedsTokenAccount] = useState(false);
   const [txSignature, setTxSignature] = useState<string | null>(null);
-
-  // TODO: You should pass the launch PDA from the launch detail page
-  // For now, user needs to enter it manually
 
   const loadUserCommitment = async () => {
     if (!publicKey || !launchPda) return;
@@ -67,13 +72,59 @@ const Allocation: React.FC<AllocationProps> = ({ setView }) => {
     try {
       const pda = new PublicKey(launchPda);
       await calculateAllocation(pda);
-      // Reload commitment to get updated allocation
       await loadUserCommitment();
-      alert("Allocation calculated!");
-    } catch (error: any) {
-      alert(`Failed to calculate: ${error.message}`);
+      toast.success("Allocation calculated.");
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(`Calculation failed: ${msg}`);
     } finally {
       setCalculating(false);
+    }
+  };
+
+  const handleCreateTokenAccount = async () => {
+    if (!publicKey || !launchPda || !sendTransaction) return;
+
+    setCreatingAccount(true);
+    const toastId = toast.loading("Creating token account…");
+    try {
+      const pda = new PublicKey(launchPda);
+      const launch = await fetchLaunch(pda);
+      if (!launch) {
+        toast.error("Could not load launch. Check the Launch PDA.", {
+          id: toastId,
+        });
+        return;
+      }
+      const userTokenAccount = getAssociatedTokenAddressSync(
+        launch.tokenMint,
+        publicKey,
+        false,
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+      );
+      const ix = createAssociatedTokenAccountInstruction(
+        publicKey,
+        userTokenAccount,
+        publicKey,
+        launch.tokenMint,
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+      );
+      const tx = new Transaction().add(ix);
+      const { blockhash } = await connection.getLatestBlockhash();
+      tx.recentBlockhash = blockhash;
+      tx.feePayer = publicKey;
+      await sendTransaction(tx, connection);
+      toast.success("Token account created. You can now claim.", {
+        id: toastId,
+      });
+      setNeedsTokenAccount(false);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(msg, { id: toastId });
+    } finally {
+      setCreatingAccount(false);
     }
   };
 
@@ -81,24 +132,26 @@ const Allocation: React.FC<AllocationProps> = ({ setView }) => {
     if (!publicKey || !launchPda || !userCommitment || !client) return;
 
     setClaiming(true);
+    setNeedsTokenAccount(false);
+    const toastId = toast.loading("Claiming tokens…");
     try {
       const pda = new PublicKey(launchPda);
       const launch = await fetchLaunch(pda);
       if (!launch) {
-        alert("Could not load launch. Check the launch PDA.");
+        toast.error("Could not load launch. Check the Launch PDA.", {
+          id: toastId,
+        });
         return;
       }
-      const tokenMint = launch.tokenMint;
-      const creator = launch.creator;
       const tokenVault = getAssociatedTokenAddressSync(
-        tokenMint,
-        creator,
+        launch.tokenMint,
+        launch.creator,
         false,
         TOKEN_PROGRAM_ID,
         ASSOCIATED_TOKEN_PROGRAM_ID,
       );
       const userTokenAccount = getAssociatedTokenAddressSync(
-        tokenMint,
+        launch.tokenMint,
         publicKey,
         false,
         TOKEN_PROGRAM_ID,
@@ -107,22 +160,25 @@ const Allocation: React.FC<AllocationProps> = ({ setView }) => {
       try {
         await getAccount(connection, userTokenAccount);
       } catch {
-        alert(
-          "Your token account for this launch does not exist yet. The creator must have set up the token vault and you may need to create your token account (e.g. from the launch detail page).",
-        );
+        toast.error("Create your token account first using the button below.", {
+          id: toastId,
+        });
+        setNeedsTokenAccount(true);
         return;
       }
       const tx = await claimTokens(pda, tokenVault, userTokenAccount);
       if (tx) {
         setTxSignature(tx);
         await loadUserCommitment();
-        alert(`Tokens claimed! Tx: ${tx.slice(0, 8)}...`);
+        toast.success(`Tokens claimed. Tx: ${tx.slice(0, 8)}…`, {
+          id: toastId,
+        });
       } else {
-        alert("Claim failed. Check console for details.");
+        toast.error("Claim failed. Try again.", { id: toastId });
       }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      alert(`Failed to claim: ${msg}`);
+      toast.error(msg, { id: toastId });
     } finally {
       setClaiming(false);
     }
@@ -173,14 +229,18 @@ const Allocation: React.FC<AllocationProps> = ({ setView }) => {
                 {userCommitment.hasClaimed ? "Claimed" : "Committed"}
               </div>
               <h2 className="text-3xl md:text-4xl font-black mb-2 tracking-tight">
-                {userCommitment.tokensAllocated > 0
+                {(typeof userCommitment.tokensAllocated === "object"
+                  ? userCommitment.tokensAllocated.toNumber()
+                  : userCommitment.tokensAllocated) > 0
                   ? "Allocation Ready!"
                   : "Calculate Your Allocation"}
               </h2>
               <p className="text-gray-400 font-medium max-w-md text-sm md:text-base">
                 {userCommitment.hasClaimed
                   ? "You have successfully claimed your tokens!"
-                  : userCommitment.tokensAllocated > 0
+                  : (typeof userCommitment.tokensAllocated === "object"
+                      ? userCommitment.tokensAllocated.toNumber()
+                      : userCommitment.tokensAllocated) > 0
                   ? "Your tokens are ready to claim."
                   : "Calculate your allocation based on your commitment and timing."}
               </p>
@@ -201,7 +261,12 @@ const Allocation: React.FC<AllocationProps> = ({ setView }) => {
               </div>
               <div className="p-5 flex-1 flex flex-col justify-center">
                 <p className="text-[32px] font-bold text-[#09090A] leading-tight tracking-tight">
-                  {lamportsToSol(userCommitment.amount).toFixed(4)} SOL
+                  {(typeof userCommitment.amount === "object" &&
+                  "toNumber" in userCommitment.amount
+                    ? userCommitment.amount.toNumber() / 1e9
+                    : Number(userCommitment.amount) / 1e9
+                  ).toFixed(4)}{" "}
+                  SOL
                 </p>
                 <p className="text-[12px] font-medium text-[#6B7280] mt-1">
                   Committed
@@ -218,19 +283,35 @@ const Allocation: React.FC<AllocationProps> = ({ setView }) => {
               </div>
               <div className="p-5 flex-1 flex flex-col justify-center">
                 <div className="flex items-baseline gap-2">
-                  <p className="text-[32px] font-bold text-[#09090A] leading-tight tracking-tight">
-                    {userCommitment.weight > 0
-                      ? `${(userCommitment.weight / 10000).toFixed(2)}x`
-                      : "TBD"}
-                  </p>
-                  {userCommitment.weight > 10000 && (
-                    <span className="text-[12px] font-bold text-[#22C55E] flex items-center gap-0.5">
-                      <ArrowUp size={12} strokeWidth={3} /> Early
-                    </span>
-                  )}
+                  {(() => {
+                    const w =
+                      typeof userCommitment.weight === "object" &&
+                      userCommitment.weight
+                        ? (
+                            userCommitment.weight as { toNumber: () => number }
+                          ).toNumber()
+                        : userCommitment.weight ?? 0;
+                    return (
+                      <>
+                        <p className="text-[32px] font-bold text-[#09090A] leading-tight tracking-tight">
+                          {w > 0 ? `${(w / 10000).toFixed(2)}x` : "TBD"}
+                        </p>
+                        {w > 10000 && (
+                          <span className="text-[12px] font-bold text-[#22C55E] flex items-center gap-0.5">
+                            <ArrowUp size={12} strokeWidth={3} /> Early
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 <p className="text-[12px] font-medium text-[#6B7280] mt-1">
-                  {userCommitment.weight > 0
+                  {(typeof userCommitment.weight === "object" &&
+                  userCommitment.weight
+                    ? (
+                        userCommitment.weight as { toNumber: () => number }
+                      ).toNumber()
+                    : userCommitment.weight ?? 0) > 0
                     ? "Early Conviction Bonus"
                     : "Calculate to see"}
                 </p>
@@ -246,12 +327,19 @@ const Allocation: React.FC<AllocationProps> = ({ setView }) => {
               </div>
               <div className="p-5 flex-1 flex flex-col justify-center">
                 <p className="text-[32px] font-bold text-[#09090A] leading-tight tracking-tight">
-                  {userCommitment.tokensAllocated > 0
-                    ? userCommitment.tokensAllocated.toLocaleString()
+                  {(typeof userCommitment.tokensAllocated === "object"
+                    ? userCommitment.tokensAllocated.toNumber()
+                    : userCommitment.tokensAllocated) > 0
+                    ? typeof userCommitment.tokensAllocated === "object" &&
+                      userCommitment.tokensAllocated.toLocaleString
+                      ? userCommitment.tokensAllocated.toLocaleString()
+                      : String(userCommitment.tokensAllocated)
                     : "—"}
                 </p>
                 <p className="text-[12px] font-medium text-[#6B7280] mt-1">
-                  {userCommitment.tokensAllocated > 0
+                  {(typeof userCommitment.tokensAllocated === "object"
+                    ? userCommitment.tokensAllocated.toNumber()
+                    : userCommitment.tokensAllocated) > 0
                     ? "Tokens"
                     : "Calculate first"}
                 </p>
@@ -261,7 +349,9 @@ const Allocation: React.FC<AllocationProps> = ({ setView }) => {
 
           {/* CALCULATE / CLAIM SECTION */}
           <div className="bg-white rounded-[24px] p-8 border border-[#E6E8EF]">
-            {userCommitment.tokensAllocated === 0 ? (
+            {(typeof userCommitment.tokensAllocated === "object"
+              ? userCommitment.tokensAllocated.toNumber()
+              : userCommitment.tokensAllocated) === 0 ? (
               // Calculate Allocation
               <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                 <div>
@@ -308,35 +398,61 @@ const Allocation: React.FC<AllocationProps> = ({ setView }) => {
               </div>
             ) : (
               // Claim Tokens
-              <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-                <div className="flex items-start gap-5">
-                  <div className="w-14 h-14 bg-[#F5F6FA] rounded-full flex items-center justify-center border-2 border-[#E6E8EF] flex-shrink-0">
-                    <PartyPopper size={24} className="text-[#3A2BFF]" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-[#09090A] mb-1">
-                      Claim Allocation
-                    </h3>
-                    <p className="text-sm font-medium text-[#6B7280] max-w-sm leading-relaxed">
-                      Claiming will transfer your tokens to your wallet.
+              <div className="flex flex-col gap-6">
+                {needsTokenAccount && (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                    <p className="text-sm font-medium text-amber-900 mb-3">
+                      Create a token account for this launch to receive your
+                      allocation.
                     </p>
+                    <button
+                      onClick={handleCreateTokenAccount}
+                      disabled={creatingAccount}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-white rounded-lg font-semibold hover:bg-amber-600 disabled:opacity-60 transition-colors"
+                    >
+                      {creatingAccount ? (
+                        <Loader2 size={18} className="animate-spin" />
+                      ) : (
+                        <Wallet size={18} />
+                      )}
+                      {creatingAccount ? "Creating…" : "Create token account"}
+                    </button>
                   </div>
-                </div>
+                )}
+                <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+                  <div className="flex items-start gap-5">
+                    <div className="w-14 h-14 bg-[#F5F6FA] rounded-full flex items-center justify-center border-2 border-[#E6E8EF] shrink-0">
+                      <PartyPopper size={24} className="text-[#3A2BFF]" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-[#09090A] mb-1">
+                        Claim allocation
+                      </h3>
+                      <p className="text-sm font-medium text-[#6B7280] max-w-sm leading-relaxed">
+                        Transfer your allocated tokens to your wallet.
+                      </p>
+                    </div>
+                  </div>
 
-                <button
-                  onClick={handleClaim}
-                  disabled={claiming}
-                  className="bg-[#CFEA4D] text-[#09090A] px-10 py-4 rounded-full font-bold shadow-md hover:bg-[#DFFF5E] transition-colors flex-shrink-0 w-full md:w-auto text-sm md:text-base border-2 border-[#09090A] flex items-center justify-center gap-2 disabled:bg-gray-300"
-                >
-                  {claiming ? (
-                    <>
-                      <Loader2 size={20} className="animate-spin" />
-                      Claiming...
-                    </>
-                  ) : (
-                    `Claim ${userCommitment.tokensAllocated.toLocaleString()} Tokens`
-                  )}
-                </button>
+                  <button
+                    onClick={handleClaim}
+                    disabled={claiming}
+                    className="bg-[#CFEA4D] text-[#09090A] px-10 py-4 rounded-full font-bold shadow-md hover:bg-[#DFFF5E] transition-colors shrink-0 w-full md:w-auto text-sm md:text-base border-2 border-[#09090A] flex items-center justify-center gap-2 disabled:bg-gray-300"
+                  >
+                    {claiming ? (
+                      <>
+                        <Loader2 size={20} className="animate-spin" />
+                        Claiming…
+                      </>
+                    ) : (
+                      `Claim ${(typeof userCommitment.tokensAllocated ===
+                      "object"
+                        ? userCommitment.tokensAllocated.toNumber()
+                        : userCommitment.tokensAllocated
+                      ).toLocaleString()} tokens`
+                    )}
+                  </button>
+                </div>
               </div>
             )}
           </div>

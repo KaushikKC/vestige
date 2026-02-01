@@ -2,14 +2,29 @@
 
 import React, { useState } from "react";
 import { ArrowDown, Wallet, Info, Lock } from "lucide-react";
-import { ViewState } from "../types";
+import { ViewState, Launch } from "../types";
 import CreateLaunchForm from "../../components/CreateLaunchForm";
 
 interface CreatorProps {
   setView: (view: ViewState) => void;
+  setSelectedLaunch: (launch: Launch | null) => void;
 }
 
-const Creator: React.FC<CreatorProps> = ({ setView }) => {
+const Creator: React.FC<CreatorProps> = ({ setView, setSelectedLaunch }) => {
+  const handleGoToLaunch = (launchPda: string) => {
+    const minimalLaunch: Launch = {
+      id: launchPda,
+      name: "Your launch",
+      symbol: "—",
+      status: "PRIVATE",
+      progress: 0,
+      timeLeft: "—",
+      creator: "—",
+      launchPda,
+    };
+    setSelectedLaunch(minimalLaunch);
+    setView(ViewState.LAUNCH_DETAIL);
+  };
   const [fromAmount, setFromAmount] = useState("10.0");
   const [toAmount, setToAmount] = useState("9.95");
   const [showBridge, setShowBridge] = useState(false);
@@ -44,7 +59,7 @@ const Creator: React.FC<CreatorProps> = ({ setView }) => {
       {!showBridge ? (
         <div className="flex justify-center">
           <div className="w-full max-w-2xl">
-            <CreateLaunchForm />
+            <CreateLaunchForm onGoToLaunch={handleGoToLaunch} />
           </div>
         </div>
       ) : (

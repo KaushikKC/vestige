@@ -24,6 +24,7 @@ import { CHART_DATA, COLORS } from "../../constants";
 import { useVestige } from "../../lib/use-vestige";
 import { PublicKey } from "@solana/web3.js";
 import MagicBlockControls from "../../components/MagicBlockControls";
+import toast from "react-hot-toast";
 
 interface LaunchDetailProps {
   setView: (view: ViewState) => void;
@@ -60,7 +61,7 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
 
   const handleCommit = () => {
     if (!connected) {
-      alert("Please connect your wallet first");
+      toast.error("Connect your wallet first.");
       return;
     }
     setShowConfirm(true);
@@ -86,9 +87,10 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
         setShowConfirm(false);
         setCommitted(true);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Commit failed:", e);
-      alert(`Commit failed: ${e.message}`);
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Commit failed: ${msg}`);
     }
   };
 
