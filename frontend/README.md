@@ -11,8 +11,6 @@ Next.js app for **Vestige** — the privacy-preserving token launchpad on Solana
 | **Live app** | [**https://vestige-eight.vercel.app/**](https://vestige-eight.vercel.app/) |
 | **Demo video** | [**https://youtu.be/aJsDFx8rhUM**](https://youtu.be/aJsDFx8rhUM) |
 
-For full project docs, ideology, and architecture see the [root README](../README.md).
-
 ---
 
 ## Tech stack
