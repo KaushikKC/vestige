@@ -664,6 +664,65 @@
       ]
     },
     {
+      "name": "finalize_graduation",
+      "docs": [
+        "After graduate_and_undelegate (on ER), commitment_pool is synced to Solana but launch is not.",
+        "Creator calls this ON SOLANA to copy commitment_pool state into launch so is_graduated and totals are correct."
+      ],
+      "discriminator": [
+        253,
+        214,
+        158,
+        72,
+        30,
+        227,
+        103,
+        200
+      ],
+      "accounts": [
+        {
+          "name": "launch",
+          "writable": true
+        },
+        {
+          "name": "commitment_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "fund_ephemeral",
       "docs": [
         "Step 2: Fund the ephemeral SOL account (deposit SOL)",
@@ -1767,6 +1826,108 @@
         {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "undelegate_user_commitment",
+      "docs": [
+        "Participant calls this ON THE ER to undelegate their user_commitment so it syncs back to Solana.",
+        "After this, they can call calculate_allocation and claim_tokens on Solana."
+      ],
+      "discriminator": [
+        123,
+        30,
+        218,
+        124,
+        207,
+        83,
+        104,
+        230
+      ],
+      "accounts": [
+        {
+          "name": "user_commitment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "launch",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch.creator",
+                "account": "Launch"
+              },
+              {
+                "kind": "account",
+                "path": "launch.token_mint",
+                "account": "Launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "signer": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "magic_program",
+          "address": "Magic11111111111111111111111111111111111111"
+        },
+        {
+          "name": "magic_context",
+          "writable": true,
+          "address": "MagicContext1111111111111111111111111111111"
         }
       ],
       "args": []

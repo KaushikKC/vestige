@@ -222,6 +222,55 @@ export function useVestige() {
     [client, wallet.publicKey],
   );
 
+  // After graduate (on ER), creator calls this on Solana to sync launch from commitment_pool
+  const finalizeGraduation = useCallback(
+    async (launchPda: PublicKey): Promise<string | null> => {
+      if (!client || !wallet.publicKey) {
+        setError("Wallet not connected");
+        return null;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const tx = await client.finalizeGraduation(launchPda, wallet.publicKey);
+        return tx;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Unknown error");
+        console.error("Finalize graduation error:", e);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [client, wallet.publicKey],
+  );
+
+  // Participant calls this (on ER) to sync their user_commitment to Solana, then can calculate/claim
+  const undelegateUserCommitment = useCallback(
+    async (launchPda: PublicKey): Promise<string | null> => {
+      if (!client || !wallet.publicKey) {
+        setError("Wallet not connected");
+        return null;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const tx = await client.undelegateUserCommitment(
+          launchPda,
+          wallet.publicKey,
+        );
+        return tx;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Unknown error");
+        console.error("Undelegate user commitment error:", e);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [client, wallet.publicKey],
+  );
+
   // Graduate launch
   const graduate = useCallback(
     async (launchPda: PublicKey): Promise<string | null> => {
@@ -347,7 +396,10 @@ export function useVestige() {
       setError(null);
 
       try {
-        const tx = await client.sweepEphemeralToVault(launchPda, wallet.publicKey);
+        const tx = await client.sweepEphemeralToVault(
+          launchPda,
+          wallet.publicKey,
+        );
         return tx;
       } catch (e) {
         setError(e instanceof Error ? e.message : "Unknown error");
@@ -362,7 +414,9 @@ export function useVestige() {
 
   // Query commitment data from ER (for privacy demo)
   const queryCommitmentFromER = useCallback(
-    async (launchPda: PublicKey): Promise<{ pool: any; userCommitment: any } | null> => {
+    async (
+      launchPda: PublicKey,
+    ): Promise<{ pool: any; userCommitment: any } | null> => {
       if (!client || !wallet.publicKey) {
         setError("Wallet not connected");
         return null;
@@ -381,7 +435,9 @@ export function useVestige() {
 
   // Query commitment data from Solana base layer (for comparison)
   const queryCommitmentFromSolana = useCallback(
-    async (launchPda: PublicKey): Promise<{ pool: any; userCommitment: any } | null> => {
+    async (
+      launchPda: PublicKey,
+    ): Promise<{ pool: any; userCommitment: any } | null> => {
       if (!client || !wallet.publicKey) {
         setError("Wallet not connected");
         return null;
@@ -415,6 +471,8 @@ export function useVestige() {
     enablePrivateMode,
     delegateToER,
     graduateAndUndelegate,
+    finalizeGraduation,
+    undelegateUserCommitment,
     graduate,
     calculateAllocation,
     claimTokens,

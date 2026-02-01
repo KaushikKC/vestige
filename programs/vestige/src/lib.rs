@@ -558,6 +558,39 @@ pub mod vestige {
         Ok(())
     }
 
+    /// After graduate_and_undelegate (on ER), commitment_pool is synced to Solana but launch is not.
+    /// Creator calls this ON SOLANA to copy commitment_pool state into launch so is_graduated and totals are correct.
+    pub fn finalize_graduation(ctx: Context<FinalizeGraduation>) -> Result<()> {
+        let launch = &mut ctx.accounts.launch;
+        let commitment_pool = &ctx.accounts.commitment_pool;
+        let clock = Clock::get()?;
+
+        require!(commitment_pool.total_committed > 0, VestigeError::NoCommitment);
+        launch.total_committed = commitment_pool.total_committed;
+        launch.total_participants = commitment_pool.total_participants;
+        launch.is_graduated = true;
+        launch.graduation_time = clock.unix_timestamp;
+        launch.is_delegated = false;
+
+        msg!("Launch finalized: {} lamports, {} participants", launch.total_committed, launch.total_participants);
+        Ok(())
+    }
+
+    /// Participant calls this ON THE ER to undelegate their user_commitment so it syncs back to Solana.
+    /// After this, they can call calculate_allocation and claim_tokens on Solana.
+    pub fn undelegate_user_commitment(ctx: Context<UndelegateUserCommitment>) -> Result<()> {
+        let user_commitment = &ctx.accounts.user_commitment;
+        user_commitment.exit(&crate::ID)?;
+        commit_and_undelegate_accounts(
+            &ctx.accounts.payer,
+            vec![&user_commitment.to_account_info()],
+            &ctx.accounts.magic_context,
+            &ctx.accounts.magic_program,
+        )?;
+        msg!("User commitment undelegated and synced to Solana");
+        Ok(())
+    }
+
     /// Calculate user's token allocation based on weighted participation
     /// Formula: weight = 1 + alpha * (1 - t/T)
     /// Early participants get up to 50% bonus tokens
@@ -1135,6 +1168,42 @@ pub struct GraduateAndUndelegate<'info> {
     /// CHECK: Permission program
     #[account(address = PERMISSION_PROGRAM_ID)]
     pub permission_program: UncheckedAccount<'info>,
+}
+
+/// Context for finalize_graduation (runs on Solana after graduate_and_undelegate on ER)
+#[derive(Accounts)]
+pub struct FinalizeGraduation<'info> {
+    #[account(mut)]
+    pub launch: Account<'info, Launch>,
+
+    #[account(
+        seeds = [COMMITMENT_POOL_SEED, launch.key().as_ref()],
+        bump = commitment_pool.bump
+    )]
+    pub commitment_pool: Account<'info, CommitmentPool>,
+
+    #[account(constraint = authority.key() == launch.creator @ VestigeError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
+
+/// Context for undelegate_user_commitment (runs on ER so user_commitment syncs to Solana)
+#[commit]
+#[derive(Accounts)]
+pub struct UndelegateUserCommitment<'info> {
+    #[account(
+        mut,
+        seeds = [USER_COMMITMENT_SEED, launch.key().as_ref(), user.key().as_ref()],
+        bump = user_commitment.bump
+    )]
+    pub user_commitment: Account<'info, UserCommitment>,
+
+    #[account(seeds = [LAUNCH_SEED, launch.creator.as_ref(), launch.token_mint.as_ref()], bump = launch.bump)]
+    pub launch: Account<'info, Launch>,
+
+    pub user: Signer<'info>,
+
+    #[account(mut)]
+    pub payer: Signer<'info>,
 }
 
 #[derive(Accounts)]

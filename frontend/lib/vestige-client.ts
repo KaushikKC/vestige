@@ -1699,6 +1699,77 @@ export class VestigeClient {
   }
 
   /**
+   * After graduate_and_undelegate (on ER), commitment_pool is synced to Solana but launch is not.
+   * Creator calls this ON SOLANA to copy commitment_pool state into launch so is_graduated and totals are correct.
+   * Then participants can calculate_allocation and claim_tokens.
+   */
+  async finalizeGraduation(
+    launchPda: PublicKey,
+    authority: PublicKey,
+  ): Promise<string> {
+    const [commitmentPoolPda] =
+      VestigeClient.deriveCommitmentPoolPda(launchPda);
+    const tx = await this.program.methods
+      .finalizeGraduation()
+      .accounts({
+        launch: launchPda,
+        commitmentPool: commitmentPoolPda,
+        authority: authority,
+      })
+      .rpc();
+    console.log("✅ Launch finalized on Solana:", tx);
+    return tx;
+  }
+
+  /**
+   * Participant calls this ON THE ER to undelegate their user_commitment so it syncs back to Solana.
+   * Send via Magic Router. After this, they can call calculate_allocation and claim_tokens on Solana.
+   */
+  async undelegateUserCommitment(
+    launchPda: PublicKey,
+    user: PublicKey,
+  ): Promise<string> {
+    const [userCommitmentPda] = VestigeClient.deriveUserCommitmentPda(
+      launchPda,
+      user,
+    );
+    const instruction = await this.erProgram.methods
+      .undelegateUserCommitment()
+      .accounts({
+        userCommitment: userCommitmentPda,
+        launch: launchPda,
+        user: user,
+        payer: user,
+      })
+      .instruction();
+    const modifiedKeys = instruction.keys.map((key) =>
+      key.pubkey.equals(user) && key.isSigner
+        ? { ...key, isWritable: false }
+        : key,
+    );
+    const modifiedInstruction = new TransactionInstruction({
+      keys: modifiedKeys,
+      programId: instruction.programId,
+      data: instruction.data,
+    });
+    const transaction = new Transaction().add(modifiedInstruction);
+    transaction.feePayer = user;
+    transaction.recentBlockhash = (
+      await this.erConnection.getLatestBlockhash()
+    ).blockhash;
+    const signedTx = await this.provider.wallet.signTransaction(transaction);
+    const sendConnection = new Connection(ER_ROUTER_URL, "confirmed");
+    console.log("  Sending undelegate_user_commitment via Magic Router");
+    const txSig = await sendConnection.sendRawTransaction(
+      signedTx.serialize(),
+      { skipPreflight: true, preflightCommitment: "confirmed" },
+    );
+    await sendConnection.confirmTransaction(txSig, "confirmed");
+    console.log("✅ User commitment undelegated (synced to Solana):", txSig);
+    return txSig;
+  }
+
+  /**
    * Calculate allocation after graduation
    */
   async calculateAllocation(

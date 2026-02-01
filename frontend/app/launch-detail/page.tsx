@@ -239,13 +239,13 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
             ))}
           </div>
 
-          <div className="bg-[#B9A7FF]/10 border border-[#B9A7FF]/20 p-4 rounded-xl flex gap-3">
+          <div className="bg-[#F5F6FA] border border-[#E6E8EF] p-4 rounded-xl flex gap-3">
             <EyeOff className="text-[#3A2BFF] shrink-0" size={20} />
             <div>
-              <h4 className="text-sm font-bold text-[#3A2BFF] mb-1">
+              <h4 className="text-sm font-bold text-[#0B0D17] mb-1">
                 Privacy Active
               </h4>
-              <p className="text-xs text-[#0B0D17]/70">
+              <p className="text-xs text-[#6B7280]">
                 Total participants and exact committed capital are hidden to
                 prevent market manipulation. Data will be revealed upon
                 graduation.
