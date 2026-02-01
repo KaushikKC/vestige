@@ -58,16 +58,19 @@ function launchDataToLaunch(data: LaunchData): Launch {
   };
 }
 
-// Mock Data for Mini Charts
-const MOCK_CHART_DATA_1 = Array.from({ length: 20 }, (_, i) => ({
-  val: 40 + Math.random() * 30 + i * 2,
-}));
-const MOCK_CHART_DATA_2 = Array.from({ length: 20 }, (_, i) => ({
-  val: 80 - Math.random() * 20 + i,
-}));
-const MOCK_CHART_DATA_3 = Array.from({ length: 20 }, () => ({
-  val: 20 + Math.random() * 50,
-}));
+// Base data for mini charts (will be updated live)
+const baseChart1 = () =>
+  Array.from({ length: 20 }, (_, i) => ({
+    val: 40 + Math.random() * 30 + i * 2,
+  }));
+const baseChart2 = () =>
+  Array.from({ length: 20 }, (_, i) => ({
+    val: 80 - Math.random() * 20 + i,
+  }));
+const baseChart3 = () =>
+  Array.from({ length: 20 }, () => ({
+    val: 20 + Math.random() * 50,
+  }));
 
 const Discover: React.FC<DiscoverProps> = ({ setView, setSelectedLaunch }) => {
   const [timeRange, setTimeRange] = useState("24h");
@@ -76,6 +79,39 @@ const Discover: React.FC<DiscoverProps> = ({ setView, setSelectedLaunch }) => {
   const [realLaunches, setRealLaunches] = useState<Launch[]>([]);
   const [loadingLaunches, setLoadingLaunches] = useState(true);
   const [launchPdaInput, setLaunchPdaInput] = useState("");
+  const [liveChart1, setLiveChart1] = useState<{ val: number }[]>(() =>
+    baseChart1(),
+  );
+  const [liveChart2, setLiveChart2] = useState<{ val: number }[]>(() =>
+    baseChart2(),
+  );
+  const [liveChart3, setLiveChart3] = useState<{ val: number }[]>(() =>
+    baseChart3(),
+  );
+  const [heroParticipants, setHeroParticipants] = useState(24500);
+  useEffect(() => {
+    const t = setInterval(() => {
+      setLiveChart1((prev) =>
+        prev.map((p) => ({
+          val: Math.max(0, p.val + (Math.random() - 0.5) * 4),
+        })),
+      );
+      setLiveChart2((prev) =>
+        prev.map((p) => ({
+          val: Math.max(0, p.val + (Math.random() - 0.5) * 3),
+        })),
+      );
+      setLiveChart3((prev) =>
+        prev.map((p) => ({
+          val: Math.max(0, p.val + (Math.random() - 0.5) * 5),
+        })),
+      );
+      setHeroParticipants((n) =>
+        Math.max(20000, Math.min(28000, n + (Math.random() - 0.5) * 400)),
+      );
+    }, 1800);
+    return () => clearInterval(t);
+  }, []);
 
   const { fetchLaunches } = useVestige();
 
@@ -181,7 +217,9 @@ const Discover: React.FC<DiscoverProps> = ({ setView, setSelectedLaunch }) => {
                     +145%
                   </span>
                 </div>
-                <div className="text-3xl font-black mb-1">24.5k</div>
+                <div className="text-3xl font-black mb-1 tabular-nums transition-all duration-500">
+                  {(heroParticipants / 1000).toFixed(1)}k
+                </div>
                 <div className="text-xs font-bold opacity-60 mb-6">
                   Participants
                 </div>
@@ -193,7 +231,7 @@ const Discover: React.FC<DiscoverProps> = ({ setView, setSelectedLaunch }) => {
                     minWidth={0}
                     minHeight={0}
                   >
-                    <AreaChart data={MOCK_CHART_DATA_1}>
+                    <AreaChart data={liveChart1}>
                       <Area
                         type="monotone"
                         dataKey="val"
@@ -213,7 +251,7 @@ const Discover: React.FC<DiscoverProps> = ({ setView, setSelectedLaunch }) => {
       {/* OPEN BY LAUNCH PDA - Quick way to view your launch */}
       <div className="bg-white rounded-2xl p-6 border-2 border-[#CFEA4D] shadow-sm">
         <h3 className="text-lg font-bold text-[#09090A] mb-3 flex items-center gap-2">
-          <Rocket size={20} className="text-[#1D04E1]" />
+          {/* <Rocket size={20} className="text-[#1D04E1]" /> */}
           Open a launch by PDA
         </h3>
         <p className="text-sm text-[#6B7280] mb-4">
@@ -481,7 +519,7 @@ const Discover: React.FC<DiscoverProps> = ({ setView, setSelectedLaunch }) => {
                 name: "Solana",
                 price: "$145.20",
                 change: "+5.4%",
-                data: MOCK_CHART_DATA_1,
+                data: liveChart1,
                 color: "#09090A",
               },
               {
@@ -489,7 +527,7 @@ const Discover: React.FC<DiscoverProps> = ({ setView, setSelectedLaunch }) => {
                 name: "Jupiter",
                 price: "$1.24",
                 change: "+12.1%",
-                data: MOCK_CHART_DATA_2,
+                data: liveChart2,
                 color: "#22C55E",
               },
               {
@@ -497,7 +535,7 @@ const Discover: React.FC<DiscoverProps> = ({ setView, setSelectedLaunch }) => {
                 name: "Pyth Network",
                 price: "$0.45",
                 change: "+2.3%",
-                data: MOCK_CHART_DATA_3,
+                data: liveChart3,
                 color: "#EAB308",
               },
               {
@@ -505,7 +543,7 @@ const Discover: React.FC<DiscoverProps> = ({ setView, setSelectedLaunch }) => {
                 name: "Bonk",
                 price: "$0.000024",
                 change: "-1.5%",
-                data: MOCK_CHART_DATA_2,
+                data: liveChart2,
                 color: "#EF4444",
               },
               {
@@ -513,7 +551,7 @@ const Discover: React.FC<DiscoverProps> = ({ setView, setSelectedLaunch }) => {
                 name: "dogwifhat",
                 price: "$2.89",
                 change: "+8.7%",
-                data: MOCK_CHART_DATA_1,
+                data: liveChart1,
                 color: "#09090A",
               },
             ].map((coin, i) => (

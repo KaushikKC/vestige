@@ -10,9 +10,13 @@ import {
 import { BN } from "@coral-xyz/anchor";
 import {
   createInitializeMint2Instruction,
+  createAssociatedTokenAccountInstruction,
+  createMintToInstruction,
   TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
   MINT_SIZE,
   getMinimumBalanceForRentExemptMint,
+  getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useVestige } from "@/lib/use-vestige";
@@ -133,10 +137,9 @@ export default function CreateLaunchForm({
         `⏱️ Launch duration: ${formData.durationMinutes} minutes (${durationSeconds} seconds)`,
       );
 
-      // Convert to proper units (BN for u64)
-      const tokenSupply = VestigeClient.solToLamports(
-        parseFloat(formData.tokenSupply),
-      );
+      // Token supply in base units (6 decimals)
+      const tokenSupplyRaw = Math.floor(parseFloat(formData.tokenSupply) * 1e6);
+      const tokenSupply = new BN(tokenSupplyRaw);
       const graduationTarget = VestigeClient.solToLamports(
         parseFloat(formData.graduationTarget),
       );
@@ -173,6 +176,49 @@ export default function CreateLaunchForm({
         .rpc({ skipPreflight: true });
 
       console.log("✅ Launch created! Transaction:", tx);
+
+      // Create creator's token vault (ATA) and mint full supply so participants can claim
+      const creatorTokenVault = getAssociatedTokenAddressSync(
+        tokenMint,
+        publicKey,
+        false,
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+      );
+      const vaultTx = new Transaction();
+      const existingVault = await connection.getAccountInfo(creatorTokenVault);
+      if (!existingVault) {
+        vaultTx.add(
+          createAssociatedTokenAccountInstruction(
+            publicKey,
+            creatorTokenVault,
+            publicKey,
+            tokenMint,
+            TOKEN_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID,
+          ),
+        );
+      }
+      vaultTx.add(
+        createMintToInstruction(
+          tokenMint,
+          creatorTokenVault,
+          publicKey,
+          tokenSupplyRaw,
+          [],
+          TOKEN_PROGRAM_ID,
+        ),
+      );
+      const { blockhash: blockhash2 } = await connection.getLatestBlockhash();
+      vaultTx.recentBlockhash = blockhash2;
+      vaultTx.feePayer = publicKey;
+      const signedVault = await wallet.signTransaction!(vaultTx);
+      const vaultTxSig = await connection.sendRawTransaction(
+        signedVault.serialize(),
+      );
+      await connection.confirmTransaction(vaultTxSig, "confirmed");
+      console.log("✅ Token vault created and supply minted:", vaultTxSig);
+
       setTxSignature(tx);
       setLaunchPdaCreated(launchPda.toBase58());
 
@@ -204,7 +250,7 @@ export default function CreateLaunchForm({
     return (
       <div className="bg-white rounded-2xl p-8 shadow-lg border border-[#E6E8EF] text-center">
         <div className="w-16 h-16 bg-[#F5F6FA] rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-[#E6E8EF]">
-          <Rocket size={32} className="text-[#3A2BFF]" />
+          {/* <Rocket size={32} className="text-[#3A2BFF]" /> */}
         </div>
         <h3 className="text-2xl font-bold mb-4 text-[#0B0D17]">
           Launch Created
@@ -393,7 +439,7 @@ export default function CreateLaunchForm({
             </>
           ) : (
             <>
-              <Rocket size={20} />
+              {/* <Rocket size={20} /> */}
               Create Launch
             </>
           )}

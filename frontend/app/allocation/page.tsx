@@ -178,7 +178,15 @@ const Allocation: React.FC<AllocationProps> = () => {
       }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      toast.error(msg, { id: toastId });
+      const isTokenVaultNotInit =
+        typeof msg === "string" &&
+        (msg.includes("AccountNotInitialized") || msg.includes("token_vault"));
+      toast.error(
+        isTokenVaultNotInit
+          ? "Token vault not set up for this launch. The creator must create the launch with token distribution (new flow)."
+          : msg,
+        { id: toastId },
+      );
     } finally {
       setClaiming(false);
     }

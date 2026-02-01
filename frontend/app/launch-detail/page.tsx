@@ -9,6 +9,8 @@ import {
   AlertTriangle,
   EyeOff,
   Loader2,
+  Share2,
+  Bookmark,
 } from "lucide-react";
 import {
   AreaChart,
@@ -36,6 +38,8 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [committed, setCommitted] = useState(false);
   const [txSignature, setTxSignature] = useState<string | null>(null);
+  const [chartData, setChartData] = useState(() => [...CHART_DATA]);
+  const [watched, setWatched] = useState(false);
 
   // Vestige hook for real transactions
   const { connected, balance, commit, loading, error, publicKey, fetchLaunch } =
@@ -43,6 +47,22 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
 
   // Fetch real launch data for MagicBlock status
   const [realLaunchData, setRealLaunchData] = useState<any>(null);
+
+  // Live-ticking chart so it feels like real data
+  useEffect(() => {
+    const t = setInterval(() => {
+      setChartData((prev) =>
+        prev.map((p) => ({
+          ...p,
+          price: Math.max(
+            5,
+            Math.min(120, p.price + (Math.random() - 0.5) * 3),
+          ),
+        })),
+      );
+    }, 2200);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     if (launch?.launchPda) {
@@ -130,11 +150,47 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
         </div>
 
         <div className="flex gap-2">
-          <button className="px-4 py-2 bg-white border-2 border-[#09090A] rounded-lg text-sm font-semibold text-[#0B0D17] shadow-sm hover:bg-[#F5F6FA]">
+          <button
+            type="button"
+            onClick={() => {
+              if (
+                typeof navigator !== "undefined" &&
+                navigator.share &&
+                launch?.launchPda
+              ) {
+                navigator
+                  .share({
+                    title: `${launch.name} (${launch.symbol})`,
+                    text: `View launch on Vestige`,
+                    url: `${
+                      typeof window !== "undefined"
+                        ? window.location.origin
+                        : ""
+                    }/?pda=${launch.launchPda}`,
+                  })
+                  .catch(() => {});
+              } else {
+                navigator.clipboard
+                  ?.writeText(launch?.launchPda ?? "")
+                  .then(() => toast.success("Launch PDA copied"));
+              }
+            }}
+            className="px-4 py-2 bg-white border-2 border-[#09090A] rounded-lg text-sm font-semibold text-[#0B0D17] shadow-sm hover:bg-[#F5F6FA] flex items-center gap-2 transition-colors"
+          >
+            <Share2 size={16} />
             Share
           </button>
-          <button className="px-4 py-2 bg-[#0B0D17] rounded-lg text-sm font-semibold text-white shadow-md hover:bg-[#222] border-2 border-[#09090A]">
-            Watch
+          <button
+            type="button"
+            onClick={() => setWatched(!watched)}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold shadow-md border-2 border-[#09090A] flex items-center gap-2 transition-colors ${
+              watched
+                ? "bg-[#CFEA4D] text-[#0B0D17]"
+                : "bg-[#0B0D17] text-white hover:bg-[#222]"
+            }`}
+          >
+            <Bookmark size={16} className={watched ? "fill-current" : ""} />
+            {watched ? "Watching" : "Watch"}
           </button>
         </div>
       </div>
@@ -173,7 +229,7 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
                 minWidth={0}
                 minHeight={0}
               >
-                <AreaChart data={CHART_DATA}>
+                <AreaChart data={chartData}>
                   <defs>
                     <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#3A2BFF" stopOpacity={0.2} />
