@@ -521,6 +521,18 @@ export default function MagicBlockControls({
                       {privacyDemo.solanaData.pool.totalParticipants.toNumber()}
                     </span>
                   </div>
+                  {privacyDemo.erData?.pool &&
+                    privacyDemo.solanaData.pool.totalCommitted.toNumber() ===
+                      0 &&
+                    privacyDemo.erData.pool.totalCommitted.toNumber() > 0 && (
+                      <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">
+                        <strong>Why 0?</strong> Pool totals on Solana update
+                        only when the <strong>creator</strong> runs
+                        &quot;Graduate &amp; Undelegate&quot;, then
+                        &quot;Finalize graduation&quot;. &quot;Sync my
+                        commitment&quot; only syncs your individual commitment.
+                      </div>
+                    )}
                 </div>
               ) : (
                 <div className="text-sm text-[#6B7280]">No data on Solana</div>

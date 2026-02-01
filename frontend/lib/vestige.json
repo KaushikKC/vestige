@@ -666,8 +666,8 @@
     {
       "name": "finalize_graduation",
       "docs": [
-        "After graduate_and_undelegate (on ER), commitment_pool is synced to Solana but launch is not.",
-        "Creator calls this ON SOLANA to copy commitment_pool state into launch so is_graduated and totals are correct."
+        "After graduate_and_undelegate (on ER), commitment_pool is synced to Solana but may still be",
+        "owned by the Ephemeral Rollups program. We deserialize without owner check and copy to launch."
       ],
       "discriminator": [
         253,
@@ -685,35 +685,7 @@
           "writable": true
         },
         {
-          "name": "commitment_pool",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  109,
-                  109,
-                  105,
-                  116,
-                  109,
-                  101,
-                  110,
-                  116,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              }
-            ]
-          }
+          "name": "commitment_pool"
         },
         {
           "name": "authority",
@@ -905,7 +877,9 @@
       "docs": [
         "Graduate and undelegate in one transaction (for delegated pools)",
         "Uses SDK's commit_and_undelegate for atomic settlement",
-        "IMPORTANT: This must be called on the ER!"
+        "IMPORTANT: This must be called on the ER!",
+        "NOTE: launch is READ-ONLY here because it's not delegated to ER.",
+        "All launch updates happen in finalize_graduation on Solana."
       ],
       "discriminator": [
         254,
@@ -920,7 +894,9 @@
       "accounts": [
         {
           "name": "launch",
-          "writable": true
+          "docs": [
+            "Launch is READ-ONLY here - not delegated to ER, so can't be writable"
+          ]
         },
         {
           "name": "commitment_pool",
@@ -955,17 +931,9 @@
           }
         },
         {
-          "name": "permission_pool",
-          "writable": true
-        },
-        {
           "name": "payer",
           "writable": true,
           "signer": true
-        },
-        {
-          "name": "permission_program",
-          "address": "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1"
         },
         {
           "name": "magic_program",
@@ -2156,6 +2124,11 @@
       "code": 6018,
       "name": "NothingToSweep",
       "msg": "Nothing to sweep to vault"
+    },
+    {
+      "code": 6019,
+      "name": "InvalidAccountData",
+      "msg": "Invalid or unreadable account data (e.g. commitment_pool owned by ER)"
     }
   ],
   "types": [
@@ -2231,6 +2204,14 @@
           {
             "name": "total_participants",
             "type": "u64"
+          },
+          {
+            "name": "is_graduated",
+            "type": "bool"
+          },
+          {
+            "name": "graduation_time",
+            "type": "i64"
           },
           {
             "name": "bump",

@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::AccountDeserialize;
 use anchor_lang::system_program;
 use anchor_spl::token::{self, Token, TokenAccount, Mint, Transfer};
 
@@ -8,7 +9,7 @@ use ephemeral_rollups_sdk::cpi::DelegateConfig;
 use ephemeral_rollups_sdk::ephem::commit_and_undelegate_accounts;
 use ephemeral_rollups_sdk::consts::PERMISSION_PROGRAM_ID;
 use ephemeral_rollups_sdk::access_control::instructions::{
-    CreatePermissionCpiBuilder, UpdatePermissionCpiBuilder,
+    CreatePermissionCpiBuilder,
 };
 use ephemeral_rollups_sdk::access_control::structs::{Member, MembersArgs};
 
@@ -112,6 +113,8 @@ pub mod vestige {
         pool.launch = launch.key();
         pool.total_committed = 0;
         pool.total_participants = 0;
+        pool.is_graduated = false;
+        pool.graduation_time = 0;
         pool.bump = ctx.bumps.commitment_pool;
 
         msg!("Vestige Launch Initialized!");
@@ -505,8 +508,10 @@ pub mod vestige {
     /// Graduate and undelegate in one transaction (for delegated pools)
     /// Uses SDK's commit_and_undelegate for atomic settlement
     /// IMPORTANT: This must be called on the ER!
+    /// NOTE: launch is READ-ONLY here because it's not delegated to ER.
+    /// All launch updates happen in finalize_graduation on Solana.
     pub fn graduate_and_undelegate(ctx: Context<GraduateAndUndelegate>) -> Result<()> {
-        let launch = &mut ctx.accounts.launch;
+        let launch = &ctx.accounts.launch; // READ-ONLY - not delegated
         let commitment_pool = &mut ctx.accounts.commitment_pool;
         let clock = Clock::get()?;
 
@@ -519,29 +524,14 @@ pub mod vestige {
 
         require!(target_reached || time_expired, VestigeError::GraduationConditionsNotMet);
 
-        // Sync final state
-        launch.total_committed = commitment_pool.total_committed;
-        launch.total_participants = commitment_pool.total_participants;
-        launch.is_graduated = true;
-        launch.graduation_time = clock.unix_timestamp;
-        launch.is_delegated = false;
+        // Mark commitment_pool as graduated (finalize_graduation will copy to launch)
+        commitment_pool.is_graduated = true;
+        commitment_pool.graduation_time = clock.unix_timestamp;
 
-        // Update permission to make data public (no members = public access)
-        // This reveals the commitment pool data
-        UpdatePermissionCpiBuilder::new(&ctx.accounts.permission_program)
-            .permissioned_account(&commitment_pool.to_account_info(), true)
-            .authority(&commitment_pool.to_account_info(), false)
-            .permission(&ctx.accounts.permission_pool)
-            .args(MembersArgs { members: None })
-            .invoke_signed(&[&[
-                COMMITMENT_POOL_SEED,
-                launch.key().as_ref(),
-                &[commitment_pool.bump],
-            ]])?;
-
-        msg!("=== LAUNCH GRADUATED & UNDELEGATING ===");
-        msg!("Total Committed: {} lamports", launch.total_committed);
-        msg!("Total Participants: {}", launch.total_participants);
+        msg!("=== COMMITMENT POOL GRADUATED & UNDELEGATING ===");
+        msg!("Total Committed: {} lamports", commitment_pool.total_committed);
+        msg!("Total Participants: {}", commitment_pool.total_participants);
+        msg!("NOTE: Call finalize_graduation on Solana to update launch");
 
         // IMPORTANT: Call exit() on the SAME account we're undelegating
         // This is how RPS example does it
@@ -558,18 +548,24 @@ pub mod vestige {
         Ok(())
     }
 
-    /// After graduate_and_undelegate (on ER), commitment_pool is synced to Solana but launch is not.
-    /// Creator calls this ON SOLANA to copy commitment_pool state into launch so is_graduated and totals are correct.
+    /// After graduate_and_undelegate (on ER), commitment_pool is synced to Solana but may still be
+    /// owned by the Ephemeral Rollups program. We deserialize without owner check and copy to launch.
     pub fn finalize_graduation(ctx: Context<FinalizeGraduation>) -> Result<()> {
         let launch = &mut ctx.accounts.launch;
-        let commitment_pool = &ctx.accounts.commitment_pool;
-        let clock = Clock::get()?;
 
+        let data = ctx.accounts.commitment_pool.try_borrow_data()?;
+        let mut slice = data.as_ref();
+        let commitment_pool =
+            CommitmentPool::try_deserialize(&mut slice).map_err(|_| VestigeError::InvalidAccountData)?;
+
+        // Check that graduate_and_undelegate was called (sets is_graduated on commitment_pool)
+        require!(commitment_pool.is_graduated, VestigeError::NotGraduated);
         require!(commitment_pool.total_committed > 0, VestigeError::NoCommitment);
+
         launch.total_committed = commitment_pool.total_committed;
         launch.total_participants = commitment_pool.total_participants;
         launch.is_graduated = true;
-        launch.graduation_time = clock.unix_timestamp;
+        launch.graduation_time = commitment_pool.graduation_time; // Use time from ER graduation
         launch.is_delegated = false;
 
         msg!("Launch finalized: {} lamports, {} participants", launch.total_committed, launch.total_participants);
@@ -752,11 +748,13 @@ pub struct CommitmentPool {
     pub launch: Pubkey,            // 32
     pub total_committed: u64,      // 8
     pub total_participants: u64,   // 8
+    pub is_graduated: bool,        // 1 (set by graduate_and_undelegate on ER)
+    pub graduation_time: i64,      // 8 (set by graduate_and_undelegate on ER)
     pub bump: u8,                  // 1
 }
 
 impl CommitmentPool {
-    pub const SIZE: usize = 8 + 32 + 8 + 8 + 1;
+    pub const SIZE: usize = 8 + 32 + 8 + 8 + 1 + 8 + 1; // = 66
 }
 
 #[account]
@@ -1145,10 +1143,11 @@ pub struct Graduate<'info> {
 
 /// Context for graduating and undelegating (uses #[commit] for magic accounts)
 /// IMPORTANT: The #[commit] macro automatically adds magic_context and magic_program
+/// NOTE: launch is READ-ONLY because it's not delegated to ER. Only commitment_pool is delegated.
 #[commit]
 #[derive(Accounts)]
 pub struct GraduateAndUndelegate<'info> {
-    #[account(mut)]
+    /// Launch is READ-ONLY here - not delegated to ER, so can't be writable
     pub launch: Account<'info, Launch>,
 
     #[account(
@@ -1158,29 +1157,26 @@ pub struct GraduateAndUndelegate<'info> {
     )]
     pub commitment_pool: Account<'info, CommitmentPool>,
 
-    /// CHECK: Permission for commitment pool
-    #[account(mut)]
-    pub permission_pool: UncheckedAccount<'info>,
-
     #[account(mut)]
     pub payer: Signer<'info>,
-
-    /// CHECK: Permission program
-    #[account(address = PERMISSION_PROGRAM_ID)]
-    pub permission_program: UncheckedAccount<'info>,
 }
 
 /// Context for finalize_graduation (runs on Solana after graduate_and_undelegate on ER)
+/// commitment_pool may still be owned by the Ephemeral Rollups program (DELeGG...) after
+/// undelegate; we accept it via UncheckedAccount and deserialize manually.
 #[derive(Accounts)]
 pub struct FinalizeGraduation<'info> {
     #[account(mut)]
     pub launch: Account<'info, Launch>,
 
+    /// CHECK: Commitment pool PDA; may be owned by Vestige or by Ephemeral Rollups after undelegate.
     #[account(
-        seeds = [COMMITMENT_POOL_SEED, launch.key().as_ref()],
-        bump = commitment_pool.bump
+        constraint = commitment_pool.key() == Pubkey::find_program_address(
+            &[COMMITMENT_POOL_SEED, launch.key().as_ref()],
+            &crate::ID
+        ).0
     )]
-    pub commitment_pool: Account<'info, CommitmentPool>,
+    pub commitment_pool: UncheckedAccount<'info>,
 
     #[account(constraint = authority.key() == launch.creator @ VestigeError::Unauthorized)]
     pub authority: Signer<'info>,
@@ -1320,4 +1316,6 @@ pub enum VestigeError {
     InsufficientEphemeralBalance,
     #[msg("Nothing to sweep to vault")]
     NothingToSweep,
+    #[msg("Invalid or unreadable account data (e.g. commitment_pool owned by ER)")]
+    InvalidAccountData,
 }

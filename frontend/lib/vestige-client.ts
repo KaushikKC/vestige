@@ -47,6 +47,15 @@ export const DEVNET_ER_RPC_URL = "https://devnet-us.magicblock.app";
 // Router auto-routes txs to the correct regional ER (use for private_commit to avoid InvalidWritableAccount)
 const ER_ROUTER_URL = "https://devnet-router.magicblock.app";
 
+// MagicBlock #[commit] macro accounts - these are placeholders the ER intercepts
+// Used by commit_and_undelegate_accounts CPI
+export const MAGIC_PROGRAM = new PublicKey(
+  "Magic11111111111111111111111111111111111111",
+);
+export const MAGIC_CONTEXT = new PublicKey(
+  "MagicContext1111111111111111111111111111111",
+);
+
 // PDA Seeds
 export const LAUNCH_SEED = "launch";
 export const COMMITMENT_POOL_SEED = "commitment_pool";
@@ -1000,9 +1009,14 @@ export class VestigeClient {
 
     if (confirmation.value.err) {
       console.error("❌ ER transaction FAILED:", confirmation.value.err);
-      throw new Error(
-        `ER transaction failed: ${JSON.stringify(confirmation.value.err)}`,
-      );
+      const errStr = JSON.stringify(confirmation.value.err);
+      // 6004 = InsufficientEphemeralBalance - ER had stale ephemeral balance
+      if (errStr.includes("6004") || errStr.includes("Custom")) {
+        throw new Error(
+          "ER transaction failed: InsufficientEphemeralBalance (6004). The ER may have a stale copy of your ephemeral account. Wait 30–60 seconds and try committing again.",
+        );
+      }
+      throw new Error(`ER transaction failed: ${errStr}`);
     }
 
     // Get transaction details to verify it executed
@@ -1323,7 +1337,8 @@ export class VestigeClient {
           user,
         );
         console.log("   Fund tx:", fundTx);
-        await wait(2000);
+        // Let base layer state settle before delegation so ER gets correct balance
+        await wait(5000);
 
         // Step 2: Delegate user_commitment and ephemeral_sol to TEE (so private_commit can run on ER)
         // Check ephemeral balance BEFORE delegation
@@ -1356,26 +1371,53 @@ export class VestigeClient {
         console.log("   Step 2: Delegating user accounts to TEE...");
         await this.delegateUserAccountsForPrivateCommit(launchPda, user);
 
-        // Check ephemeral balance on ER AFTER delegation
-        await wait(5000); // Wait for ER to sync
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const ephAfter = await (
-            this.erProgram.account as any
-          ).ephemeralSol.fetch(ephemeralSolPda);
-          console.log("   📊 Ephemeral on ER AFTER delegation:", {
-            trackedBalance: ephAfter.balance.toNumber() / LAMPORTS_PER_SOL,
-            user: ephAfter.user.toBase58(),
-          });
-        } catch (e) {
-          console.warn(
-            "   Could not fetch ephemeral from ER after delegation:",
-            e,
+        // ER needs time to sync delegation state AND account data (balance) from Solana
+        // Error 6004 = InsufficientEphemeralBalance if ER has stale balance (0)
+        console.log(
+          "   Waiting for ER to sync delegations and balance (15s)...",
+        );
+        await wait(15000);
+
+        // Check ephemeral balance on ER - MUST be >= amount or private_commit fails with 6004
+        let erBalanceOk = false;
+        for (let checkAttempt = 1; checkAttempt <= 3; checkAttempt++) {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const ephAfter = await (
+              this.erProgram.account as any
+            ).ephemeralSol.fetch(ephemeralSolPda);
+            const erBalance = ephAfter.balance.toNumber();
+            console.log("   📊 Ephemeral on ER (check " + checkAttempt + "):", {
+              trackedBalance: erBalance / LAMPORTS_PER_SOL,
+              user: ephAfter.user.toBase58(),
+            });
+            if (erBalance >= amountLamports) {
+              erBalanceOk = true;
+              break;
+            }
+            console.warn(
+              "   ER ephemeral balance " +
+                erBalance +
+                " < amount " +
+                amountLamports +
+                " - ER may still be syncing",
+            );
+            if (checkAttempt < 3) await wait(10000);
+          } catch (e) {
+            console.warn(
+              "   Could not fetch ephemeral from ER (attempt " +
+                checkAttempt +
+                "):",
+              e,
+            );
+            if (checkAttempt < 3) await wait(10000);
+          }
+        }
+        if (!erBalanceOk) {
+          throw new Error(
+            "Ephemeral balance on ER is still below commit amount. Wait 30s and try again, or the ER node may be slow to sync.",
           );
         }
-        // ER needs time to sync delegation state from Solana before we can write those accounts
-        console.log("   Waiting for ER to sync delegations (8s)...");
-        await wait(8000);
 
         // CRITICAL: Verify ALL writable accounts are properly delegated before attempting private commit
         const [commitmentPoolPda] =
@@ -1633,6 +1675,8 @@ export class VestigeClient {
    * Must be called on the ER (sends commit_and_undelegate)
    *
    * Uses non-writable payer pattern (same as privateCommit) for ER compatibility
+   * IMPORTANT: launch is READ-ONLY (not delegated) - only commitment_pool is modified
+   * IMPORTANT: Must include magic_program and magic_context for commit_and_undelegate CPI
    */
   async graduateAndUndelegate(
     launchPda: PublicKey,
@@ -1640,20 +1684,23 @@ export class VestigeClient {
   ): Promise<string> {
     const [commitmentPoolPda] =
       VestigeClient.deriveCommitmentPoolPda(launchPda);
-    const [permissionPoolPda] = derivePermissionPda(commitmentPoolPda);
 
     console.log("🎓📤 Graduating and undelegating from ER...");
-    console.log("  This will reveal all commitment data publicly");
+    console.log("  commitment_pool will be synced to Solana");
+    console.log("  launch is READ-ONLY (not delegated) - update via finalize_graduation");
+    console.log("  Including magic_program and magic_context for commit_and_undelegate");
 
     // Build instruction manually to ensure payer is NOT writable (ER requirement)
+    // launch is read-only (not delegated), only commitment_pool is writable
+    // Include magic_program and magic_context required by #[commit] macro
     const instruction = await this.erProgram.methods
       .graduateAndUndelegate()
       .accounts({
         launch: launchPda,
         commitmentPool: commitmentPoolPda,
-        permissionPool: permissionPoolPda,
         payer: payer,
-        permissionProgram: PERMISSION_PROGRAM_ID,
+        magicProgram: MAGIC_PROGRAM,
+        magicContext: MAGIC_CONTEXT,
       })
       .instruction();
 
@@ -1691,10 +1738,47 @@ export class VestigeClient {
       { skipPreflight: true, preflightCommitment: "confirmed" },
     );
 
-    await sendConnection.confirmTransaction(txSig, "confirmed");
+    const confirmation = await sendConnection.confirmTransaction(txSig, "confirmed");
+
+    if (confirmation.value.err) {
+      console.error("❌ Graduate and undelegate FAILED:", confirmation.value.err);
+      throw new Error(`Graduate and undelegate failed: ${JSON.stringify(confirmation.value.err)}`);
+    }
 
     console.log("✅ Launch GRADUATED & UNDELEGATED:", txSig);
     console.log("🔓 All commitment data is now public!");
+
+    // Wait for commitment_pool state to sync from ER to Solana
+    console.log("  ⏳ Waiting 15s for commitment_pool to sync to Solana...");
+    await new Promise(r => setTimeout(r, 15000));
+
+    // Verify commitment_pool on Solana has the data
+    console.log("  🔍 Verifying commitment_pool state on Solana...");
+    try {
+      const poolAccountInfo = await this.connection.getAccountInfo(commitmentPoolPda);
+      if (poolAccountInfo) {
+        console.log("    Owner:", poolAccountInfo.owner.toBase58());
+        console.log("    Lamports:", poolAccountInfo.lamports);
+        if (poolAccountInfo.data.length >= 24) {
+          const dataView = new DataView(poolAccountInfo.data.buffer, poolAccountInfo.data.byteOffset);
+          const totalCommittedLow = dataView.getUint32(8, true);
+          const totalCommittedHigh = dataView.getUint32(12, true);
+          const totalCommitted = totalCommittedLow + totalCommittedHigh * 0x100000000;
+          console.log("    total_committed:", totalCommitted / LAMPORTS_PER_SOL, "SOL");
+          if (totalCommitted === 0) {
+            console.warn("    ⚠️ WARNING: total_committed is still 0 on Solana!");
+            console.warn("    The undelegation may not have completed. Wait longer or check ER status.");
+          } else {
+            console.log("    ✅ Commitment data synced to Solana!");
+          }
+        }
+      } else {
+        console.warn("    ⚠️ commitment_pool account not found on Solana!");
+      }
+    } catch (e) {
+      console.error("    Error checking commitment_pool:", e);
+    }
+
     return txSig;
   }
 
@@ -1709,6 +1793,35 @@ export class VestigeClient {
   ): Promise<string> {
     const [commitmentPoolPda] =
       VestigeClient.deriveCommitmentPoolPda(launchPda);
+
+    // Debug: Check commitment_pool state on Solana before calling finalize
+    console.log("📋 Checking commitment_pool on Solana before finalize...");
+    try {
+      const poolAccountInfo = await this.connection.getAccountInfo(commitmentPoolPda);
+      if (poolAccountInfo) {
+        console.log("   Owner:", poolAccountInfo.owner.toBase58());
+        console.log("   Lamports:", poolAccountInfo.lamports);
+        console.log("   Data length:", poolAccountInfo.data.length);
+        // Try to read the data manually (skip 8-byte discriminator)
+        if (poolAccountInfo.data.length >= 24) {
+          const dataView = new DataView(poolAccountInfo.data.buffer, poolAccountInfo.data.byteOffset);
+          // After 8-byte discriminator, we have total_committed (u64) and total_participants (u64)
+          const totalCommittedLow = dataView.getUint32(8, true);
+          const totalCommittedHigh = dataView.getUint32(12, true);
+          const totalCommitted = totalCommittedLow + totalCommittedHigh * 0x100000000;
+          const totalParticipantsLow = dataView.getUint32(16, true);
+          const totalParticipantsHigh = dataView.getUint32(20, true);
+          const totalParticipants = totalParticipantsLow + totalParticipantsHigh * 0x100000000;
+          console.log("   Raw data - total_committed:", totalCommitted / LAMPORTS_PER_SOL, "SOL");
+          console.log("   Raw data - total_participants:", totalParticipants);
+        }
+      } else {
+        console.log("   ❌ commitment_pool account NOT FOUND on Solana!");
+      }
+    } catch (e) {
+      console.error("   Error checking commitment_pool:", e);
+    }
+
     const tx = await this.program.methods
       .finalizeGraduation()
       .accounts({
@@ -1724,6 +1837,7 @@ export class VestigeClient {
   /**
    * Participant calls this ON THE ER to undelegate their user_commitment so it syncs back to Solana.
    * Send via Magic Router. After this, they can call calculate_allocation and claim_tokens on Solana.
+   * IMPORTANT: Must include magic_program and magic_context for commit_and_undelegate CPI
    */
   async undelegateUserCommitment(
     launchPda: PublicKey,
@@ -1733,6 +1847,9 @@ export class VestigeClient {
       launchPda,
       user,
     );
+    console.log("📤 Undelegating user_commitment...");
+    console.log("  Including magic_program and magic_context for commit_and_undelegate");
+
     const instruction = await this.erProgram.methods
       .undelegateUserCommitment()
       .accounts({
@@ -1740,6 +1857,8 @@ export class VestigeClient {
         launch: launchPda,
         user: user,
         payer: user,
+        magicProgram: MAGIC_PROGRAM,
+        magicContext: MAGIC_CONTEXT,
       })
       .instruction();
     const modifiedKeys = instruction.keys.map((key) =>
@@ -1975,18 +2094,47 @@ export class VestigeClient {
 
     let pool = null;
     let userCommitment = null;
+    let launch: LaunchData | null = null;
+
+    try {
+      launch = await this.getLaunch(launchPda);
+    } catch (e) {
+      console.log("  Launch not found on Solana");
+    }
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      pool = await (this.program.account as any).commitmentPool.fetch(
-        commitmentPoolPda,
-      );
+      const commitmentPool = await (
+        this.program.account as any
+      ).commitmentPool.fetch(commitmentPoolPda);
+      // Prefer launch totals when graduated (set by finalize_graduation); else use commitment_pool
+      const useLaunchTotals =
+        launch?.isGraduated && launch.totalCommitted.gt(new BN(0));
+      pool = useLaunchTotals
+        ? {
+            totalCommitted: launch!.totalCommitted,
+            totalParticipants: launch!.totalParticipants,
+          }
+        : commitmentPool;
       console.log("  Solana Pool data:", {
         totalCommitted: pool.totalCommitted.toNumber() / LAMPORTS_PER_SOL,
         totalParticipants: pool.totalParticipants.toNumber(),
+        source: useLaunchTotals ? "launch (graduated)" : "commitment_pool",
       });
     } catch (e) {
-      console.log("  Pool not found on Solana");
+      // If commitment_pool fetch fails, try showing launch totals when graduated
+      if (launch?.isGraduated && launch.totalCommitted.gt(new BN(0))) {
+        pool = {
+          totalCommitted: launch.totalCommitted,
+          totalParticipants: launch.totalParticipants,
+        };
+        console.log("  Solana Pool data (from launch):", {
+          totalCommitted: pool.totalCommitted.toNumber() / LAMPORTS_PER_SOL,
+          totalParticipants: pool.totalParticipants.toNumber(),
+        });
+      } else {
+        console.log("  Pool not found on Solana");
+      }
     }
 
     try {
