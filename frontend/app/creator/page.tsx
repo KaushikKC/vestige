@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { ArrowDown, Wallet, Info, Lock } from "lucide-react";
 import { ViewState, Launch } from "../types";
 import CreateLaunchForm from "../../components/CreateLaunchForm";
+import CreateInvertedLaunchForm from "../../components/CreateInvertedLaunchForm";
 
 interface CreatorProps {
   setView: (view: ViewState) => void;
@@ -25,18 +26,33 @@ const Creator: React.FC<CreatorProps> = ({ setView, setSelectedLaunch }) => {
     setSelectedLaunch(minimalLaunch);
     setView(ViewState.LAUNCH_DETAIL);
   };
+  const handleGoToInvertedLaunch = (launchPda: string) => {
+    const minimalLaunch: Launch = {
+      id: launchPda,
+      name: "Inverted launch",
+      symbol: "—",
+      status: "PRIVATE",
+      progress: 0,
+      timeLeft: "—",
+      creator: "—",
+      launchPda,
+    };
+    setSelectedLaunch(minimalLaunch);
+    setView(ViewState.INVERTED_LAUNCH_DETAIL);
+  };
   const [fromAmount, setFromAmount] = useState("10.0");
   const [toAmount, setToAmount] = useState("9.95");
   const [showBridge, setShowBridge] = useState(false);
+  const [activeTab, setActiveTab] = useState<"standard" | "inverted" | "bridge">("standard");
 
   return (
     <div className="space-y-6 pt-10 animate-fade-slide-up">
       {/* Tab Switcher */}
       <div className="flex justify-center gap-4 mb-8">
         <button
-          onClick={() => setShowBridge(false)}
+          onClick={() => setActiveTab("standard")}
           className={`px-6 py-3 rounded-xl font-bold transition-all border-2 ${
-            !showBridge
+            activeTab === "standard"
               ? "bg-[#C8FF2E] border-[#09090A] text-[#0B0D17]"
               : "bg-white border-[#E6E8EF] text-[#6B7280] hover:border-[#09090A]"
           }`}
@@ -44,9 +60,19 @@ const Creator: React.FC<CreatorProps> = ({ setView, setSelectedLaunch }) => {
           Create Launch
         </button>
         <button
-          onClick={() => setShowBridge(true)}
+          onClick={() => setActiveTab("inverted")}
           className={`px-6 py-3 rounded-xl font-bold transition-all border-2 ${
-            showBridge
+            activeTab === "inverted"
+              ? "bg-[#C8FF2E] border-[#09090A] text-[#0B0D17]"
+              : "bg-white border-[#E6E8EF] text-[#6B7280] hover:border-[#09090A]"
+          }`}
+        >
+          Inverted Launch
+        </button>
+        <button
+          onClick={() => setActiveTab("bridge")}
+          className={`px-6 py-3 rounded-xl font-bold transition-all border-2 ${
+            activeTab === "bridge"
               ? "bg-[#C8FF2E] border-[#09090A] text-[#0B0D17]"
               : "bg-white border-[#E6E8EF] text-[#6B7280] hover:border-[#09090A]"
           }`}
@@ -56,10 +82,16 @@ const Creator: React.FC<CreatorProps> = ({ setView, setSelectedLaunch }) => {
       </div>
 
       {/* Conditional Rendering */}
-      {!showBridge ? (
+      {activeTab === "standard" ? (
         <div className="flex justify-center">
           <div className="w-full max-w-2xl">
             <CreateLaunchForm onGoToLaunch={handleGoToLaunch} />
+          </div>
+        </div>
+      ) : activeTab === "inverted" ? (
+        <div className="flex justify-center">
+          <div className="w-full max-w-2xl">
+            <CreateInvertedLaunchForm onGoToLaunch={handleGoToInvertedLaunch} />
           </div>
         </div>
       ) : (

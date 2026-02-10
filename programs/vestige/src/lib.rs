@@ -27,6 +27,17 @@ pub const SWEPT_SEED: &[u8] = b"swept"; // Marks that user has swept ephemeral S
 pub const EARLY_BONUS_ALPHA: u64 = 50; // 50% bonus for earliest participants
 pub const BASIS_POINTS: u64 = 10000;
 
+// Inverted Launch Seeds
+pub const INVERTED_LAUNCH_SEED: &[u8] = b"inverted_launch";
+pub const BONDED_POOL_SEED: &[u8] = b"bonded_pool";
+pub const USER_BOND_SEED: &[u8] = b"user_bond";
+pub const INVERTED_VAULT_SEED: &[u8] = b"inverted_vault";
+
+// Inverted Launch Constants
+pub const WEIGHT_SCALE: u64 = 10_000;       // Risk weight denominator (1x = 10_000)
+pub const BONDED_PRECISION: u64 = 1_000_000_000; // Precision for bonded unit calculations
+pub const PRICE_RATIO: u64 = 10;             // p_max must equal p_min * PRICE_RATIO
+
 // MagicBlock TEE Validator for Private Ephemeral Rollups
 pub const TEE_VALIDATOR: &str = "FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA";
 
@@ -70,6 +81,50 @@ fn derive_seeds_from_account_type(account_type: &AccountType) -> Vec<Vec<u8>> {
             ]
         }
     }
+}
+
+/// Get the current curve price for an inverted launch (linear from p_max to p_min)
+fn get_curve_price(launch: &InvertedLaunch, current_time: i64) -> u64 {
+    if current_time <= launch.start_time {
+        return launch.p_max;
+    }
+    if current_time >= launch.end_time {
+        return launch.p_min;
+    }
+    let elapsed = (current_time - launch.start_time) as u128;
+    let duration = (launch.end_time - launch.start_time) as u128;
+    let price_range = (launch.p_max - launch.p_min) as u128;
+    // price = p_max - (p_max - p_min) * elapsed / duration
+    let decrease = price_range.checked_mul(elapsed).unwrap() / duration;
+    launch.p_max.checked_sub(decrease as u64).unwrap()
+}
+
+/// Get the current risk weight for an inverted launch (linear from r_best to r_min)
+fn get_risk_weight(launch: &InvertedLaunch, current_time: i64) -> u64 {
+    if current_time <= launch.start_time {
+        return launch.r_best;
+    }
+    if current_time >= launch.end_time {
+        return launch.r_min;
+    }
+    let elapsed = (current_time - launch.start_time) as u128;
+    let duration = (launch.end_time - launch.start_time) as u128;
+    let weight_range = (launch.r_best - launch.r_min) as u128;
+    // weight = r_best - (r_best - r_min) * elapsed / duration
+    let decrease = weight_range.checked_mul(elapsed).unwrap() / duration;
+    launch.r_best.checked_sub(decrease as u64).unwrap()
+}
+
+/// Calculate bonded units from SOL amount and curve price
+/// bonded_units = sol_amount * BONDED_PRECISION / curve_price
+fn calculate_bonded_units(sol_amount: u64, curve_price: u64) -> Result<u64> {
+    let numerator = (sol_amount as u128)
+        .checked_mul(BONDED_PRECISION as u128)
+        .ok_or(VestigeError::Overflow)?;
+    let units = numerator
+        .checked_div(curve_price as u128)
+        .ok_or(VestigeError::Overflow)?;
+    Ok(units as u64)
 }
 
 #[ephemeral] // Enables undelegation instruction for ER validator
@@ -757,6 +812,273 @@ pub mod vestige {
 
         Ok(())
     }
+
+    // ============== INVERTED LAUNCH INSTRUCTIONS ==============
+
+    /// Initialize an inverted launch (price starts high, drops over time)
+    pub fn initialize_inverted_launch(
+        ctx: Context<InitializeInvertedLaunch>,
+        bonded_supply: u64,
+        start_time: i64,
+        end_time: i64,
+        p_max: u64,
+        p_min: u64,
+        r_best: u64,
+        r_min: u64,
+        graduation_target: u64,
+    ) -> Result<()> {
+        require!(end_time > start_time, VestigeError::InvalidTimeRange);
+        require!(bonded_supply > 0, VestigeError::InvalidTokenSupply);
+        require!(graduation_target > 0, VestigeError::InvalidGraduationTarget);
+        require!(p_max > p_min, VestigeError::InvalidPriceRange);
+        require!(p_max == p_min.checked_mul(PRICE_RATIO).ok_or(VestigeError::Overflow)?, VestigeError::InvalidPriceRatio);
+        require!(r_best > r_min, VestigeError::InvalidWeightRange);
+        require!(r_min >= WEIGHT_SCALE, VestigeError::WeightBelowMinimum);
+
+        let launch = &mut ctx.accounts.inverted_launch;
+        launch.creator = ctx.accounts.creator.key();
+        launch.token_mint = ctx.accounts.token_mint.key();
+        launch.bonded_supply = bonded_supply;
+        launch.start_time = start_time;
+        launch.end_time = end_time;
+        launch.p_max = p_max;
+        launch.p_min = p_min;
+        launch.r_best = r_best;
+        launch.r_min = r_min;
+        launch.graduation_target = graduation_target;
+        launch.total_bonded_sold = 0;
+        launch.total_sol_collected = 0;
+        launch.is_graduated = false;
+        launch.bump = ctx.bumps.inverted_launch;
+
+        // Initialize bonded pool
+        let pool = &mut ctx.accounts.bonded_pool;
+        pool.inverted_launch = launch.key();
+        pool.total_bonded_sold = 0;
+        pool.total_sol_collected = 0;
+        pool.total_weighted_units = 0;
+        pool.total_participants = 0;
+        pool.bump = ctx.bumps.bonded_pool;
+
+        // Create inverted vault PDA (owned by this program)
+        let vault = &ctx.accounts.inverted_vault;
+        let (_, vault_bump) = Pubkey::find_program_address(
+            &[INVERTED_VAULT_SEED, launch.key().as_ref()],
+            ctx.program_id,
+        );
+        let rent = Rent::get()?;
+        let space: u64 = 0;
+        let lamports = rent.minimum_balance(space as usize);
+        system_program::create_account(
+            CpiContext::new_with_signer(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::CreateAccount {
+                    from: ctx.accounts.creator.to_account_info(),
+                    to: vault.to_account_info(),
+                },
+                &[&[INVERTED_VAULT_SEED, launch.key().as_ref(), &[vault_bump]]],
+            ),
+            lamports,
+            space,
+            &crate::ID,
+        )?;
+
+        msg!("Inverted Launch Initialized!");
+        msg!("Bonded Supply: {}", bonded_supply);
+        msg!("Price Range: {} -> {} lamports", p_max, p_min);
+        msg!("Risk Weight: {} -> {}", r_best, r_min);
+        msg!("Graduation Target: {} lamports", graduation_target);
+
+        Ok(())
+    }
+
+    /// Buy bonded units in an inverted launch
+    pub fn buy_bonded(ctx: Context<BuyBonded>, sol_amount: u64) -> Result<()> {
+        require!(sol_amount > 0, VestigeError::InvalidSolAmount);
+
+        let launch = &ctx.accounts.inverted_launch;
+        let clock = Clock::get()?;
+
+        require!(clock.unix_timestamp >= launch.start_time, VestigeError::LaunchNotStarted);
+        require!(clock.unix_timestamp <= launch.end_time, VestigeError::LaunchEnded);
+        require!(!launch.is_graduated, VestigeError::AlreadyGraduated);
+
+        // Get current curve price and risk weight
+        let curve_price = get_curve_price(launch, clock.unix_timestamp);
+        let risk_weight = get_risk_weight(launch, clock.unix_timestamp);
+
+        // Calculate bonded units: sol_amount * BONDED_PRECISION / curve_price
+        let bonded_units = calculate_bonded_units(sol_amount, curve_price)?;
+        require!(bonded_units > 0, VestigeError::ZeroBondedUnits);
+
+        // Check supply not exceeded
+        let pool = &ctx.accounts.bonded_pool;
+        require!(
+            pool.total_bonded_sold.checked_add(bonded_units).ok_or(VestigeError::Overflow)? <= launch.bonded_supply,
+            VestigeError::BondedSupplyExceeded
+        );
+
+        // Calculate weighted units: bonded_units * risk_weight (u128 intermediate)
+        let weighted_units = (bonded_units as u128)
+            .checked_mul(risk_weight as u128)
+            .ok_or(VestigeError::Overflow)? as u64;
+
+        // Transfer SOL from user to vault
+        system_program::transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::Transfer {
+                    from: ctx.accounts.user.to_account_info(),
+                    to: ctx.accounts.inverted_vault.to_account_info(),
+                },
+            ),
+            sol_amount,
+        )?;
+
+        // Update user bond
+        let user_bond = &mut ctx.accounts.user_bond;
+        let is_new_participant = user_bond.total_sol_spent == 0;
+
+        user_bond.user = ctx.accounts.user.key();
+        user_bond.inverted_launch = ctx.accounts.inverted_launch.key();
+        user_bond.total_sol_spent = user_bond.total_sol_spent
+            .checked_add(sol_amount).ok_or(VestigeError::Overflow)?;
+        user_bond.total_bonded_units = user_bond.total_bonded_units
+            .checked_add(bonded_units).ok_or(VestigeError::Overflow)?;
+        user_bond.weighted_bonded_units = user_bond.weighted_bonded_units
+            .checked_add(weighted_units).ok_or(VestigeError::Overflow)?;
+
+        // Update bonded pool
+        let pool = &mut ctx.accounts.bonded_pool;
+        pool.total_bonded_sold = pool.total_bonded_sold
+            .checked_add(bonded_units).ok_or(VestigeError::Overflow)?;
+        pool.total_sol_collected = pool.total_sol_collected
+            .checked_add(sol_amount).ok_or(VestigeError::Overflow)?;
+        pool.total_weighted_units = pool.total_weighted_units
+            .checked_add(weighted_units).ok_or(VestigeError::Overflow)?;
+        if is_new_participant {
+            pool.total_participants = pool.total_participants
+                .checked_add(1).ok_or(VestigeError::Overflow)?;
+        }
+
+        msg!("Bonded units purchased!");
+        msg!("SOL spent: {}", sol_amount);
+        msg!("Curve price: {}", curve_price);
+        msg!("Risk weight: {}", risk_weight);
+        msg!("Bonded units: {}", bonded_units);
+        msg!("Weighted units: {}", weighted_units);
+
+        Ok(())
+    }
+
+    /// Graduate an inverted launch (permissionless)
+    pub fn graduate_inverted(ctx: Context<GraduateInverted>) -> Result<()> {
+        let launch = &mut ctx.accounts.inverted_launch;
+        let pool = &ctx.accounts.bonded_pool;
+        let clock = Clock::get()?;
+
+        require!(!launch.is_graduated, VestigeError::AlreadyGraduated);
+
+        let target_reached = pool.total_sol_collected >= launch.graduation_target;
+        let time_expired = clock.unix_timestamp > launch.end_time;
+
+        require!(target_reached || time_expired, VestigeError::GraduationConditionsNotMet);
+
+        // Sync pool totals to launch
+        launch.total_bonded_sold = pool.total_bonded_sold;
+        launch.total_sol_collected = pool.total_sol_collected;
+        launch.is_graduated = true;
+
+        msg!("=== INVERTED LAUNCH GRADUATED ===");
+        msg!("Total Bonded Sold: {}", launch.total_bonded_sold);
+        msg!("Total SOL Collected: {}", launch.total_sol_collected);
+
+        Ok(())
+    }
+
+    /// Calculate rebase: final_tokens = weighted_bonded_units / WEIGHT_SCALE
+    pub fn calculate_rebase(ctx: Context<CalculateRebase>) -> Result<()> {
+        let launch = &ctx.accounts.inverted_launch;
+        let user_bond = &mut ctx.accounts.user_bond;
+
+        require!(launch.is_graduated, VestigeError::NotGraduated);
+        require!(user_bond.final_tokens == 0, VestigeError::AllocationAlreadyCalculated);
+        require!(user_bond.total_bonded_units > 0, VestigeError::NoCommitment);
+
+        let final_tokens = user_bond.weighted_bonded_units
+            .checked_div(WEIGHT_SCALE)
+            .ok_or(VestigeError::Overflow)?;
+
+        user_bond.final_tokens = final_tokens;
+
+        msg!("=== REBASE CALCULATED ===");
+        msg!("Weighted bonded units: {}", user_bond.weighted_bonded_units);
+        msg!("Final tokens: {}", final_tokens);
+
+        Ok(())
+    }
+
+    /// Claim rebased tokens (CPI token transfer)
+    pub fn claim_rebase(ctx: Context<ClaimRebase>) -> Result<()> {
+        let launch = &ctx.accounts.inverted_launch;
+        let user_bond = &mut ctx.accounts.user_bond;
+
+        require!(launch.is_graduated, VestigeError::NotGraduated);
+        require!(user_bond.final_tokens > 0, VestigeError::NoAllocation);
+        require!(!user_bond.has_claimed, VestigeError::AlreadyClaimed);
+
+        // Transfer tokens from token_vault to user using InvertedLaunch PDA as signer
+        let seeds = &[
+            INVERTED_LAUNCH_SEED,
+            launch.creator.as_ref(),
+            launch.token_mint.as_ref(),
+            &[launch.bump],
+        ];
+        let signer_seeds = &[&seeds[..]];
+
+        token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.token_vault.to_account_info(),
+                    to: ctx.accounts.user_token_account.to_account_info(),
+                    authority: ctx.accounts.inverted_launch.to_account_info(),
+                },
+                signer_seeds,
+            ),
+            user_bond.final_tokens,
+        )?;
+
+        user_bond.has_claimed = true;
+
+        msg!("=== REBASE TOKENS CLAIMED ===");
+        msg!("Amount: {}", user_bond.final_tokens);
+
+        Ok(())
+    }
+
+    /// Creator withdraws SOL from inverted vault after graduation
+    pub fn creator_withdraw_inverted(ctx: Context<CreatorWithdrawInverted>) -> Result<()> {
+        let launch = &ctx.accounts.inverted_launch;
+
+        require!(launch.is_graduated, VestigeError::NotGraduated);
+        require!(ctx.accounts.creator.key() == launch.creator, VestigeError::Unauthorized);
+
+        let vault_info = ctx.accounts.inverted_vault.to_account_info();
+        let vault_balance = vault_info.lamports();
+        let rent = Rent::get()?.minimum_balance(0);
+        let withdrawable = vault_balance.saturating_sub(rent);
+        require!(withdrawable > 0, VestigeError::NothingToSweep);
+
+        // Direct lamport transfer from vault to creator
+        **vault_info.try_borrow_mut_lamports()? -= withdrawable;
+        **ctx.accounts.creator.to_account_info().try_borrow_mut_lamports()? += withdrawable;
+
+        msg!("=== INVERTED LAUNCH FUNDS WITHDRAWN ===");
+        msg!("Amount: {} lamports", withdrawable);
+
+        Ok(())
+    }
 }
 
 // ============== Account Structures ==============
@@ -827,6 +1149,60 @@ pub struct EphemeralSol {
 
 impl EphemeralSol {
     pub const SIZE: usize = 8 + 32 + 32 + 8 + 1 + 1;
+}
+
+// ============== Inverted Launch Account Structures ==============
+
+#[account]
+pub struct InvertedLaunch {
+    pub creator: Pubkey,           // 32
+    pub token_mint: Pubkey,        // 32
+    pub bonded_supply: u64,        // 8 - Total bonded units available
+    pub start_time: i64,           // 8
+    pub end_time: i64,             // 8
+    pub p_max: u64,                // 8 - Starting (highest) price in lamports
+    pub p_min: u64,                // 8 - Ending (lowest) price in lamports
+    pub r_best: u64,               // 8 - Best risk weight (early buyers)
+    pub r_min: u64,                // 8 - Minimum risk weight (late buyers)
+    pub graduation_target: u64,    // 8 - SOL target for graduation
+    pub total_bonded_sold: u64,    // 8 - Total bonded units sold
+    pub total_sol_collected: u64,  // 8 - Total SOL collected
+    pub is_graduated: bool,        // 1
+    pub bump: u8,                  // 1
+}
+
+impl InvertedLaunch {
+    pub const SIZE: usize = 8 + 32 + 32 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 1 + 1;
+}
+
+#[account]
+pub struct BondedPool {
+    pub inverted_launch: Pubkey,   // 32
+    pub total_bonded_sold: u64,    // 8
+    pub total_sol_collected: u64,  // 8
+    pub total_weighted_units: u64, // 8
+    pub total_participants: u64,   // 8
+    pub bump: u8,                  // 1
+}
+
+impl BondedPool {
+    pub const SIZE: usize = 8 + 32 + 8 + 8 + 8 + 8 + 1;
+}
+
+#[account]
+pub struct UserBond {
+    pub user: Pubkey,                  // 32
+    pub inverted_launch: Pubkey,       // 32
+    pub total_sol_spent: u64,          // 8
+    pub total_bonded_units: u64,       // 8
+    pub weighted_bonded_units: u64,    // 8
+    pub final_tokens: u64,            // 8
+    pub has_claimed: bool,             // 1
+    pub bump: u8,                      // 1
+}
+
+impl UserBond {
+    pub const SIZE: usize = 8 + 32 + 32 + 8 + 8 + 8 + 8 + 1 + 1;
 }
 
 // ============== Contexts ==============
@@ -1336,6 +1712,169 @@ pub struct GetLaunchInfo<'info> {
     pub launch: Account<'info, Launch>,
 }
 
+// ============== Inverted Launch Contexts ==============
+
+#[derive(Accounts)]
+pub struct InitializeInvertedLaunch<'info> {
+    #[account(
+        init,
+        payer = creator,
+        space = InvertedLaunch::SIZE,
+        seeds = [INVERTED_LAUNCH_SEED, creator.key().as_ref(), token_mint.key().as_ref()],
+        bump
+    )]
+    pub inverted_launch: Account<'info, InvertedLaunch>,
+
+    #[account(
+        init,
+        payer = creator,
+        space = BondedPool::SIZE,
+        seeds = [BONDED_POOL_SEED, inverted_launch.key().as_ref()],
+        bump
+    )]
+    pub bonded_pool: Account<'info, BondedPool>,
+
+    /// CHECK: Inverted vault PDA for holding SOL
+    #[account(
+        mut,
+        seeds = [INVERTED_VAULT_SEED, inverted_launch.key().as_ref()],
+        bump
+    )]
+    pub inverted_vault: AccountInfo<'info>,
+
+    pub token_mint: Account<'info, Mint>,
+
+    #[account(mut)]
+    pub creator: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct BuyBonded<'info> {
+    #[account(
+        seeds = [INVERTED_LAUNCH_SEED, inverted_launch.creator.as_ref(), inverted_launch.token_mint.as_ref()],
+        bump = inverted_launch.bump
+    )]
+    pub inverted_launch: Account<'info, InvertedLaunch>,
+
+    #[account(
+        mut,
+        seeds = [BONDED_POOL_SEED, inverted_launch.key().as_ref()],
+        bump = bonded_pool.bump
+    )]
+    pub bonded_pool: Account<'info, BondedPool>,
+
+    #[account(
+        init_if_needed,
+        payer = user,
+        space = UserBond::SIZE,
+        seeds = [USER_BOND_SEED, inverted_launch.key().as_ref(), user.key().as_ref()],
+        bump
+    )]
+    pub user_bond: Account<'info, UserBond>,
+
+    /// CHECK: Inverted vault to receive SOL
+    #[account(
+        mut,
+        seeds = [INVERTED_VAULT_SEED, inverted_launch.key().as_ref()],
+        bump
+    )]
+    pub inverted_vault: AccountInfo<'info>,
+
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct GraduateInverted<'info> {
+    #[account(mut)]
+    pub inverted_launch: Account<'info, InvertedLaunch>,
+
+    #[account(
+        seeds = [BONDED_POOL_SEED, inverted_launch.key().as_ref()],
+        bump = bonded_pool.bump
+    )]
+    pub bonded_pool: Account<'info, BondedPool>,
+
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct CalculateRebase<'info> {
+    #[account(
+        seeds = [INVERTED_LAUNCH_SEED, inverted_launch.creator.as_ref(), inverted_launch.token_mint.as_ref()],
+        bump = inverted_launch.bump
+    )]
+    pub inverted_launch: Account<'info, InvertedLaunch>,
+
+    #[account(
+        mut,
+        seeds = [USER_BOND_SEED, inverted_launch.key().as_ref(), user.key().as_ref()],
+        bump = user_bond.bump
+    )]
+    pub user_bond: Account<'info, UserBond>,
+
+    pub user: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct ClaimRebase<'info> {
+    #[account(
+        seeds = [INVERTED_LAUNCH_SEED, inverted_launch.creator.as_ref(), inverted_launch.token_mint.as_ref()],
+        bump = inverted_launch.bump
+    )]
+    pub inverted_launch: Account<'info, InvertedLaunch>,
+
+    #[account(
+        mut,
+        seeds = [USER_BOND_SEED, inverted_launch.key().as_ref(), user.key().as_ref()],
+        bump = user_bond.bump
+    )]
+    pub user_bond: Account<'info, UserBond>,
+
+    #[account(
+        mut,
+        constraint = token_vault.mint == inverted_launch.token_mint
+    )]
+    pub token_vault: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        constraint = user_token_account.owner == user.key(),
+        constraint = user_token_account.mint == inverted_launch.token_mint
+    )]
+    pub user_token_account: Account<'info, TokenAccount>,
+
+    pub user: Signer<'info>,
+
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+pub struct CreatorWithdrawInverted<'info> {
+    #[account(
+        seeds = [INVERTED_LAUNCH_SEED, inverted_launch.creator.as_ref(), inverted_launch.token_mint.as_ref()],
+        bump = inverted_launch.bump
+    )]
+    pub inverted_launch: Account<'info, InvertedLaunch>,
+
+    /// CHECK: Inverted vault holding SOL (PDA owned by program)
+    #[account(
+        mut,
+        constraint = inverted_vault.key() == Pubkey::find_program_address(
+            &[INVERTED_VAULT_SEED, inverted_launch.key().as_ref()],
+            &crate::ID
+        ).0
+    )]
+    pub inverted_vault: UncheckedAccount<'info>,
+
+    #[account(mut)]
+    pub creator: Signer<'info>,
+}
+
 // ============== Errors ==============
 
 #[error_code]
@@ -1380,4 +1919,20 @@ pub enum VestigeError {
     NothingToSweep,
     #[msg("Invalid or unreadable account data (e.g. commitment_pool owned by ER)")]
     InvalidAccountData,
+    #[msg("Price max must be greater than price min")]
+    InvalidPriceRange,
+    #[msg("Price max must equal price min times PRICE_RATIO (10)")]
+    InvalidPriceRatio,
+    #[msg("Risk weight best must be greater than risk weight min")]
+    InvalidWeightRange,
+    #[msg("Risk weight min must be at least WEIGHT_SCALE (10000)")]
+    WeightBelowMinimum,
+    #[msg("SOL amount must be greater than zero")]
+    InvalidSolAmount,
+    #[msg("Calculated bonded units is zero")]
+    ZeroBondedUnits,
+    #[msg("Bonded supply would be exceeded")]
+    BondedSupplyExceeded,
+    #[msg("Arithmetic overflow")]
+    Overflow,
 }

@@ -63,6 +63,17 @@ export const USER_COMMITMENT_SEED = "user_commitment";
 export const VAULT_SEED = "vault";
 export const EPHEMERAL_SOL_SEED = "ephemeral_sol"; // User's private SOL holding
 
+// Inverted Launch PDA Seeds
+export const INVERTED_LAUNCH_SEED = "inverted_launch";
+export const BONDED_POOL_SEED = "bonded_pool";
+export const USER_BOND_SEED = "user_bond";
+export const INVERTED_VAULT_SEED = "inverted_vault";
+
+// Inverted Launch Constants
+export const WEIGHT_SCALE = 10_000;
+export const BONDED_PRECISION = 1_000_000_000;
+export const PRICE_RATIO = 10;
+
 // Launch data interface
 export interface LaunchData {
   publicKey: PublicKey;
@@ -88,6 +99,34 @@ export interface UserCommitmentData {
   commitTime: BN;
   weight: BN;
   tokensAllocated: BN;
+  hasClaimed: boolean;
+}
+
+// Inverted Launch data interfaces
+export interface InvertedLaunchData {
+  publicKey: PublicKey;
+  creator: PublicKey;
+  tokenMint: PublicKey;
+  bondedSupply: BN;
+  startTime: BN;
+  endTime: BN;
+  pMax: BN;
+  pMin: BN;
+  rBest: BN;
+  rMin: BN;
+  graduationTarget: BN;
+  totalBondedSold: BN;
+  totalSolCollected: BN;
+  isGraduated: boolean;
+}
+
+export interface UserBondData {
+  user: PublicKey;
+  invertedLaunch: PublicKey;
+  totalSolSpent: BN;
+  totalBondedUnits: BN;
+  weightedBondedUnits: BN;
+  finalTokens: BN;
   hasClaimed: boolean;
 }
 
@@ -432,6 +471,104 @@ export class VestigeClient {
       [Buffer.from(EPHEMERAL_SOL_SEED), launchPda.toBuffer(), user.toBuffer()],
       PROGRAM_ID,
     );
+  }
+
+  // ============== Inverted Launch PDA Derivers ==============
+
+  static deriveInvertedLaunchPda(
+    creator: PublicKey,
+    tokenMint: PublicKey,
+  ): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [
+        Buffer.from(INVERTED_LAUNCH_SEED),
+        creator.toBuffer(),
+        tokenMint.toBuffer(),
+      ],
+      PROGRAM_ID,
+    );
+  }
+
+  static deriveBondedPoolPda(
+    invertedLaunchPda: PublicKey,
+  ): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(BONDED_POOL_SEED), invertedLaunchPda.toBuffer()],
+      PROGRAM_ID,
+    );
+  }
+
+  static deriveUserBondPda(
+    invertedLaunchPda: PublicKey,
+    user: PublicKey,
+  ): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [
+        Buffer.from(USER_BOND_SEED),
+        invertedLaunchPda.toBuffer(),
+        user.toBuffer(),
+      ],
+      PROGRAM_ID,
+    );
+  }
+
+  static deriveInvertedVaultPda(
+    invertedLaunchPda: PublicKey,
+  ): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(INVERTED_VAULT_SEED), invertedLaunchPda.toBuffer()],
+      PROGRAM_ID,
+    );
+  }
+
+  // ============== Inverted Launch Static Utilities ==============
+
+  /**
+   * Calculate current curve price (linear from p_max to p_min)
+   */
+  static getCurrentCurvePrice(launch: InvertedLaunchData): number {
+    const now = Math.floor(Date.now() / 1000);
+    const start = launch.startTime.toNumber();
+    const end = launch.endTime.toNumber();
+    const pMax = launch.pMax.toNumber();
+    const pMin = launch.pMin.toNumber();
+
+    if (now <= start) return pMax;
+    if (now >= end) return pMin;
+
+    const elapsed = now - start;
+    const duration = end - start;
+    return pMax - ((pMax - pMin) * elapsed) / duration;
+  }
+
+  /**
+   * Calculate current risk weight (linear from r_best to r_min)
+   */
+  static getCurrentRiskWeight(launch: InvertedLaunchData): number {
+    const now = Math.floor(Date.now() / 1000);
+    const start = launch.startTime.toNumber();
+    const end = launch.endTime.toNumber();
+    const rBest = launch.rBest.toNumber();
+    const rMin = launch.rMin.toNumber();
+
+    if (now <= start) return rBest;
+    if (now >= end) return rMin;
+
+    const elapsed = now - start;
+    const duration = end - start;
+    return rBest - ((rBest - rMin) * elapsed) / duration;
+  }
+
+  /**
+   * Get the effective price per token (SOL per final token) given current curve state
+   */
+  static getEffectivePrice(launch: InvertedLaunchData): number {
+    const curvePrice = VestigeClient.getCurrentCurvePrice(launch);
+    const riskWeight = VestigeClient.getCurrentRiskWeight(launch);
+    // effective_price = curvePrice * WEIGHT_SCALE / (riskWeight * BONDED_PRECISION) * WEIGHT_SCALE
+    // Simplified: curvePrice / (riskWeight / WEIGHT_SCALE) / BONDED_PRECISION * WEIGHT_SCALE
+    // = curvePrice * WEIGHT_SCALE^2 / (riskWeight * BONDED_PRECISION)
+    return (curvePrice * WEIGHT_SCALE) / (riskWeight * BONDED_PRECISION) * WEIGHT_SCALE;
   }
 
   /**
@@ -2173,6 +2310,269 @@ export class VestigeClient {
 
     return { pool, userCommitment };
   }
+
+  // ============== INVERTED LAUNCH METHODS ==============
+
+  /**
+   * Initialize an inverted launch
+   */
+  async initializeInvertedLaunch(
+    creator: PublicKey,
+    tokenMint: PublicKey,
+    bondedSupply: BN,
+    startTime: BN,
+    endTime: BN,
+    pMax: BN,
+    pMin: BN,
+    rBest: BN,
+    rMin: BN,
+    graduationTarget: BN,
+  ): Promise<string> {
+    const [invertedLaunchPda] = VestigeClient.deriveInvertedLaunchPda(
+      creator,
+      tokenMint,
+    );
+    const [bondedPoolPda] = VestigeClient.deriveBondedPoolPda(invertedLaunchPda);
+    const [invertedVaultPda] = VestigeClient.deriveInvertedVaultPda(
+      invertedLaunchPda,
+    );
+
+    console.log("Initializing inverted launch...");
+    console.log("  Inverted Launch PDA:", invertedLaunchPda.toBase58());
+
+    const tx = await this.program.methods
+      .initializeInvertedLaunch(
+        bondedSupply,
+        startTime,
+        endTime,
+        pMax,
+        pMin,
+        rBest,
+        rMin,
+        graduationTarget,
+      )
+      .accounts({
+        invertedLaunch: invertedLaunchPda,
+        bondedPool: bondedPoolPda,
+        invertedVault: invertedVaultPda,
+        tokenMint: tokenMint,
+        creator: creator,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+
+    console.log("Inverted launch initialized:", tx);
+    return tx;
+  }
+
+  /**
+   * Buy bonded units in an inverted launch
+   */
+  async buyBonded(
+    invertedLaunchPda: PublicKey,
+    solAmount: BN,
+    user: PublicKey,
+  ): Promise<string> {
+    const [bondedPoolPda] = VestigeClient.deriveBondedPoolPda(invertedLaunchPda);
+    const [userBondPda] = VestigeClient.deriveUserBondPda(
+      invertedLaunchPda,
+      user,
+    );
+    const [invertedVaultPda] = VestigeClient.deriveInvertedVaultPda(
+      invertedLaunchPda,
+    );
+
+    console.log("Buying bonded units...");
+    console.log("  SOL amount:", solAmount.toString(), "lamports");
+
+    const tx = await this.program.methods
+      .buyBonded(solAmount)
+      .accounts({
+        invertedLaunch: invertedLaunchPda,
+        bondedPool: bondedPoolPda,
+        userBond: userBondPda,
+        invertedVault: invertedVaultPda,
+        user: user,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+
+    console.log("Bonded units purchased:", tx);
+    return tx;
+  }
+
+  /**
+   * Graduate an inverted launch (permissionless)
+   */
+  async graduateInverted(
+    invertedLaunchPda: PublicKey,
+    authority: PublicKey,
+  ): Promise<string> {
+    const [bondedPoolPda] = VestigeClient.deriveBondedPoolPda(invertedLaunchPda);
+
+    console.log("Graduating inverted launch...");
+
+    const tx = await this.program.methods
+      .graduateInverted()
+      .accounts({
+        invertedLaunch: invertedLaunchPda,
+        bondedPool: bondedPoolPda,
+        authority: authority,
+      })
+      .rpc();
+
+    console.log("Inverted launch graduated:", tx);
+    return tx;
+  }
+
+  /**
+   * Calculate rebase for a user bond
+   */
+  async calculateRebase(
+    invertedLaunchPda: PublicKey,
+    user: PublicKey,
+  ): Promise<string> {
+    const [userBondPda] = VestigeClient.deriveUserBondPda(
+      invertedLaunchPda,
+      user,
+    );
+
+    const tx = await this.program.methods
+      .calculateRebase()
+      .accounts({
+        invertedLaunch: invertedLaunchPda,
+        userBond: userBondPda,
+        user: user,
+      })
+      .rpc();
+
+    console.log("Rebase calculated:", tx);
+    return tx;
+  }
+
+  /**
+   * Claim rebased tokens
+   */
+  async claimRebase(
+    invertedLaunchPda: PublicKey,
+    user: PublicKey,
+    tokenVault: PublicKey,
+    userTokenAccount: PublicKey,
+  ): Promise<string> {
+    const [userBondPda] = VestigeClient.deriveUserBondPda(
+      invertedLaunchPda,
+      user,
+    );
+
+    console.log("Claiming rebased tokens...");
+
+    const tx = await this.program.methods
+      .claimRebase()
+      .accounts({
+        invertedLaunch: invertedLaunchPda,
+        userBond: userBondPda,
+        tokenVault: tokenVault,
+        userTokenAccount: userTokenAccount,
+        user: user,
+        tokenProgram: new PublicKey(
+          "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        ),
+      })
+      .rpc();
+
+    console.log("Rebase tokens claimed:", tx);
+    return tx;
+  }
+
+  /**
+   * Creator withdraws SOL from inverted vault
+   */
+  async creatorWithdrawInverted(
+    invertedLaunchPda: PublicKey,
+    creator: PublicKey,
+  ): Promise<string> {
+    const [invertedVaultPda] = VestigeClient.deriveInvertedVaultPda(
+      invertedLaunchPda,
+    );
+
+    console.log("Withdrawing inverted launch funds...");
+
+    const tx = await this.program.methods
+      .creatorWithdrawInverted()
+      .accounts({
+        invertedLaunch: invertedLaunchPda,
+        invertedVault: invertedVaultPda,
+        creator: creator,
+      })
+      .rpc();
+
+    console.log("Inverted launch funds withdrawn:", tx);
+    return tx;
+  }
+
+  /**
+   * Fetch inverted launch data
+   */
+  async getInvertedLaunch(
+    invertedLaunchPda: PublicKey,
+  ): Promise<InvertedLaunchData | null> {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const account = await (this.program.account as any).invertedLaunch.fetch(
+        invertedLaunchPda,
+      );
+      return {
+        publicKey: invertedLaunchPda,
+        ...(account as unknown as Omit<InvertedLaunchData, "publicKey">),
+      };
+    } catch (e) {
+      console.error("Error fetching inverted launch:", e);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch all inverted launches
+   */
+  async getAllInvertedLaunches(): Promise<InvertedLaunchData[]> {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const accounts = await (this.program.account as any).invertedLaunch.all();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return accounts.map((acc: any) => ({
+        publicKey: acc.publicKey,
+        ...(acc.account as unknown as Omit<InvertedLaunchData, "publicKey">),
+      }));
+    } catch (e) {
+      console.error("Error fetching inverted launches:", e);
+      return [];
+    }
+  }
+
+  /**
+   * Fetch user bond for an inverted launch
+   */
+  async getUserBond(
+    invertedLaunchPda: PublicKey,
+    user: PublicKey,
+  ): Promise<UserBondData | null> {
+    try {
+      const [userBondPda] = VestigeClient.deriveUserBondPda(
+        invertedLaunchPda,
+        user,
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const account = await (this.program.account as any).userBond.fetch(
+        userBondPda,
+      );
+      return account as unknown as UserBondData;
+    } catch {
+      console.log("No user bond found");
+      return null;
+    }
+  }
+
+  // ============== END INVERTED LAUNCH METHODS ==============
 
   /**
    * Query commitment data from Solana base layer

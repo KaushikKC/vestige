@@ -8,6 +8,165 @@
   },
   "instructions": [
     {
+      "name": "buy_bonded",
+      "docs": [
+        "Buy bonded units in an inverted launch"
+      ],
+      "discriminator": [
+        193,
+        251,
+        135,
+        96,
+        249,
+        240,
+        86,
+        194
+      ],
+      "accounts": [
+        {
+          "name": "inverted_launch",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  118,
+                  101,
+                  114,
+                  116,
+                  101,
+                  100,
+                  95,
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "inverted_launch.creator",
+                "account": "InvertedLaunch"
+              },
+              {
+                "kind": "account",
+                "path": "inverted_launch.token_mint",
+                "account": "InvertedLaunch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bonded_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  101,
+                  100,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "inverted_launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_bond",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  98,
+                  111,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "inverted_launch"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "inverted_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  118,
+                  101,
+                  114,
+                  116,
+                  101,
+                  100,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "inverted_launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "sol_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "calculate_allocation",
       "docs": [
         "Calculate user's token allocation based on weighted participation",
@@ -67,6 +226,198 @@
         {
           "name": "user",
           "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "calculate_rebase",
+      "docs": [
+        "Calculate rebase: final_tokens = weighted_bonded_units / WEIGHT_SCALE"
+      ],
+      "discriminator": [
+        185,
+        140,
+        220,
+        211,
+        9,
+        148,
+        105,
+        210
+      ],
+      "accounts": [
+        {
+          "name": "inverted_launch",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  118,
+                  101,
+                  114,
+                  116,
+                  101,
+                  100,
+                  95,
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "inverted_launch.creator",
+                "account": "InvertedLaunch"
+              },
+              {
+                "kind": "account",
+                "path": "inverted_launch.token_mint",
+                "account": "InvertedLaunch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_bond",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  98,
+                  111,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "inverted_launch"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_rebase",
+      "docs": [
+        "Claim rebased tokens (CPI token transfer)"
+      ],
+      "discriminator": [
+        32,
+        190,
+        212,
+        97,
+        165,
+        74,
+        250,
+        112
+      ],
+      "accounts": [
+        {
+          "name": "inverted_launch",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  118,
+                  101,
+                  114,
+                  116,
+                  101,
+                  100,
+                  95,
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "inverted_launch.creator",
+                "account": "InvertedLaunch"
+              },
+              {
+                "kind": "account",
+                "path": "inverted_launch.token_mint",
+                "account": "InvertedLaunch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_bond",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  98,
+                  111,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "inverted_launch"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_vault",
+          "writable": true
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
       "args": []
@@ -387,6 +738,71 @@
           }
         }
       ]
+    },
+    {
+      "name": "creator_withdraw_inverted",
+      "docs": [
+        "Creator withdraws SOL from inverted vault after graduation"
+      ],
+      "discriminator": [
+        105,
+        14,
+        28,
+        177,
+        130,
+        64,
+        6,
+        43
+      ],
+      "accounts": [
+        {
+          "name": "inverted_launch",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  118,
+                  101,
+                  114,
+                  116,
+                  101,
+                  100,
+                  95,
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "inverted_launch.creator",
+                "account": "InvertedLaunch"
+              },
+              {
+                "kind": "account",
+                "path": "inverted_launch.token_mint",
+                "account": "InvertedLaunch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "inverted_vault",
+          "writable": true
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
     },
     {
       "name": "delegate_pda",
@@ -948,6 +1364,60 @@
       "args": []
     },
     {
+      "name": "graduate_inverted",
+      "docs": [
+        "Graduate an inverted launch (permissionless)"
+      ],
+      "discriminator": [
+        254,
+        246,
+        31,
+        209,
+        181,
+        218,
+        130,
+        14
+      ],
+      "accounts": [
+        {
+          "name": "inverted_launch",
+          "writable": true
+        },
+        {
+          "name": "bonded_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  101,
+                  100,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "inverted_launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "init_ephemeral_sol",
       "docs": [
         "Step 1: Initialize user's ephemeral SOL account for a specific launch",
@@ -1132,6 +1602,165 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "initialize_inverted_launch",
+      "docs": [
+        "Initialize an inverted launch (price starts high, drops over time)"
+      ],
+      "discriminator": [
+        62,
+        75,
+        131,
+        220,
+        67,
+        199,
+        109,
+        191
+      ],
+      "accounts": [
+        {
+          "name": "inverted_launch",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  118,
+                  101,
+                  114,
+                  116,
+                  101,
+                  100,
+                  95,
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bonded_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  101,
+                  100,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "inverted_launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "inverted_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  118,
+                  101,
+                  114,
+                  116,
+                  101,
+                  100,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "inverted_launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_mint"
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "bonded_supply",
+          "type": "u64"
+        },
+        {
+          "name": "start_time",
+          "type": "i64"
+        },
+        {
+          "name": "end_time",
+          "type": "i64"
+        },
+        {
+          "name": "p_max",
+          "type": "u64"
+        },
+        {
+          "name": "p_min",
+          "type": "u64"
+        },
+        {
+          "name": "r_best",
+          "type": "u64"
+        },
+        {
+          "name": "r_min",
+          "type": "u64"
+        },
+        {
+          "name": "graduation_target",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "initialize_launch",
@@ -2059,6 +2688,19 @@
   ],
   "accounts": [
     {
+      "name": "BondedPool",
+      "discriminator": [
+        190,
+        14,
+        12,
+        15,
+        212,
+        123,
+        210,
+        104
+      ]
+    },
+    {
       "name": "CommitmentPool",
       "discriminator": [
         113,
@@ -2085,6 +2727,19 @@
       ]
     },
     {
+      "name": "InvertedLaunch",
+      "discriminator": [
+        143,
+        126,
+        191,
+        96,
+        29,
+        39,
+        169,
+        50
+      ]
+    },
+    {
       "name": "Launch",
       "discriminator": [
         144,
@@ -2095,6 +2750,19 @@
         85,
         213,
         38
+      ]
+    },
+    {
+      "name": "UserBond",
+      "discriminator": [
+        237,
+        134,
+        205,
+        190,
+        104,
+        151,
+        172,
+        41
       ]
     },
     {
@@ -2211,6 +2879,46 @@
       "code": 6019,
       "name": "InvalidAccountData",
       "msg": "Invalid or unreadable account data (e.g. commitment_pool owned by ER)"
+    },
+    {
+      "code": 6020,
+      "name": "InvalidPriceRange",
+      "msg": "Price max must be greater than price min"
+    },
+    {
+      "code": 6021,
+      "name": "InvalidPriceRatio",
+      "msg": "Price max must equal price min times PRICE_RATIO (10)"
+    },
+    {
+      "code": 6022,
+      "name": "InvalidWeightRange",
+      "msg": "Risk weight best must be greater than risk weight min"
+    },
+    {
+      "code": 6023,
+      "name": "WeightBelowMinimum",
+      "msg": "Risk weight min must be at least WEIGHT_SCALE (10000)"
+    },
+    {
+      "code": 6024,
+      "name": "InvalidSolAmount",
+      "msg": "SOL amount must be greater than zero"
+    },
+    {
+      "code": 6025,
+      "name": "ZeroBondedUnits",
+      "msg": "Calculated bonded units is zero"
+    },
+    {
+      "code": 6026,
+      "name": "BondedSupplyExceeded",
+      "msg": "Bonded supply would be exceeded"
+    },
+    {
+      "code": 6027,
+      "name": "Overflow",
+      "msg": "Arithmetic overflow"
     }
   ],
   "types": [
@@ -2271,6 +2979,38 @@
       }
     },
     {
+      "name": "BondedPool",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "inverted_launch",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_bonded_sold",
+            "type": "u64"
+          },
+          {
+            "name": "total_sol_collected",
+            "type": "u64"
+          },
+          {
+            "name": "total_weighted_units",
+            "type": "u64"
+          },
+          {
+            "name": "total_participants",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "CommitmentPool",
       "type": {
         "kind": "struct",
@@ -2326,6 +3066,70 @@
           },
           {
             "name": "is_delegated",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InvertedLaunch",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "bonded_supply",
+            "type": "u64"
+          },
+          {
+            "name": "start_time",
+            "type": "i64"
+          },
+          {
+            "name": "end_time",
+            "type": "i64"
+          },
+          {
+            "name": "p_max",
+            "type": "u64"
+          },
+          {
+            "name": "p_min",
+            "type": "u64"
+          },
+          {
+            "name": "r_best",
+            "type": "u64"
+          },
+          {
+            "name": "r_min",
+            "type": "u64"
+          },
+          {
+            "name": "graduation_target",
+            "type": "u64"
+          },
+          {
+            "name": "total_bonded_sold",
+            "type": "u64"
+          },
+          {
+            "name": "total_sol_collected",
+            "type": "u64"
+          },
+          {
+            "name": "is_graduated",
             "type": "bool"
           },
           {
@@ -2411,6 +3215,46 @@
           {
             "name": "pubkey",
             "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UserBond",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "inverted_launch",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_sol_spent",
+            "type": "u64"
+          },
+          {
+            "name": "total_bonded_units",
+            "type": "u64"
+          },
+          {
+            "name": "weighted_bonded_units",
+            "type": "u64"
+          },
+          {
+            "name": "final_tokens",
+            "type": "u64"
+          },
+          {
+            "name": "has_claimed",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }

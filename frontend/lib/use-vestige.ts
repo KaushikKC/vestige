@@ -8,6 +8,8 @@ import {
   VestigeClient,
   LaunchData,
   UserCommitmentData,
+  InvertedLaunchData,
+  UserBondData,
 } from "./vestige-client";
 
 /**
@@ -459,6 +461,194 @@ export function useVestige() {
     [client, wallet.publicKey],
   );
 
+  // ============== INVERTED LAUNCH HOOKS ==============
+
+  const fetchInvertedLaunches = useCallback(async (): Promise<
+    InvertedLaunchData[]
+  > => {
+    if (!client) return [];
+    setLoading(true);
+    setError(null);
+    try {
+      return await client.getAllInvertedLaunches();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, [client]);
+
+  const fetchInvertedLaunch = useCallback(
+    async (pda: PublicKey): Promise<InvertedLaunchData | null> => {
+      if (!client) return null;
+      setLoading(true);
+      setError(null);
+      try {
+        return await client.getInvertedLaunch(pda);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Unknown error");
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [client],
+  );
+
+  const fetchUserBond = useCallback(
+    async (invertedLaunchPda: PublicKey): Promise<UserBondData | null> => {
+      if (!client || !wallet.publicKey) return null;
+      try {
+        return await client.getUserBond(invertedLaunchPda, wallet.publicKey);
+      } catch {
+        console.log("No user bond found");
+        return null;
+      }
+    },
+    [client, wallet.publicKey],
+  );
+
+  const buyBonded = useCallback(
+    async (
+      invertedLaunchPda: PublicKey,
+      amountSol: number,
+    ): Promise<string | null> => {
+      if (!client || !wallet.publicKey) {
+        setError("Wallet not connected");
+        return null;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const amountLamports = VestigeClient.solToLamports(amountSol);
+        const tx = await client.buyBonded(
+          invertedLaunchPda,
+          amountLamports,
+          wallet.publicKey,
+        );
+        await refreshBalance();
+        return tx;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Unknown error");
+        console.error("Buy bonded error:", e);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [client, wallet.publicKey, refreshBalance],
+  );
+
+  const graduateInverted = useCallback(
+    async (invertedLaunchPda: PublicKey): Promise<string | null> => {
+      if (!client || !wallet.publicKey) {
+        setError("Wallet not connected");
+        return null;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const tx = await client.graduateInverted(
+          invertedLaunchPda,
+          wallet.publicKey,
+        );
+        return tx;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Unknown error");
+        console.error("Graduate inverted error:", e);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [client, wallet.publicKey],
+  );
+
+  const calculateRebase = useCallback(
+    async (invertedLaunchPda: PublicKey): Promise<string | null> => {
+      if (!client || !wallet.publicKey) {
+        setError("Wallet not connected");
+        return null;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const tx = await client.calculateRebase(
+          invertedLaunchPda,
+          wallet.publicKey,
+        );
+        return tx;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Unknown error");
+        console.error("Calculate rebase error:", e);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [client, wallet.publicKey],
+  );
+
+  const claimRebase = useCallback(
+    async (
+      invertedLaunchPda: PublicKey,
+      tokenVault: PublicKey,
+      userTokenAccount: PublicKey,
+    ): Promise<string | null> => {
+      if (!client || !wallet.publicKey) {
+        setError("Wallet not connected");
+        return null;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const tx = await client.claimRebase(
+          invertedLaunchPda,
+          wallet.publicKey,
+          tokenVault,
+          userTokenAccount,
+        );
+        return tx;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Unknown error");
+        console.error("Claim rebase error:", e);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [client, wallet.publicKey],
+  );
+
+  const creatorWithdrawInverted = useCallback(
+    async (invertedLaunchPda: PublicKey): Promise<string | null> => {
+      if (!client || !wallet.publicKey) {
+        setError("Wallet not connected");
+        return null;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const tx = await client.creatorWithdrawInverted(
+          invertedLaunchPda,
+          wallet.publicKey,
+        );
+        await refreshBalance();
+        return tx;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Unknown error");
+        console.error("Creator withdraw inverted error:", e);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [client, wallet.publicKey, refreshBalance],
+  );
+
+  // ============== END INVERTED LAUNCH HOOKS ==============
+
   // Query commitment data from Solana base layer (for comparison)
   const queryCommitmentFromSolana = useCallback(
     async (
@@ -508,6 +698,16 @@ export function useVestige() {
     queryCommitmentFromER,
     queryCommitmentFromSolana,
     refreshBalance,
+
+    // Inverted Launch methods
+    fetchInvertedLaunches,
+    fetchInvertedLaunch,
+    fetchUserBond,
+    buyBonded,
+    graduateInverted,
+    calculateRebase,
+    claimRebase,
+    creatorWithdrawInverted,
 
     // Wallet methods (pass-through)
     connect: wallet.connect,

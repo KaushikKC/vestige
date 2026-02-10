@@ -15,7 +15,12 @@ import {
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { ViewState, Launch } from "../types";
 import { useVestige } from "../../lib/use-vestige";
-import { VestigeClient, LaunchData } from "../../lib/vestige-client";
+import {
+  VestigeClient,
+  LaunchData,
+  InvertedLaunchData,
+  WEIGHT_SCALE,
+} from "../../lib/vestige-client";
 import toast from "react-hot-toast";
 
 interface DiscoverProps {
@@ -77,6 +82,9 @@ const Discover: React.FC<DiscoverProps> = ({ setView, setSelectedLaunch }) => {
   const [activeTab, setActiveTab] = useState<"gainers" | "losers">("gainers");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [realLaunches, setRealLaunches] = useState<Launch[]>([]);
+  const [invertedLaunches, setInvertedLaunches] = useState<
+    InvertedLaunchData[]
+  >([]);
   const [loadingLaunches, setLoadingLaunches] = useState(true);
   const [launchPdaInput, setLaunchPdaInput] = useState("");
   const [liveChart1, setLiveChart1] = useState<{ val: number }[]>(() =>
@@ -113,18 +121,25 @@ const Discover: React.FC<DiscoverProps> = ({ setView, setSelectedLaunch }) => {
     return () => clearInterval(t);
   }, []);
 
-  const { fetchLaunches } = useVestige();
+  const { fetchLaunches, fetchInvertedLaunches } = useVestige();
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoadingLaunches(true);
       try {
-        const launches = await fetchLaunches();
+        const [launches, inverted] = await Promise.all([
+          fetchLaunches(),
+          fetchInvertedLaunches(),
+        ]);
         if (cancelled) return;
         setRealLaunches(launches.map(launchDataToLaunch));
+        setInvertedLaunches(inverted);
       } catch {
-        if (!cancelled) setRealLaunches([]);
+        if (!cancelled) {
+          setRealLaunches([]);
+          setInvertedLaunches([]);
+        }
       } finally {
         if (!cancelled) setLoadingLaunches(false);
       }
@@ -133,7 +148,7 @@ const Discover: React.FC<DiscoverProps> = ({ setView, setSelectedLaunch }) => {
     return () => {
       cancelled = true;
     };
-  }, [fetchLaunches]);
+  }, [fetchLaunches, fetchInvertedLaunches]);
 
   const handleOpenByPda = () => {
     const trimmed = launchPdaInput.trim();
@@ -443,6 +458,96 @@ const Discover: React.FC<DiscoverProps> = ({ setView, setSelectedLaunch }) => {
               ))}
             </div>
           </div>
+
+          {/* Inverted Launches */}
+          {invertedLaunches.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-xl font-extrabold text-[#09090A]">
+                Inverted Launches
+              </h3>
+              <div className="flex gap-5 overflow-x-auto pb-6 -mx-4 px-4 scroll-smooth no-scrollbar snap-x">
+                {invertedLaunches.map((il) => {
+                  const pda = il.publicKey.toBase58();
+                  const progress =
+                    il.graduationTarget.toNumber() > 0
+                      ? Math.min(
+                          100,
+                          (il.totalSolCollected.toNumber() /
+                            il.graduationTarget.toNumber()) *
+                            100,
+                        )
+                      : 0;
+                  const currentPrice =
+                    VestigeClient.getCurrentCurvePrice(il);
+                  const currentWeight =
+                    VestigeClient.getCurrentRiskWeight(il);
+                  return (
+                    <div
+                      key={pda}
+                      onClick={() => {
+                        setSelectedLaunch({
+                          id: pda,
+                          name: `Inverted ${pda.slice(0, 4)}...${pda.slice(-4)}`,
+                          symbol: "INV",
+                          status: il.isGraduated ? "GRADUATED" : "PRIVATE",
+                          progress: Math.round(progress),
+                          timeLeft: VestigeClient.getTimeRemaining(il.endTime),
+                          creator:
+                            il.creator.toBase58().slice(0, 6) +
+                            "..." +
+                            il.creator.toBase58().slice(-4),
+                          launchPda: pda,
+                          color: "#8B5CF6",
+                        });
+                        setView(ViewState.INVERTED_LAUNCH_DETAIL);
+                      }}
+                      className="min-w-[260px] md:min-w-[300px] snap-center bg-white rounded-[24px] p-5 border border-[#E6E8EF] hover:border-[#8B5CF6] shadow-sm hover:shadow-[0_0_20px_rgba(139,92,246,0.4)] hover:scale-[1.02] transition-all duration-300 cursor-pointer group flex flex-col justify-between h-[200px]"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center font-bold text-xl text-purple-600 group-hover:scale-110 transition-transform">
+                            I
+                          </div>
+                          <div>
+                            <div className="font-bold text-[#09090A] text-lg">
+                              Inverted {pda.slice(0, 4)}...
+                            </div>
+                            <div className="text-xs font-semibold text-[#6B7280]">
+                              {(currentPrice / 1e9).toFixed(4)} SOL
+                              {" | "}
+                              {(currentWeight / WEIGHT_SCALE).toFixed(1)}x
+                            </div>
+                          </div>
+                        </div>
+                        <span className="bg-purple-100 text-purple-600 px-2 py-1 rounded text-[10px] font-bold">
+                          INVERTED
+                        </span>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-[#6B7280]">
+                            {il.isGraduated ? "Graduated" : "Active"}
+                          </span>
+                          <span className="text-[#09090A]">
+                            {Math.round(progress)}% Filled
+                          </span>
+                        </div>
+                        <div className="h-2.5 w-full bg-[#F5F6FA] rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-purple-500 rounded-full"
+                            style={{
+                              width: `${Math.min(100, progress)}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Bento Grid Layout */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
