@@ -21,11 +21,10 @@ import {
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useVestige } from "@/lib/use-vestige";
 import { VestigeClient } from "@/lib/vestige-client";
-import { Loader2, Rocket, ExternalLink, Copy } from "lucide-react";
+import { Loader2, ExternalLink, Copy } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface CreateLaunchFormProps {
-  /** Called with launch PDA when user wants to go to launch detail (e.g. after creation) */
   onGoToLaunch?: (launchPda: string) => void;
 }
 
@@ -40,31 +39,41 @@ export default function CreateLaunchForm({
 
   const [formData, setFormData] = useState({
     tokenSupply: "1000000",
-    graduationTarget: "100",
-    minCommitment: "0.1",
-    maxCommitment: "10",
-    durationMinutes: "1440", // 24 hours in minutes
+    bonusPool: "500000",
+    pMax: "1",
+    rBest: "15",
+    rMin: "1",
+    graduationTarget: "10",
+    durationMinutes: "1440",
   });
   const [testMode, setTestMode] = useState(false);
 
-  // Quick test mode settings (3 minute duration, low targets)
+  // Derived from pMax
+  const pMinDisplay = formData.pMax
+    ? (parseFloat(formData.pMax) / 10).toString()
+    : "0";
+
   const applyTestMode = (enabled: boolean) => {
     setTestMode(enabled);
     if (enabled) {
       setFormData({
         tokenSupply: "1000",
-        graduationTarget: "0.5", // 0.5 SOL target (easy to reach)
-        minCommitment: "0.1",
-        maxCommitment: "1",
-        durationMinutes: "3", // 3 minutes for testing
+        bonusPool: "500",
+        pMax: "1",
+        rBest: "15",
+        rMin: "1",
+        graduationTarget: "0.5",
+        durationMinutes: "3",
       });
     } else {
       setFormData({
         tokenSupply: "1000000",
-        graduationTarget: "100",
-        minCommitment: "0.1",
-        maxCommitment: "10",
-        durationMinutes: "1440", // 24 hours
+        bonusPool: "500000",
+        pMax: "1",
+        rBest: "15",
+        rMin: "1",
+        graduationTarget: "10",
+        durationMinutes: "1440",
       });
     }
   };
@@ -77,15 +86,11 @@ export default function CreateLaunchForm({
 
     setCreating(true);
     try {
-      console.log("Creating SPL token mint...");
-
       const connection = (client as any).connection;
       const mintKeypair = Keypair.generate();
 
-      // Get rent exemption amount for mint
+      // Create SPL token mint
       const lamports = await getMinimumBalanceForRentExemptMint(connection);
-
-      // Create transaction to initialize mint
       const transaction = new Transaction().add(
         SystemProgram.createAccount({
           fromPubkey: publicKey,
@@ -96,78 +101,75 @@ export default function CreateLaunchForm({
         }),
         createInitializeMint2Instruction(
           mintKeypair.publicKey,
-          6, // decimals
-          publicKey, // mint authority
-          publicKey, // freeze authority
-          TOKEN_PROGRAM_ID,
-        ),
+          9, // 9 decimals to match TOKEN_PRECISION
+          publicKey,
+          publicKey,
+          TOKEN_PROGRAM_ID
+        )
       );
 
-      // Send and sign transaction
       const { blockhash } = await connection.getLatestBlockhash();
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = publicKey;
-
-      // Sign with both wallet and mint keypair
       const signedTx = await wallet.signTransaction!(transaction);
       signedTx.partialSign(mintKeypair);
-
       const mintTxSig = await connection.sendRawTransaction(
-        signedTx.serialize(),
+        signedTx.serialize()
       );
       await connection.confirmTransaction(mintTxSig, "confirmed");
-
       const tokenMint = mintKeypair.publicKey;
-      console.log("✅ Token mint created:", tokenMint.toBase58());
 
-      // Wait a bit for the transaction to fully settle
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Derive launch PDA
       const [launchPda] = VestigeClient.deriveLaunchPda(publicKey, tokenMint);
-      console.log("📝 Creating launch at PDA:", launchPda.toBase58());
 
-      // Calculate times (must be BN for i64)
+      // Compute params
       const now = Math.floor(Date.now() / 1000);
-      const durationSeconds = parseInt(formData.durationMinutes) * 60; // minutes to seconds
+      const durationSeconds = parseInt(formData.durationMinutes) * 60;
       const startTime = new BN(now);
       const endTime = new BN(now + durationSeconds);
 
-      console.log(
-        `⏱️ Launch duration: ${formData.durationMinutes} minutes (${durationSeconds} seconds)`,
+      // Token amounts (raw, 9 decimals matching TOKEN_PRECISION)
+      const tokenSupplyRaw = Math.floor(
+        parseFloat(formData.tokenSupply) * 1e9
       );
-
-      // Token supply in base units (6 decimals)
-      const tokenSupplyRaw = Math.floor(parseFloat(formData.tokenSupply) * 1e6);
+      const bonusPoolRaw = Math.floor(parseFloat(formData.bonusPool) * 1e9);
       const tokenSupply = new BN(tokenSupplyRaw);
-      const graduationTarget = VestigeClient.solToLamports(
-        parseFloat(formData.graduationTarget),
+      const bonusPool = new BN(bonusPoolRaw);
+
+      // Price in lamports: pMax SOL * 1e9
+      const pMaxLamports = VestigeClient.solToLamports(
+        parseFloat(formData.pMax)
       );
-      const minCommitment = VestigeClient.solToLamports(
-        parseFloat(formData.minCommitment),
-      );
-      const maxCommitment = VestigeClient.solToLamports(
-        parseFloat(formData.maxCommitment),
+      const pMinLamports = VestigeClient.solToLamports(
+        parseFloat(formData.pMax) / 10
       );
 
-      // Call initialize_launch
+      const rBest = new BN(parseInt(formData.rBest));
+      const rMin = new BN(parseInt(formData.rMin));
+      const graduationTarget = VestigeClient.solToLamports(
+        parseFloat(formData.graduationTarget)
+      );
+
+      // Initialize launch
       const program = (client as any).program;
-      const [commitmentPoolPda] =
-        VestigeClient.deriveCommitmentPoolPda(launchPda);
       const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
 
       const tx = await program.methods
         .initializeLaunch(
           tokenSupply,
+          bonusPool,
           startTime,
           endTime,
-          graduationTarget,
-          minCommitment,
-          maxCommitment,
+          pMaxLamports,
+          pMinLamports,
+          rBest,
+          rMin,
+          graduationTarget
         )
         .accounts({
           launch: launchPda,
-          commitmentPool: commitmentPoolPda,
           vault: vaultPda,
           tokenMint: tokenMint,
           creator: publicKey,
@@ -175,54 +177,55 @@ export default function CreateLaunchForm({
         })
         .rpc({ skipPreflight: true });
 
-      console.log("✅ Launch created! Transaction:", tx);
+      await connection.confirmTransaction(tx, "confirmed");
 
-      // Create creator's token vault (ATA) and mint full supply so participants can claim
-      const creatorTokenVault = getAssociatedTokenAddressSync(
+      // Create ATA for Launch PDA (token vault) and mint supply + bonus
+      const launchTokenVault = getAssociatedTokenAddressSync(
         tokenMint,
-        publicKey,
-        false,
+        launchPda,
+        true, // allowOwnerOffCurve - PDA owner
         TOKEN_PROGRAM_ID,
-        ASSOCIATED_TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID
       );
+
+      const totalMint = tokenSupplyRaw + bonusPoolRaw;
+
       const vaultTx = new Transaction();
-      const existingVault = await connection.getAccountInfo(creatorTokenVault);
+      const existingVault = await connection.getAccountInfo(launchTokenVault);
       if (!existingVault) {
         vaultTx.add(
           createAssociatedTokenAccountInstruction(
             publicKey,
-            creatorTokenVault,
-            publicKey,
+            launchTokenVault,
+            launchPda,
             tokenMint,
             TOKEN_PROGRAM_ID,
-            ASSOCIATED_TOKEN_PROGRAM_ID,
-          ),
+            ASSOCIATED_TOKEN_PROGRAM_ID
+          )
         );
       }
       vaultTx.add(
         createMintToInstruction(
           tokenMint,
-          creatorTokenVault,
+          launchTokenVault,
           publicKey,
-          tokenSupplyRaw,
+          totalMint,
           [],
-          TOKEN_PROGRAM_ID,
-        ),
+          TOKEN_PROGRAM_ID
+        )
       );
-      const { blockhash: blockhash2 } = await connection.getLatestBlockhash();
-      vaultTx.recentBlockhash = blockhash2;
+      const { blockhash: bh2 } = await connection.getLatestBlockhash();
+      vaultTx.recentBlockhash = bh2;
       vaultTx.feePayer = publicKey;
       const signedVault = await wallet.signTransaction!(vaultTx);
       const vaultTxSig = await connection.sendRawTransaction(
-        signedVault.serialize(),
+        signedVault.serialize()
       );
       await connection.confirmTransaction(vaultTxSig, "confirmed");
-      console.log("✅ Token vault created and supply minted:", vaultTxSig);
 
       setTxSignature(tx);
       setLaunchPdaCreated(launchPda.toBase58());
-
-      toast.success("Launch created. You can now enable private mode.");
+      toast.success("Launch created successfully!");
     } catch (error: unknown) {
       console.error("Launch creation failed:", error);
       const msg = error instanceof Error ? error.message : String(error);
@@ -235,7 +238,9 @@ export default function CreateLaunchForm({
   if (!connected) {
     return (
       <div className="bg-white rounded-2xl p-8 shadow-lg border border-[#E6E8EF] text-center">
-        <p className="text-[#6B7280]">Connect your wallet to create a launch</p>
+        <p className="text-[#6B7280]">
+          Connect your wallet to create a launch
+        </p>
       </div>
     );
   }
@@ -249,20 +254,16 @@ export default function CreateLaunchForm({
   if (txSignature && launchPdaCreated) {
     return (
       <div className="bg-white rounded-2xl p-8 shadow-lg border border-[#E6E8EF] text-center">
-        <div className="w-16 h-16 bg-[#F5F6FA] rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-[#E6E8EF]">
-          {/* <Rocket size={32} className="text-[#3A2BFF]" /> */}
-        </div>
         <h3 className="text-2xl font-bold mb-4 text-[#0B0D17]">
           Launch Created
         </h3>
         <p className="text-sm text-[#6B7280] mb-4">
-          Your launch has been deployed to Solana
+          Your inverted bonding curve launch has been deployed to Solana.
         </p>
 
-        {/* Launch PDA - visible in UI for demo */}
         <div className="mb-4 p-4 bg-[#F5F6FA] rounded-xl border border-[#E6E8EF] text-left">
           <p className="text-xs font-bold text-[#6B7280] mb-2 uppercase tracking-wide">
-            Launch PDA (use this to open or share your launch)
+            Launch PDA
           </p>
           <div className="flex items-center gap-2 flex-wrap">
             <code className="text-sm text-[#0B0D17] break-all font-mono flex-1 min-w-0">
@@ -283,7 +284,7 @@ export default function CreateLaunchForm({
           {onGoToLaunch && (
             <button
               onClick={() => onGoToLaunch(launchPdaCreated)}
-              className="py-3 px-6 bg-[#3A2BFF] text-white rounded-xl font-bold hover:bg-[#2A1BDF] flex items-center justify-center gap-2"
+              className="py-3 px-6 bg-[#1D04E1] text-white rounded-xl font-bold hover:bg-[#1603C0] flex items-center justify-center gap-2"
             >
               <ExternalLink size={18} />
               Open launch page
@@ -295,7 +296,7 @@ export default function CreateLaunchForm({
             rel="noopener noreferrer"
             className="py-3 px-6 border-2 border-[#E6E8EF] rounded-xl font-bold text-[#0B0D17] hover:bg-[#F5F6FA] inline-flex items-center justify-center gap-2"
           >
-            View transaction on Explorer
+            View transaction
           </a>
         </div>
 
@@ -306,9 +307,11 @@ export default function CreateLaunchForm({
             setTestMode(false);
             setFormData({
               tokenSupply: "1000000",
-              graduationTarget: "100",
-              minCommitment: "0.1",
-              maxCommitment: "10",
+              bonusPool: "500000",
+              pMax: "1",
+              rBest: "15",
+              rMin: "1",
+              graduationTarget: "10",
               durationMinutes: "1440",
             });
           }}
@@ -322,40 +325,112 @@ export default function CreateLaunchForm({
 
   return (
     <div className="bg-white rounded-2xl p-8 shadow-lg border border-[#E6E8EF]">
-      <h2 className="text-2xl font-bold mb-6">Create New Launch</h2>
+      <h2 className="text-2xl font-bold mb-6">New Inverted Curve Launch</h2>
 
-      {/* Quick Test Mode Toggle */}
       <div className="mb-6 p-4 bg-[#F5F6FA] rounded-xl border-2 border-[#E6E8EF]">
         <label className="flex items-center gap-3 cursor-pointer">
           <input
             type="checkbox"
             checked={testMode}
             onChange={(e) => applyTestMode(e.target.checked)}
-            className="w-5 h-5 rounded border-2 border-[#E6E8EF] accent-[#3A2BFF]"
+            className="w-5 h-5 rounded border-2 border-[#E6E8EF] accent-[#1D04E1]"
           />
           <div>
             <span className="font-bold text-[#0B0D17]">Quick Test Mode</span>
             <p className="text-xs text-[#6B7280] mt-1">
-              3-minute duration, 0.5 SOL target - perfect for demo!
+              3-minute duration, 0.5 SOL target, small supply
             </p>
           </div>
         </label>
       </div>
 
       <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-bold text-[#6B7280] mb-2">
+              Token Supply
+            </label>
+            <input
+              type="number"
+              value={formData.tokenSupply}
+              onChange={(e) =>
+                setFormData({ ...formData, tokenSupply: e.target.value })
+              }
+              className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
+              placeholder="1000000"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-[#6B7280] mb-2">
+              Bonus Pool
+            </label>
+            <input
+              type="number"
+              value={formData.bonusPool}
+              onChange={(e) =>
+                setFormData({ ...formData, bonusPool: e.target.value })
+              }
+              className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
+              placeholder="500000"
+            />
+            <p className="text-xs text-[#6B7280] mt-1">
+              Reserved for graduation bonus distribution
+            </p>
+          </div>
+        </div>
+
         <div>
           <label className="block text-sm font-bold text-[#6B7280] mb-2">
-            Token Supply
+            Starting Price (SOL) &mdash; p_max
           </label>
           <input
             type="number"
-            value={formData.tokenSupply}
+            value={formData.pMax}
             onChange={(e) =>
-              setFormData({ ...formData, tokenSupply: e.target.value })
+              setFormData({ ...formData, pMax: e.target.value })
             }
-            className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#3A2BFF] outline-none"
-            placeholder="1000000"
+            className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
+            placeholder="1"
+            step="0.01"
           />
+          <p className="text-xs text-[#6B7280] mt-1">
+            Price drops from {formData.pMax || "?"} SOL to {pMinDisplay} SOL
+            (10:1 ratio)
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-bold text-[#6B7280] mb-2">
+              Risk Weight Best (r_best)
+            </label>
+            <input
+              type="number"
+              value={formData.rBest}
+              onChange={(e) =>
+                setFormData({ ...formData, rBest: e.target.value })
+              }
+              className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
+              placeholder="15"
+            />
+            <p className="text-xs text-[#6B7280] mt-1">
+              Must be &gt; 10 (price ratio)
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-[#6B7280] mb-2">
+              Risk Weight Min (r_min)
+            </label>
+            <input
+              type="number"
+              value={formData.rMin}
+              onChange={(e) =>
+                setFormData({ ...formData, rMin: e.target.value })
+              }
+              className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
+              placeholder="1"
+            />
+          </div>
         </div>
 
         <div>
@@ -368,41 +443,9 @@ export default function CreateLaunchForm({
             onChange={(e) =>
               setFormData({ ...formData, graduationTarget: e.target.value })
             }
-            className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#3A2BFF] outline-none"
-            placeholder="100"
+            className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
+            placeholder="10"
           />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-bold text-[#6B7280] mb-2">
-              Min Commitment (SOL)
-            </label>
-            <input
-              type="number"
-              value={formData.minCommitment}
-              onChange={(e) =>
-                setFormData({ ...formData, minCommitment: e.target.value })
-              }
-              className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#3A2BFF] outline-none"
-              placeholder="0.1"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-[#6B7280] mb-2">
-              Max Commitment (SOL)
-            </label>
-            <input
-              type="number"
-              value={formData.maxCommitment}
-              onChange={(e) =>
-                setFormData({ ...formData, maxCommitment: e.target.value })
-              }
-              className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#3A2BFF] outline-none"
-              placeholder="10"
-            />
-          </div>
         </div>
 
         <div>
@@ -415,13 +458,13 @@ export default function CreateLaunchForm({
             onChange={(e) =>
               setFormData({ ...formData, durationMinutes: e.target.value })
             }
-            className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#3A2BFF] outline-none"
+            className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
             placeholder="1440"
           />
           <p className="text-xs text-[#6B7280] mt-1">
             {parseInt(formData.durationMinutes) >= 60
-              ? `≈ ${(parseInt(formData.durationMinutes) / 60).toFixed(
-                  1,
+              ? `= ${(parseInt(formData.durationMinutes) / 60).toFixed(
+                  1
                 )} hours`
               : `${formData.durationMinutes} minutes`}
           </p>
@@ -430,7 +473,7 @@ export default function CreateLaunchForm({
         <button
           onClick={handleCreate}
           disabled={creating}
-          className="w-full py-4 bg-[#C8FF2E] hover:bg-[#bce62b] text-[#0B0D17] font-bold rounded-xl transition-all border-2 border-[#09090A] flex items-center justify-center gap-2 disabled:bg-gray-300"
+          className="w-full py-4 bg-[#CFEA4D] hover:bg-[#DFFF5E] text-[#0B0D17] font-bold rounded-xl transition-all border-2 border-[#09090A] flex items-center justify-center gap-2 disabled:bg-gray-300"
         >
           {creating ? (
             <>
@@ -438,17 +481,16 @@ export default function CreateLaunchForm({
               Creating Launch...
             </>
           ) : (
-            <>
-              {/* <Rocket size={20} /> */}
-              Create Launch
-            </>
+            "Create Launch"
           )}
         </button>
       </div>
 
       <div className="mt-6 p-4 bg-blue-50 rounded-xl text-sm text-[#6B7280]">
-        <strong>Note:</strong> After creating, you can delegate to MagicBlock ER
-        for private commitments!
+        <strong>How it works:</strong> Price drops from p_max to p_min over the
+        duration. Early buyers pay more but earn a higher risk weight, giving
+        them bonus tokens at graduation. Real tokens are delivered immediately on
+        buy.
       </div>
     </div>
   );

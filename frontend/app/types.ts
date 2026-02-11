@@ -1,37 +1,41 @@
 export enum ViewState {
-    DISCOVER = 'DISCOVER',
-    LAUNCH_DETAIL = 'LAUNCH_DETAIL',
-    INVERTED_LAUNCH_DETAIL = 'INVERTED_LAUNCH_DETAIL',
-    CREATOR = 'CREATOR',
-    ALLOCATION = 'ALLOCATION',
-    DOCS = 'DOCS',
-    MY_COMMITMENTS = 'MY_COMMITMENTS'
-  }
-  
-  export interface Launch {
-    id: string;
-    name: string;
-    symbol: string;
-    status: 'PRIVATE' | 'GRADUATED';
-    progress: number;
-    timeLeft: string;
-    creator: string;
-    color?: string;
-    // Real launch data (optional - for on-chain launches)
-    launchPda?: string;
-    tokenMint?: string;
-    graduationTarget?: number;
-    totalCommitted?: number;
-    totalParticipants?: number;
-    isDelegated?: boolean;
-    minCommitment?: number;
-    maxCommitment?: number;
-  }
-  
-  export interface StatMetric {
-    label: string;
-    value: string;
-    isMasked?: boolean;
-    change?: number;
-  }
-  
+  DISCOVER = 'DISCOVER',
+  LAUNCH_DETAIL = 'LAUNCH_DETAIL',
+  CREATOR = 'CREATOR',
+  DOCS = 'DOCS',
+}
+
+export interface Launch {
+  id: string;
+  name: string;
+  symbol: string;
+  status: 'ACTIVE' | 'GRADUATED';
+  progress: number;
+  timeLeft: string;
+  creator: string;
+  color?: string;
+  launchPda?: string;
+  tokenMint?: string;
+  graduationTarget?: number;
+  totalSolCollected?: number;
+  totalBaseSold?: number;
+  totalBonusReserved?: number;
+  totalParticipants?: number;
+  pMax?: number;
+  pMin?: number;
+  rBest?: number;
+  rMin?: number;
+  tokenSupply?: number;
+  bonusPool?: number;
+  startTime?: number;
+  endTime?: number;
+  curvePrice?: number;
+  riskWeight?: number;
+}
+
+export interface StatMetric {
+  label: string;
+  value: string;
+  isMasked?: boolean;
+  change?: number;
+}

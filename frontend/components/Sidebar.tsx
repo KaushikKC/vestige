@@ -4,7 +4,6 @@ import React from "react";
 import {
   Rocket,
   PlusCircle,
-  Lock,
   FileText,
   Info,
   LifeBuoy,
@@ -26,10 +25,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   setIsOpen,
 }) => {
   const menuItems = [
-    // { id: ViewState.DISCOVER, label: 'Dashboard', icon: LayoutDashboard },
     { id: ViewState.DISCOVER, label: "Discover", icon: Rocket },
-    { id: ViewState.CREATOR, label: "Swap & Bridge", icon: PlusCircle },
-    { id: ViewState.ALLOCATION, label: "My Commitments", icon: Lock },
+    { id: ViewState.CREATOR, label: "Creator", icon: PlusCircle },
     { id: ViewState.DOCS, label: "Docs", icon: FileText },
   ];
 
@@ -71,14 +68,13 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* Menu - flex-1 to take space, but no-scrollbar */}
+        {/* Menu */}
         <div className="flex-1 px-0 py-4 flex flex-col gap-1 no-scrollbar overflow-y-auto">
           <div className="px-8 mb-4 text-xs font-bold text-white/40 uppercase tracking-widest">
             Menu
           </div>
 
           {menuItems.map((item, index) => {
-            // Logic to simulate 'Discover' being the active one for visual matching
             const isActive =
               (item.label === "Discover" &&
                 currentView === ViewState.DISCOVER) ||
@@ -139,10 +135,10 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* Footer - Copyright */}
+        {/* Footer */}
         <div className="p-8 pt-0 flex-shrink-0">
           <p className="text-[10px] text-white/30 font-medium">
-            © 2026 Vestige Labs.
+            &copy; 2026 Vestige Labs.
           </p>
         </div>
       </div>

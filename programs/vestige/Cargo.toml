@@ -1,7 +1,7 @@
 [package]
 name = "vestige"
 version = "0.1.0"
-description = "Privacy-Preserving Token Launch using MagicBlock Ephemeral Rollups"
+description = "Inverted bonding curve token launchpad with immediate delivery and graduation bonus"
 edition = "2021"
 
 [lib]
@@ -22,4 +22,3 @@ anchor-debug = []
 [dependencies]
 anchor-lang = { version = "0.32.1", features = ["init-if-needed"] }
 anchor-spl = "0.32.1"
-ephemeral-rollups-sdk = { version = "0.8", features = ["anchor", "access-control"] }

@@ -1,0 +1,8 @@
+{
+  "name": "Vestige",
+  "short_name": "Vestige",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FDFCFB",
+  "theme_color": "#1D04E1"
+}

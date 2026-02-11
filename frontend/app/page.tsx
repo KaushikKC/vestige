@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import Image from "next/image";
 import {
   Menu,
   Globe,
@@ -13,10 +12,10 @@ import {
 import Sidebar from "../components/Sidebar";
 import StatsPanel from "../components/StatusPanel";
 import WalletButton from "../components/WalletButton";
+import BottomTabs from "../components/BottomTabs";
 import Discover from "./discover/page";
 import LaunchDetail from "./launch-detail/page";
 import Creator from "./creator/page";
-import Allocation from "./allocation/page";
 import { ViewState, Launch } from "./types";
 import { useVestige } from "../lib/use-vestige";
 
@@ -25,7 +24,6 @@ export default function App() {
   const [selectedLaunch, setSelectedLaunch] = useState<Launch | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Wallet and Vestige state
   const { balance, connected, publicKey } = useVestige();
 
   const renderView = () => {
@@ -40,8 +38,6 @@ export default function App() {
         return (
           <Creator setView={setView} setSelectedLaunch={setSelectedLaunch} />
         );
-      case ViewState.ALLOCATION:
-        return <Allocation setView={setView} />;
       case ViewState.DOCS:
         return (
           <div className="flex flex-col items-center justify-center h-[50vh] text-center">
@@ -64,7 +60,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen w-full bg-[#F5F6FA] overflow-hidden">
-      {/* Left Sidebar */}
+      {/* Left Sidebar (desktop) */}
       <Sidebar
         currentView={currentView}
         setView={setView}
@@ -78,7 +74,7 @@ export default function App() {
         <div className="absolute inset-0 bg-striped-pattern opacity-40 pointer-events-none z-0" />
 
         {/* Header */}
-        <header className="h-[88px] px-8 flex items-center justify-between shrink-0 z-30 relative bg-[#F5F6FA]/50 backdrop-blur-sm">
+        <header className="h-[88px] px-4 md:px-8 flex items-center justify-between shrink-0 z-30 relative bg-[#F5F6FA]/50 backdrop-blur-sm">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsSidebarOpen(true)}
@@ -86,13 +82,16 @@ export default function App() {
             >
               <Menu size={24} />
             </button>
-            <h2 className="text-3xl font-extrabold text-[#0B0D17] hidden sm:block capitalize tracking-tight">
+            <h2 className="text-2xl md:text-3xl font-extrabold text-[#0B0D17] hidden sm:block capitalize tracking-tight">
               {currentView === ViewState.DISCOVER
                 ? "Discover"
+                : currentView === ViewState.CREATOR
+                ? "Create"
+                : currentView === ViewState.LAUNCH_DETAIL
+                ? "Launch"
                 : currentView.replace("_", " ").toLowerCase()}
             </h2>
 
-            {/* Header Actions for Discovery */}
             {currentView === ViewState.DISCOVER && (
               <div className="hidden md:flex items-center gap-2 ml-4">
                 <button className="p-2 text-[#6B7280] hover:text-[#0B0D17] hover:bg-white rounded-xl transition-colors border-2 border-transparent hover:border-[#09090A]">
@@ -108,31 +107,26 @@ export default function App() {
             )}
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 md:gap-6">
             <div className="hidden md:flex items-center gap-2 text-sm font-bold text-[#0B0D17] cursor-pointer hover:bg-white px-3 py-1.5 rounded-xl transition-colors border-2 border-transparent hover:border-[#09090A]">
               <Globe size={18} /> ENG <ChevronDown size={14} />
             </div>
 
-            <div className="hidden md:flex items-center gap-2 text-sm font-bold text-[#0B0D17] cursor-pointer hover:bg-white px-3 py-1.5 rounded-xl transition-colors border-2 border-transparent hover:border-[#09090A]">
-              <div className="w-5 h-5 rounded-full border-2 border-black flex items-center justify-center text-[10px]">
-                $
-              </div>
-              USD <ChevronDown size={14} />
-            </div>
-
-            {/* Wallet Connect Button */}
             <WalletButton balance={balance} />
           </div>
         </header>
 
         {/* Scrollable Content */}
-        <main className="flex-1 overflow-y-auto custom-scrollbar p-4 md:px-8 md:pb-8 z-10 scroll-smooth">
+        <main className="flex-1 overflow-y-auto custom-scrollbar p-4 md:px-8 md:pb-8 pb-20 md:pb-8 z-10 scroll-smooth">
           <div className="max-w-[1400px] mx-auto">{renderView()}</div>
         </main>
       </div>
 
       {/* Right Stats Panel (Desktop Only) */}
       <StatsPanel />
+
+      {/* Mobile Bottom Tabs */}
+      <BottomTabs currentView={currentView} setView={setView} />
     </div>
   );
 }

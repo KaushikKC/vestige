@@ -19,13 +19,5 @@ url = "https://api.apr.dev"
 cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
-# MagicBlock Ephemeral Rollup endpoints
-[clusters.devnet]
-rpc = "https://solana-devnet.api.onfinality.io/public"
-
-[clusters.magicblock]
-rpc = "https://devnet.magicblock.app"
-router = "https://devnet-router.magicblock.app"
-
 [scripts]
 test = "npx ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
