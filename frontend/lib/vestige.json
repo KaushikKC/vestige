@@ -4,41 +4,34 @@
     "name": "vestige",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "Privacy-Preserving Token Launch using MagicBlock Ephemeral Rollups"
+    "description": "Inverted bonding curve token launchpad with immediate delivery and graduation bonus"
   },
   "instructions": [
     {
-      "name": "buy_bonded",
+      "name": "buy",
       "docs": [
-        "Buy bonded units in an inverted launch"
+        "Buy tokens using SOL. Immediate token delivery of base tokens.",
+        "Bonus tokens are recorded and delivered at graduation."
       ],
       "discriminator": [
-        193,
-        251,
-        135,
-        96,
-        249,
-        240,
-        86,
-        194
+        102,
+        6,
+        61,
+        18,
+        1,
+        218,
+        235,
+        234
       ],
       "accounts": [
         {
-          "name": "inverted_launch",
+          "name": "launch",
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  105,
-                  110,
-                  118,
-                  101,
-                  114,
-                  116,
-                  101,
-                  100,
-                  95,
                   108,
                   97,
                   117,
@@ -49,67 +42,38 @@
               },
               {
                 "kind": "account",
-                "path": "inverted_launch.creator",
-                "account": "InvertedLaunch"
+                "path": "launch.creator",
+                "account": "Launch"
               },
               {
                 "kind": "account",
-                "path": "inverted_launch.token_mint",
-                "account": "InvertedLaunch"
+                "path": "launch.token_mint",
+                "account": "Launch"
               }
             ]
           }
         },
         {
-          "name": "bonded_pool",
+          "name": "user_position",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  98,
-                  111,
-                  110,
-                  100,
-                  101,
-                  100,
-                  95,
                   112,
                   111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "inverted_launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user_bond",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
                   115,
-                  101,
-                  114,
-                  95,
-                  98,
+                  105,
+                  116,
+                  105,
                   111,
-                  110,
-                  100
+                  110
                 ]
               },
               {
                 "kind": "account",
-                "path": "inverted_launch"
+                "path": "launch"
               },
               {
                 "kind": "account",
@@ -119,22 +83,13 @@
           }
         },
         {
-          "name": "inverted_vault",
+          "name": "vault",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  105,
-                  110,
-                  118,
-                  101,
-                  114,
-                  116,
-                  101,
-                  100,
-                  95,
                   118,
                   97,
                   117,
@@ -144,15 +99,27 @@
               },
               {
                 "kind": "account",
-                "path": "inverted_launch"
+                "path": "launch"
               }
             ]
           }
         },
         {
+          "name": "token_vault",
+          "writable": true
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
           "name": "user",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
           "name": "system_program",
@@ -167,275 +134,20 @@
       ]
     },
     {
-      "name": "calculate_allocation",
+      "name": "claim_bonus",
       "docs": [
-        "Calculate user's token allocation based on weighted participation",
-        "Formula: weight = 1 + alpha * (1 - t/T)",
-        "Early participants get up to 50% bonus tokens"
+        "Claim bonus tokens after graduation.",
+        "Transfers bonus_entitled tokens from token_vault to user."
       ],
       "discriminator": [
-        237,
-        69,
-        141,
-        199,
-        177,
-        3,
-        173,
-        150
-      ],
-      "accounts": [
-        {
-          "name": "launch"
-        },
-        {
-          "name": "user_commitment",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
-                  115,
-                  101,
-                  114,
-                  95,
-                  99,
-                  111,
-                  109,
-                  109,
-                  105,
-                  116,
-                  109,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              },
-              {
-                "kind": "account",
-                "path": "user"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user",
-          "signer": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "calculate_rebase",
-      "docs": [
-        "Calculate rebase: final_tokens = weighted_bonded_units / WEIGHT_SCALE"
-      ],
-      "discriminator": [
-        185,
-        140,
-        220,
-        211,
-        9,
-        148,
-        105,
-        210
-      ],
-      "accounts": [
-        {
-          "name": "inverted_launch",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  105,
-                  110,
-                  118,
-                  101,
-                  114,
-                  116,
-                  101,
-                  100,
-                  95,
-                  108,
-                  97,
-                  117,
-                  110,
-                  99,
-                  104
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "inverted_launch.creator",
-                "account": "InvertedLaunch"
-              },
-              {
-                "kind": "account",
-                "path": "inverted_launch.token_mint",
-                "account": "InvertedLaunch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user_bond",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
-                  115,
-                  101,
-                  114,
-                  95,
-                  98,
-                  111,
-                  110,
-                  100
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "inverted_launch"
-              },
-              {
-                "kind": "account",
-                "path": "user"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user",
-          "signer": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "claim_rebase",
-      "docs": [
-        "Claim rebased tokens (CPI token transfer)"
-      ],
-      "discriminator": [
-        32,
-        190,
-        212,
-        97,
-        165,
-        74,
+        143,
         250,
-        112
-      ],
-      "accounts": [
-        {
-          "name": "inverted_launch",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  105,
-                  110,
-                  118,
-                  101,
-                  114,
-                  116,
-                  101,
-                  100,
-                  95,
-                  108,
-                  97,
-                  117,
-                  110,
-                  99,
-                  104
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "inverted_launch.creator",
-                "account": "InvertedLaunch"
-              },
-              {
-                "kind": "account",
-                "path": "inverted_launch.token_mint",
-                "account": "InvertedLaunch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user_bond",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
-                  115,
-                  101,
-                  114,
-                  95,
-                  98,
-                  111,
-                  110,
-                  100
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "inverted_launch"
-              },
-              {
-                "kind": "account",
-                "path": "user"
-              }
-            ]
-          }
-        },
-        {
-          "name": "token_vault",
-          "writable": true
-        },
-        {
-          "name": "user_token_account",
-          "writable": true
-        },
-        {
-          "name": "user",
-          "signer": true
-        },
-        {
-          "name": "token_program",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "claim_tokens",
-      "docs": [
-        "Phase 4: Claim allocated tokens"
-      ],
-      "discriminator": [
-        108,
-        216,
-        210,
-        231,
         0,
-        212,
-        42,
-        64
+        123,
+        176,
+        198,
+        110,
+        71
       ],
       "accounts": [
         {
@@ -467,164 +179,21 @@
           }
         },
         {
-          "name": "user_commitment",
+          "name": "user_position",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  117,
-                  115,
-                  101,
-                  114,
-                  95,
-                  99,
-                  111,
-                  109,
-                  109,
-                  105,
-                  116,
-                  109,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              },
-              {
-                "kind": "account",
-                "path": "user"
-              }
-            ]
-          }
-        },
-        {
-          "name": "token_vault",
-          "writable": true
-        },
-        {
-          "name": "user_token_account",
-          "writable": true
-        },
-        {
-          "name": "user",
-          "signer": true
-        },
-        {
-          "name": "token_program",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "commit",
-      "docs": [
-        "Phase 2 (combined): Commit SOL to a launch (for NON-DELEGATED pools only)",
-        "This does deposit + record in one transaction on Solana.",
-        "DO NOT use this for delegated pools - use deposit() then record_commit() separately."
-      ],
-      "discriminator": [
-        223,
-        140,
-        142,
-        165,
-        229,
-        208,
-        156,
-        74
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "docs": [
-            "Read-only: we only read launch params"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  97,
-                  117,
-                  110,
-                  99,
-                  104
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch.creator",
-                "account": "Launch"
-              },
-              {
-                "kind": "account",
-                "path": "launch.token_mint",
-                "account": "Launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "commitment_pool",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  109,
-                  109,
-                  105,
-                  116,
-                  109,
-                  101,
-                  110,
-                  116,
-                  95,
                   112,
                   111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user_commitment",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
                   115,
-                  101,
-                  114,
-                  95,
-                  99,
-                  111,
-                  109,
-                  109,
                   105,
                   116,
-                  109,
-                  101,
-                  110,
-                  116
+                  105,
+                  111,
+                  110
                 ]
               },
               {
@@ -634,166 +203,76 @@
               {
                 "kind": "account",
                 "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_vault",
+          "writable": true
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "creator_withdraw",
+      "docs": [
+        "Creator withdraws collected SOL after graduation.",
+        "Direct lamport debit from vault PDA to creator."
+      ],
+      "discriminator": [
+        92,
+        117,
+        206,
+        254,
+        174,
+        108,
+        37,
+        106
+      ],
+      "accounts": [
+        {
+          "name": "launch",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch.creator",
+                "account": "Launch"
+              },
+              {
+                "kind": "account",
+                "path": "launch.token_mint",
+                "account": "Launch"
               }
             ]
           }
         },
         {
           "name": "vault",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "amount",
-          "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "create_permission",
-      "docs": [
-        "Create permission for an account based on account type",
-        "This must be called before delegation for privacy features",
-        "Both permission AND permissioned_account must be delegated!"
-      ],
-      "discriminator": [
-        190,
-        182,
-        26,
-        164,
-        156,
-        221,
-        8,
-        0
-      ],
-      "accounts": [
-        {
-          "name": "permissioned_account"
-        },
-        {
-          "name": "permission",
-          "writable": true
-        },
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "permission_program",
-          "address": "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "account_type",
-          "type": {
-            "defined": {
-              "name": "AccountType"
-            }
-          }
-        },
-        {
-          "name": "members",
-          "type": {
-            "option": {
-              "vec": {
-                "defined": {
-                  "name": "Member"
-                }
-              }
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "creator_withdraw_inverted",
-      "docs": [
-        "Creator withdraws SOL from inverted vault after graduation"
-      ],
-      "discriminator": [
-        105,
-        14,
-        28,
-        177,
-        130,
-        64,
-        6,
-        43
-      ],
-      "accounts": [
-        {
-          "name": "inverted_launch",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  105,
-                  110,
-                  118,
-                  101,
-                  114,
-                  116,
-                  101,
-                  100,
-                  95,
-                  108,
-                  97,
-                  117,
-                  110,
-                  99,
-                  104
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "inverted_launch.creator",
-                "account": "InvertedLaunch"
-              },
-              {
-                "kind": "account",
-                "path": "inverted_launch.token_mint",
-                "account": "InvertedLaunch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "inverted_vault",
           "writable": true
         },
         {
@@ -805,435 +284,10 @@
       "args": []
     },
     {
-      "name": "delegate_pda",
-      "docs": [
-        "Delegate a PDA to MagicBlock Private Ephemeral Rollup",
-        "Uses SDK's #[delegate] macro for proper delegation",
-        "Set specific validator based on ER (TEE for privacy)"
-      ],
-      "discriminator": [
-        248,
-        217,
-        193,
-        46,
-        124,
-        191,
-        64,
-        135
-      ],
-      "accounts": [
-        {
-          "name": "buffer_pda",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  98,
-                  117,
-                  102,
-                  102,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "pda"
-              }
-            ],
-            "program": {
-              "kind": "const",
-              "value": [
-                50,
-                211,
-                105,
-                53,
-                144,
-                108,
-                57,
-                170,
-                153,
-                67,
-                76,
-                136,
-                253,
-                187,
-                1,
-                65,
-                17,
-                12,
-                145,
-                252,
-                16,
-                148,
-                236,
-                195,
-                59,
-                133,
-                198,
-                223,
-                33,
-                52,
-                90,
-                58
-              ]
-            }
-          }
-        },
-        {
-          "name": "delegation_record_pda",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  100,
-                  101,
-                  108,
-                  101,
-                  103,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "pda"
-              }
-            ],
-            "program": {
-              "kind": "account",
-              "path": "delegation_program"
-            }
-          }
-        },
-        {
-          "name": "delegation_metadata_pda",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  100,
-                  101,
-                  108,
-                  101,
-                  103,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110,
-                  45,
-                  109,
-                  101,
-                  116,
-                  97,
-                  100,
-                  97,
-                  116,
-                  97
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "pda"
-              }
-            ],
-            "program": {
-              "kind": "account",
-              "path": "delegation_program"
-            }
-          }
-        },
-        {
-          "name": "pda",
-          "writable": true
-        },
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "validator",
-          "optional": true
-        },
-        {
-          "name": "owner_program",
-          "address": "4RQMkiv5Lp4p862UeQxQs6YgWRPBud2fwLMR5GcSo1bf"
-        },
-        {
-          "name": "delegation_program",
-          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "account_type",
-          "type": {
-            "defined": {
-              "name": "AccountType"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "deposit",
-      "docs": [
-        "Phase 2a: Deposit SOL to vault (runs on BASE LAYER - Solana)",
-        "This transfers SOL from user to vault. Must run on Solana because",
-        "user wallets cannot be delegated to ER.",
-        "Call this BEFORE record_commit when pool is delegated."
-      ],
-      "discriminator": [
-        242,
-        35,
-        198,
-        137,
-        82,
-        225,
-        242,
-        182
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "docs": [
-            "Read-only: we only read launch params"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  97,
-                  117,
-                  110,
-                  99,
-                  104
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch.creator",
-                "account": "Launch"
-              },
-              {
-                "kind": "account",
-                "path": "launch.token_mint",
-                "account": "Launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "vault",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "amount",
-          "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "finalize_graduation",
-      "docs": [
-        "After graduate_and_undelegate (on ER), commitment_pool is synced to Solana but may still be",
-        "owned by the Ephemeral Rollups program. We deserialize without owner check and copy to launch."
-      ],
-      "discriminator": [
-        253,
-        214,
-        158,
-        72,
-        30,
-        227,
-        103,
-        200
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "writable": true
-        },
-        {
-          "name": "commitment_pool"
-        },
-        {
-          "name": "authority",
-          "signer": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "fund_ephemeral",
-      "docs": [
-        "Step 2: Fund the ephemeral SOL account (deposit SOL)",
-        "This is visible on Solana but only shows \"User deposited to their ephemeral account\"",
-        "It does NOT reveal which launch they're committing to (that happens privately later)",
-        "Run on: Solana Base Layer"
-      ],
-      "discriminator": [
-        49,
-        221,
-        149,
-        34,
-        194,
-        130,
-        138,
-        97
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  97,
-                  117,
-                  110,
-                  99,
-                  104
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch.creator",
-                "account": "Launch"
-              },
-              {
-                "kind": "account",
-                "path": "launch.token_mint",
-                "account": "Launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "ephemeral_sol",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  112,
-                  104,
-                  101,
-                  109,
-                  101,
-                  114,
-                  97,
-                  108,
-                  95,
-                  115,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              },
-              {
-                "kind": "account",
-                "path": "user"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "amount",
-          "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "get_launch_info",
-      "docs": [
-        "Get launch info (view function)"
-      ],
-      "discriminator": [
-        12,
-        194,
-        47,
-        67,
-        226,
-        68,
-        103,
-        126
-      ],
-      "accounts": [
-        {
-          "name": "launch"
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "graduate",
       "docs": [
-        "Phase 3: Graduate the launch (for non-delegated pools)"
+        "Graduate the launch. Permissionless — anyone can call.",
+        "Conditions: total SOL >= target OR time > end_time."
       ],
       "discriminator": [
         45,
@@ -1251,522 +305,17 @@
           "writable": true
         },
         {
-          "name": "commitment_pool",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  109,
-                  109,
-                  105,
-                  116,
-                  109,
-                  101,
-                  110,
-                  116,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              }
-            ]
-          }
-        },
-        {
           "name": "authority",
           "signer": true
         }
       ],
       "args": []
-    },
-    {
-      "name": "graduate_and_undelegate",
-      "docs": [
-        "Graduate and undelegate in one transaction (for delegated pools)",
-        "Uses SDK's commit_and_undelegate for atomic settlement",
-        "IMPORTANT: This must be called on the ER!",
-        "NOTE: launch is READ-ONLY here because it's not delegated to ER.",
-        "All launch updates happen in finalize_graduation on Solana."
-      ],
-      "discriminator": [
-        254,
-        158,
-        64,
-        205,
-        61,
-        250,
-        197,
-        155
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "docs": [
-            "Launch is READ-ONLY here - not delegated to ER, so can't be writable"
-          ]
-        },
-        {
-          "name": "commitment_pool",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  109,
-                  109,
-                  105,
-                  116,
-                  109,
-                  101,
-                  110,
-                  116,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "magic_program",
-          "address": "Magic11111111111111111111111111111111111111"
-        },
-        {
-          "name": "magic_context",
-          "writable": true,
-          "address": "MagicContext1111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "graduate_inverted",
-      "docs": [
-        "Graduate an inverted launch (permissionless)"
-      ],
-      "discriminator": [
-        254,
-        246,
-        31,
-        209,
-        181,
-        218,
-        130,
-        14
-      ],
-      "accounts": [
-        {
-          "name": "inverted_launch",
-          "writable": true
-        },
-        {
-          "name": "bonded_pool",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  98,
-                  111,
-                  110,
-                  100,
-                  101,
-                  100,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "inverted_launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "authority",
-          "signer": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "init_ephemeral_sol",
-      "docs": [
-        "Step 1: Initialize user's ephemeral SOL account for a specific launch",
-        "This creates a PDA owned by our program that can be delegated to TEE",
-        "Run on: Solana Base Layer"
-      ],
-      "discriminator": [
-        216,
-        113,
-        247,
-        171,
-        128,
-        164,
-        146,
-        33
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  97,
-                  117,
-                  110,
-                  99,
-                  104
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch.creator",
-                "account": "Launch"
-              },
-              {
-                "kind": "account",
-                "path": "launch.token_mint",
-                "account": "Launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "ephemeral_sol",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  112,
-                  104,
-                  101,
-                  109,
-                  101,
-                  114,
-                  97,
-                  108,
-                  95,
-                  115,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              },
-              {
-                "kind": "account",
-                "path": "user"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "init_user_commitment",
-      "docs": [
-        "Initialize user_commitment PDA so it can be delegated before first commit on ER.",
-        "Per MagicBlock: \"All writable accounts must be delegated\" - user_commitment is writable in commit.",
-        "Call this (on base layer) then delegate user_commitment, then commit can run on ER."
-      ],
-      "discriminator": [
-        252,
-        50,
-        154,
-        81,
-        244,
-        235,
-        207,
-        210
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  97,
-                  117,
-                  110,
-                  99,
-                  104
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch.creator",
-                "account": "Launch"
-              },
-              {
-                "kind": "account",
-                "path": "launch.token_mint",
-                "account": "Launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user_commitment",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
-                  115,
-                  101,
-                  114,
-                  95,
-                  99,
-                  111,
-                  109,
-                  109,
-                  105,
-                  116,
-                  109,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              },
-              {
-                "kind": "account",
-                "path": "user"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "initialize_inverted_launch",
-      "docs": [
-        "Initialize an inverted launch (price starts high, drops over time)"
-      ],
-      "discriminator": [
-        62,
-        75,
-        131,
-        220,
-        67,
-        199,
-        109,
-        191
-      ],
-      "accounts": [
-        {
-          "name": "inverted_launch",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  105,
-                  110,
-                  118,
-                  101,
-                  114,
-                  116,
-                  101,
-                  100,
-                  95,
-                  108,
-                  97,
-                  117,
-                  110,
-                  99,
-                  104
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "creator"
-              },
-              {
-                "kind": "account",
-                "path": "token_mint"
-              }
-            ]
-          }
-        },
-        {
-          "name": "bonded_pool",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  98,
-                  111,
-                  110,
-                  100,
-                  101,
-                  100,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "inverted_launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "inverted_vault",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  105,
-                  110,
-                  118,
-                  101,
-                  114,
-                  116,
-                  101,
-                  100,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "inverted_launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "token_mint"
-        },
-        {
-          "name": "creator",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "bonded_supply",
-          "type": "u64"
-        },
-        {
-          "name": "start_time",
-          "type": "i64"
-        },
-        {
-          "name": "end_time",
-          "type": "i64"
-        },
-        {
-          "name": "p_max",
-          "type": "u64"
-        },
-        {
-          "name": "p_min",
-          "type": "u64"
-        },
-        {
-          "name": "r_best",
-          "type": "u64"
-        },
-        {
-          "name": "r_min",
-          "type": "u64"
-        },
-        {
-          "name": "graduation_target",
-          "type": "u64"
-        }
-      ]
     },
     {
       "name": "initialize_launch",
       "docs": [
-        "Phase 1: Initialize a new token launch",
-        "Creator sets parameters: token supply, duration, graduation target"
+        "Initialize a new launch with inverted bonding curve parameters.",
+        "Creates the Launch PDA and SOL vault PDA."
       ],
       "discriminator": [
         90,
@@ -1802,38 +351,6 @@
               {
                 "kind": "account",
                 "path": "token_mint"
-              }
-            ]
-          }
-        },
-        {
-          "name": "commitment_pool",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  109,
-                  109,
-                  105,
-                  116,
-                  109,
-                  101,
-                  110,
-                  116,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
               }
             ]
           }
@@ -1879,6 +396,10 @@
           "type": "u64"
         },
         {
+          "name": "bonus_pool",
+          "type": "u64"
+        },
+        {
           "name": "start_time",
           "type": "i64"
         },
@@ -1887,858 +408,29 @@
           "type": "i64"
         },
         {
+          "name": "p_max",
+          "type": "u64"
+        },
+        {
+          "name": "p_min",
+          "type": "u64"
+        },
+        {
+          "name": "r_best",
+          "type": "u64"
+        },
+        {
+          "name": "r_min",
+          "type": "u64"
+        },
+        {
           "name": "graduation_target",
           "type": "u64"
-        },
-        {
-          "name": "min_commitment",
-          "type": "u64"
-        },
-        {
-          "name": "max_commitment",
-          "type": "u64"
         }
       ]
-    },
-    {
-      "name": "mark_delegated",
-      "docs": [
-        "Helper to mark launch as delegated (after delegating commitment pool)"
-      ],
-      "discriminator": [
-        232,
-        62,
-        80,
-        189,
-        79,
-        140,
-        204,
-        23
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "writable": true
-        },
-        {
-          "name": "authority",
-          "signer": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "private_commit",
-      "docs": [
-        "Step 3: Private Commit - Record commitment only (no vault transfer)",
-        "Vault cannot be delegated (system-owned). SOL stays in ephemeral_sol; transfer to vault",
-        "later via sweep_ephemeral_to_vault on Solana.",
-        "THIS IS THE FULLY PRIVATE OPERATION - runs entirely on TEE",
-        "All writable accounts (ephemeral_sol, commitment_pool, user_commitment) must be delegated",
-        "Run on: MagicBlock TEE (Private Ephemeral Rollup)"
-      ],
-      "discriminator": [
-        205,
-        167,
-        145,
-        210,
-        97,
-        75,
-        100,
-        228
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "docs": [
-            "Read-only: launch parameters (does not need to be delegated)"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  97,
-                  117,
-                  110,
-                  99,
-                  104
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch.creator",
-                "account": "Launch"
-              },
-              {
-                "kind": "account",
-                "path": "launch.token_mint",
-                "account": "Launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "ephemeral_sol",
-          "docs": [
-            "Ephemeral SOL account - MUST be delegated to TEE"
-          ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  112,
-                  104,
-                  101,
-                  109,
-                  101,
-                  114,
-                  97,
-                  108,
-                  95,
-                  115,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              },
-              {
-                "kind": "account",
-                "path": "user"
-              }
-            ]
-          }
-        },
-        {
-          "name": "commitment_pool",
-          "docs": [
-            "Commitment pool - MUST be delegated to TEE"
-          ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  109,
-                  109,
-                  105,
-                  116,
-                  109,
-                  101,
-                  110,
-                  116,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user_commitment",
-          "docs": [
-            "User commitment - MUST be delegated to TEE"
-          ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
-                  115,
-                  101,
-                  114,
-                  95,
-                  99,
-                  111,
-                  109,
-                  109,
-                  105,
-                  116,
-                  109,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              },
-              {
-                "kind": "account",
-                "path": "user"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user",
-          "docs": [
-            "User (signer only, NOT writable - so this CAN run on TEE!)"
-          ],
-          "signer": true
-        }
-      ],
-      "args": [
-        {
-          "name": "amount",
-          "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "process_undelegation",
-      "discriminator": [
-        196,
-        28,
-        41,
-        206,
-        48,
-        37,
-        51,
-        167
-      ],
-      "accounts": [
-        {
-          "name": "base_account",
-          "writable": true
-        },
-        {
-          "name": "buffer"
-        },
-        {
-          "name": "payer",
-          "writable": true
-        },
-        {
-          "name": "system_program"
-        }
-      ],
-      "args": [
-        {
-          "name": "account_seeds",
-          "type": {
-            "vec": "bytes"
-          }
-        }
-      ]
-    },
-    {
-      "name": "record_commit",
-      "docs": [
-        "Phase 2b: Record commitment privately (runs on TEE/ER when delegated)",
-        "This only updates PDAs - no SOL transfer. All accounts here can be delegated.",
-        "For delegated pools: call deposit() on Solana first, then record_commit() on ER.",
-        "For non-delegated pools: use commit() which does both in one transaction."
-      ],
-      "discriminator": [
-        229,
-        233,
-        165,
-        181,
-        135,
-        196,
-        42,
-        186
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "docs": [
-            "Read-only: we only read launch params; no need to delegate for ER"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  97,
-                  117,
-                  110,
-                  99,
-                  104
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch.creator",
-                "account": "Launch"
-              },
-              {
-                "kind": "account",
-                "path": "launch.token_mint",
-                "account": "Launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "commitment_pool",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  109,
-                  109,
-                  105,
-                  116,
-                  109,
-                  101,
-                  110,
-                  116,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user_commitment",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
-                  115,
-                  101,
-                  114,
-                  95,
-                  99,
-                  111,
-                  109,
-                  109,
-                  105,
-                  116,
-                  109,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              },
-              {
-                "kind": "account",
-                "path": "user"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user",
-          "docs": [
-            "The user signing (read-only for verification, NOT writable)"
-          ],
-          "signer": true
-        }
-      ],
-      "args": [
-        {
-          "name": "amount",
-          "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "sweep_ephemeral_to_vault",
-      "docs": [
-        "Sweep committed SOL from ephemeral_sol to vault (runs on Solana base layer)",
-        "Vault is not delegated; only program-owned accounts are delegated. Call this after",
-        "private_commit once ephemeral_sol is undelegated (e.g. after graduation or when user finalizes)."
-      ],
-      "discriminator": [
-        111,
-        44,
-        21,
-        180,
-        122,
-        87,
-        15,
-        197
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  97,
-                  117,
-                  110,
-                  99,
-                  104
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch.creator",
-                "account": "Launch"
-              },
-              {
-                "kind": "account",
-                "path": "launch.token_mint",
-                "account": "Launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "ephemeral_sol",
-          "docs": [
-            "Ephemeral SOL account (must be undelegated so Vestige owns it on Solana)"
-          ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  112,
-                  104,
-                  101,
-                  109,
-                  101,
-                  114,
-                  97,
-                  108,
-                  95,
-                  115,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              },
-              {
-                "kind": "account",
-                "path": "user"
-              }
-            ]
-          }
-        },
-        {
-          "name": "vault",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user_commitment",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
-                  115,
-                  101,
-                  114,
-                  95,
-                  99,
-                  111,
-                  109,
-                  109,
-                  105,
-                  116,
-                  109,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              },
-              {
-                "kind": "account",
-                "path": "user"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "undelegate_ephemeral_sol",
-      "docs": [
-        "Participant (or creator) calls this ON THE ER to undelegate their ephemeral_sol so it syncs",
-        "back to Solana. After this, they can run sweep_ephemeral_to_vault on Solana to move SOL to vault."
-      ],
-      "discriminator": [
-        29,
-        28,
-        40,
-        73,
-        77,
-        71,
-        184,
-        184
-      ],
-      "accounts": [
-        {
-          "name": "ephemeral_sol",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  112,
-                  104,
-                  101,
-                  109,
-                  101,
-                  114,
-                  97,
-                  108,
-                  95,
-                  115,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              },
-              {
-                "kind": "account",
-                "path": "user"
-              }
-            ]
-          }
-        },
-        {
-          "name": "launch",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  97,
-                  117,
-                  110,
-                  99,
-                  104
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch.creator",
-                "account": "Launch"
-              },
-              {
-                "kind": "account",
-                "path": "launch.token_mint",
-                "account": "Launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user",
-          "signer": true
-        },
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "magic_program",
-          "address": "Magic11111111111111111111111111111111111111"
-        },
-        {
-          "name": "magic_context",
-          "writable": true,
-          "address": "MagicContext1111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "undelegate_user_commitment",
-      "docs": [
-        "Participant calls this ON THE ER to undelegate their user_commitment so it syncs back to Solana.",
-        "After this, they can call calculate_allocation and claim_tokens on Solana."
-      ],
-      "discriminator": [
-        123,
-        30,
-        218,
-        124,
-        207,
-        83,
-        104,
-        230
-      ],
-      "accounts": [
-        {
-          "name": "user_commitment",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
-                  115,
-                  101,
-                  114,
-                  95,
-                  99,
-                  111,
-                  109,
-                  109,
-                  105,
-                  116,
-                  109,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch"
-              },
-              {
-                "kind": "account",
-                "path": "user"
-              }
-            ]
-          }
-        },
-        {
-          "name": "launch",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  97,
-                  117,
-                  110,
-                  99,
-                  104
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch.creator",
-                "account": "Launch"
-              },
-              {
-                "kind": "account",
-                "path": "launch.token_mint",
-                "account": "Launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user",
-          "signer": true
-        },
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "magic_program",
-          "address": "Magic11111111111111111111111111111111111111"
-        },
-        {
-          "name": "magic_context",
-          "writable": true,
-          "address": "MagicContext1111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "withdraw_funds",
-      "docs": [
-        "Creator withdraws collected SOL after graduation"
-      ],
-      "discriminator": [
-        241,
-        36,
-        29,
-        111,
-        208,
-        31,
-        104,
-        217
-      ],
-      "accounts": [
-        {
-          "name": "launch",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  97,
-                  117,
-                  110,
-                  99,
-                  104
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "launch.creator",
-                "account": "Launch"
-              },
-              {
-                "kind": "account",
-                "path": "launch.token_mint",
-                "account": "Launch"
-              }
-            ]
-          }
-        },
-        {
-          "name": "vault",
-          "writable": true
-        },
-        {
-          "name": "creator",
-          "writable": true,
-          "signer": true
-        }
-      ],
-      "args": []
     }
   ],
   "accounts": [
-    {
-      "name": "BondedPool",
-      "discriminator": [
-        190,
-        14,
-        12,
-        15,
-        212,
-        123,
-        210,
-        104
-      ]
-    },
-    {
-      "name": "CommitmentPool",
-      "discriminator": [
-        113,
-        107,
-        145,
-        23,
-        248,
-        248,
-        179,
-        88
-      ]
-    },
-    {
-      "name": "EphemeralSol",
-      "discriminator": [
-        57,
-        117,
-        5,
-        86,
-        5,
-        93,
-        246,
-        60
-      ]
-    },
-    {
-      "name": "InvertedLaunch",
-      "discriminator": [
-        143,
-        126,
-        191,
-        96,
-        29,
-        39,
-        169,
-        50
-      ]
-    },
     {
       "name": "Launch",
       "discriminator": [
@@ -2753,29 +445,16 @@
       ]
     },
     {
-      "name": "UserBond",
+      "name": "UserPosition",
       "discriminator": [
-        237,
-        134,
-        205,
-        190,
-        104,
-        151,
-        172,
-        41
-      ]
-    },
-    {
-      "name": "UserCommitment",
-      "discriminator": [
-        163,
-        79,
-        14,
-        230,
-        58,
-        105,
-        84,
-        24
+        251,
+        248,
+        209,
+        245,
+        83,
+        234,
+        17,
+        27
       ]
     }
   ],
@@ -2792,291 +471,133 @@
     },
     {
       "code": 6002,
+      "name": "InvalidBonusPool",
+      "msg": "Bonus pool must be greater than zero"
+    },
+    {
+      "code": 6003,
       "name": "InvalidGraduationTarget",
       "msg": "Graduation target must be greater than zero"
     },
     {
-      "code": 6003,
-      "name": "LaunchNotStarted",
-      "msg": "Launch has not started yet"
-    },
-    {
       "code": 6004,
-      "name": "LaunchEnded",
-      "msg": "Launch commitment period has ended"
-    },
-    {
-      "code": 6005,
-      "name": "AlreadyGraduated",
-      "msg": "Launch has already graduated"
-    },
-    {
-      "code": 6006,
-      "name": "BelowMinCommitment",
-      "msg": "Commitment below minimum"
-    },
-    {
-      "code": 6007,
-      "name": "AboveMaxCommitment",
-      "msg": "Commitment above maximum"
-    },
-    {
-      "code": 6008,
-      "name": "GraduationConditionsNotMet",
-      "msg": "Graduation conditions not met - need target reached or time expired"
-    },
-    {
-      "code": 6009,
-      "name": "NotGraduated",
-      "msg": "Launch has not graduated yet"
-    },
-    {
-      "code": 6010,
-      "name": "NoAllocation",
-      "msg": "No token allocation available"
-    },
-    {
-      "code": 6011,
-      "name": "AlreadyClaimed",
-      "msg": "Tokens already claimed"
-    },
-    {
-      "code": 6012,
-      "name": "AllocationAlreadyCalculated",
-      "msg": "Allocation already calculated"
-    },
-    {
-      "code": 6013,
-      "name": "Unauthorized",
-      "msg": "Unauthorized - only creator can perform this action"
-    },
-    {
-      "code": 6014,
-      "name": "AlreadyDelegated",
-      "msg": "Already delegated to Ephemeral Rollup"
-    },
-    {
-      "code": 6015,
-      "name": "NotDelegated",
-      "msg": "Not delegated to Ephemeral Rollup"
-    },
-    {
-      "code": 6016,
-      "name": "NoCommitment",
-      "msg": "No commitment found"
-    },
-    {
-      "code": 6017,
-      "name": "InsufficientEphemeralBalance",
-      "msg": "Insufficient balance in ephemeral SOL account"
-    },
-    {
-      "code": 6018,
-      "name": "NothingToSweep",
-      "msg": "Nothing to sweep to vault"
-    },
-    {
-      "code": 6019,
-      "name": "InvalidAccountData",
-      "msg": "Invalid or unreadable account data (e.g. commitment_pool owned by ER)"
-    },
-    {
-      "code": 6020,
       "name": "InvalidPriceRange",
       "msg": "Price max must be greater than price min"
     },
     {
-      "code": 6021,
+      "code": 6005,
       "name": "InvalidPriceRatio",
       "msg": "Price max must equal price min times PRICE_RATIO (10)"
     },
     {
-      "code": 6022,
+      "code": 6006,
       "name": "InvalidWeightRange",
       "msg": "Risk weight best must be greater than risk weight min"
     },
     {
-      "code": 6023,
+      "code": 6007,
       "name": "WeightBelowMinimum",
-      "msg": "Risk weight min must be at least WEIGHT_SCALE (10000)"
+      "msg": "Risk weight min must be at least 1"
     },
     {
-      "code": 6024,
+      "code": 6008,
+      "name": "RiskWeightTooLow",
+      "msg": "Risk weight best must be greater than PRICE_RATIO"
+    },
+    {
+      "code": 6009,
+      "name": "LaunchNotStarted",
+      "msg": "Launch has not started yet"
+    },
+    {
+      "code": 6010,
+      "name": "LaunchEnded",
+      "msg": "Launch period has ended"
+    },
+    {
+      "code": 6011,
+      "name": "AlreadyGraduated",
+      "msg": "Launch has already graduated"
+    },
+    {
+      "code": 6012,
       "name": "InvalidSolAmount",
       "msg": "SOL amount must be greater than zero"
     },
     {
+      "code": 6013,
+      "name": "ZeroBaseTokens",
+      "msg": "Calculated base tokens is zero"
+    },
+    {
+      "code": 6014,
+      "name": "ZeroCurvePrice",
+      "msg": "Curve price is zero"
+    },
+    {
+      "code": 6015,
+      "name": "TokenSupplyExceeded",
+      "msg": "Token supply would be exceeded"
+    },
+    {
+      "code": 6016,
+      "name": "BonusPoolExceeded",
+      "msg": "Bonus pool would be exceeded"
+    },
+    {
+      "code": 6017,
+      "name": "GraduationConditionsNotMet",
+      "msg": "Graduation conditions not met"
+    },
+    {
+      "code": 6018,
+      "name": "NotGraduated",
+      "msg": "Launch has not graduated yet"
+    },
+    {
+      "code": 6019,
+      "name": "NoBonusEntitled",
+      "msg": "No bonus tokens entitled"
+    },
+    {
+      "code": 6020,
+      "name": "AlreadyClaimed",
+      "msg": "Bonus already claimed"
+    },
+    {
+      "code": 6021,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
+    },
+    {
+      "code": 6022,
+      "name": "NothingToWithdraw",
+      "msg": "Nothing to withdraw"
+    },
+    {
+      "code": 6023,
+      "name": "InvalidTokenVault",
+      "msg": "Invalid token vault"
+    },
+    {
+      "code": 6024,
+      "name": "InvalidUserTokenAccount",
+      "msg": "Invalid user token account"
+    },
+    {
       "code": 6025,
-      "name": "ZeroBondedUnits",
-      "msg": "Calculated bonded units is zero"
+      "name": "PositionMismatch",
+      "msg": "Position does not match launch"
     },
     {
       "code": 6026,
-      "name": "BondedSupplyExceeded",
-      "msg": "Bonded supply would be exceeded"
-    },
-    {
-      "code": 6027,
       "name": "Overflow",
       "msg": "Arithmetic overflow"
     }
   ],
   "types": [
     {
-      "name": "AccountType",
-      "docs": [
-        "Account types for delegation and permission management",
-        "Per MagicBlock: \"All writable accounts in a tx must be delegated\" for ER execution"
-      ],
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "CommitmentPool",
-            "fields": [
-              {
-                "name": "launch",
-                "type": "pubkey"
-              }
-            ]
-          },
-          {
-            "name": "UserCommitment",
-            "fields": [
-              {
-                "name": "launch",
-                "type": "pubkey"
-              },
-              {
-                "name": "user",
-                "type": "pubkey"
-              }
-            ]
-          },
-          {
-            "name": "Vault",
-            "fields": [
-              {
-                "name": "launch",
-                "type": "pubkey"
-              }
-            ]
-          },
-          {
-            "name": "EphemeralSol",
-            "fields": [
-              {
-                "name": "launch",
-                "type": "pubkey"
-              },
-              {
-                "name": "user",
-                "type": "pubkey"
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "name": "BondedPool",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "inverted_launch",
-            "type": "pubkey"
-          },
-          {
-            "name": "total_bonded_sold",
-            "type": "u64"
-          },
-          {
-            "name": "total_sol_collected",
-            "type": "u64"
-          },
-          {
-            "name": "total_weighted_units",
-            "type": "u64"
-          },
-          {
-            "name": "total_participants",
-            "type": "u64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CommitmentPool",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "launch",
-            "type": "pubkey"
-          },
-          {
-            "name": "total_committed",
-            "type": "u64"
-          },
-          {
-            "name": "total_participants",
-            "type": "u64"
-          },
-          {
-            "name": "is_graduated",
-            "type": "bool"
-          },
-          {
-            "name": "graduation_time",
-            "type": "i64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "EphemeralSol",
-      "docs": [
-        "Ephemeral SOL Account - User's private SOL holding for a specific launch",
-        "Following MagicBlock's \"ephemeral ATA\" pattern but for native SOL",
-        "This account is delegated to TEE for private operations"
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "user",
-            "type": "pubkey"
-          },
-          {
-            "name": "launch",
-            "type": "pubkey"
-          },
-          {
-            "name": "balance",
-            "type": "u64"
-          },
-          {
-            "name": "is_delegated",
-            "type": "bool"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "InvertedLaunch",
+      "name": "Launch",
       "type": {
         "kind": "struct",
         "fields": [
@@ -3089,7 +610,11 @@
             "type": "pubkey"
           },
           {
-            "name": "bonded_supply",
+            "name": "token_supply",
+            "type": "u64"
+          },
+          {
+            "name": "bonus_pool",
             "type": "u64"
           },
           {
@@ -3121,63 +646,19 @@
             "type": "u64"
           },
           {
-            "name": "total_bonded_sold",
+            "name": "duration",
+            "type": "i64"
+          },
+          {
+            "name": "total_base_sold",
+            "type": "u64"
+          },
+          {
+            "name": "total_bonus_reserved",
             "type": "u64"
           },
           {
             "name": "total_sol_collected",
-            "type": "u64"
-          },
-          {
-            "name": "is_graduated",
-            "type": "bool"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Launch",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "creator",
-            "type": "pubkey"
-          },
-          {
-            "name": "token_mint",
-            "type": "pubkey"
-          },
-          {
-            "name": "token_supply",
-            "type": "u64"
-          },
-          {
-            "name": "start_time",
-            "type": "i64"
-          },
-          {
-            "name": "end_time",
-            "type": "i64"
-          },
-          {
-            "name": "graduation_target",
-            "type": "u64"
-          },
-          {
-            "name": "min_commitment",
-            "type": "u64"
-          },
-          {
-            "name": "max_commitment",
-            "type": "u64"
-          },
-          {
-            "name": "total_committed",
             "type": "u64"
           },
           {
@@ -3189,14 +670,6 @@
             "type": "bool"
           },
           {
-            "name": "is_delegated",
-            "type": "bool"
-          },
-          {
-            "name": "graduation_time",
-            "type": "i64"
-          },
-          {
             "name": "bump",
             "type": "u8"
           }
@@ -3204,63 +677,7 @@
       }
     },
     {
-      "name": "Member",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "flags",
-            "type": "u8"
-          },
-          {
-            "name": "pubkey",
-            "type": "pubkey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "UserBond",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "user",
-            "type": "pubkey"
-          },
-          {
-            "name": "inverted_launch",
-            "type": "pubkey"
-          },
-          {
-            "name": "total_sol_spent",
-            "type": "u64"
-          },
-          {
-            "name": "total_bonded_units",
-            "type": "u64"
-          },
-          {
-            "name": "weighted_bonded_units",
-            "type": "u64"
-          },
-          {
-            "name": "final_tokens",
-            "type": "u64"
-          },
-          {
-            "name": "has_claimed",
-            "type": "bool"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "UserCommitment",
+      "name": "UserPosition",
       "type": {
         "kind": "struct",
         "fields": [
@@ -3273,23 +690,19 @@
             "type": "pubkey"
           },
           {
-            "name": "amount",
+            "name": "total_sol_spent",
             "type": "u64"
           },
           {
-            "name": "commit_time",
-            "type": "i64"
-          },
-          {
-            "name": "weight",
+            "name": "total_base_tokens",
             "type": "u64"
           },
           {
-            "name": "tokens_allocated",
+            "name": "total_bonus_entitled",
             "type": "u64"
           },
           {
-            "name": "has_claimed",
+            "name": "has_claimed_bonus",
             "type": "bool"
           },
           {

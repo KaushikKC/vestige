@@ -63,7 +63,7 @@ export interface BuyEstimate {
 // ============== Client ==============
 
 export class VestigeClient {
-  public program: Program;
+  public program: any;
   public provider: AnchorProvider;
   public connection: any;
 
