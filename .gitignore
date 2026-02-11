@@ -7,3 +7,5 @@ test-ledger
 .yarn
 .cargo
 .claude
+mobile/android/
+mobile/.expo/

@@ -65,10 +65,10 @@ export interface BuyEstimate {
 
 class ReadOnlyWallet implements Wallet {
   publicKey = Keypair.generate().publicKey;
-  async signTransaction(tx: any) {
+  async signTransaction<T extends import('@solana/web3.js').Transaction | import('@solana/web3.js').VersionedTransaction>(tx: T): Promise<T> {
     throw new Error('Read-only wallet cannot sign');
   }
-  async signAllTransactions(txs: any[]) {
+  async signAllTransactions<T extends import('@solana/web3.js').Transaction | import('@solana/web3.js').VersionedTransaction>(txs: T[]): Promise<T[]> {
     throw new Error('Read-only wallet cannot sign');
   }
   payer = Keypair.generate();
