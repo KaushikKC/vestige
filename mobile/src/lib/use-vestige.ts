@@ -1,9 +1,7 @@
 import { useCallback, useRef } from 'react';
-import { Connection, PublicKey, Transaction } from '@solana/web3.js';
+import { Connection, PublicKey } from '@solana/web3.js';
 import {
   getAssociatedTokenAddressSync,
-  TOKEN_PROGRAM_ID,
-  ASSOCIATED_TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
 import { BN } from '@coral-xyz/anchor';
 import { useWallet } from './use-wallet';
@@ -16,13 +14,14 @@ import {
   buildBuyTx,
   buildGraduateTx,
   buildClaimBonusTx,
-  buildCreatorWithdrawTx,
+  buildCreatorClaimFeesTx,
+  buildAdvanceMilestoneTx,
   buildInitializeLaunchTx,
 } from './vestige-transactions';
 import { RPC_ENDPOINT } from '../constants/solana';
 
 export function useVestige() {
-  const { publicKey, transactWithWallet } = useWallet();
+  const { publicKey, signAndSendTransaction } = useWallet();
   const clientRef = useRef<VestigeClient | null>(null);
   const connectionRef = useRef<Connection | null>(null);
 
@@ -100,16 +99,10 @@ export function useVestige() {
         userTokenAccount
       );
 
-      const signature = await transactWithWallet(async (wallet) => {
-        const signedTxs = await wallet.signAndSendTransactions({
-          transactions: [tx],
-        });
-        return signedTxs[0];
-      });
-
+      const signature = await signAndSendTransaction(tx);
       return signature;
     },
-    [publicKey, getConnection, getClient, transactWithWallet]
+    [publicKey, getConnection, getClient, signAndSendTransaction]
   );
 
   const graduate = useCallback(
@@ -126,16 +119,10 @@ export function useVestige() {
         publicKey
       );
 
-      const signature = await transactWithWallet(async (wallet) => {
-        const signedTxs = await wallet.signAndSendTransactions({
-          transactions: [tx],
-        });
-        return signedTxs[0];
-      });
-
+      const signature = await signAndSendTransaction(tx);
       return signature;
     },
-    [publicKey, getConnection, getClient, transactWithWallet]
+    [publicKey, getConnection, getClient, signAndSendTransaction]
   );
 
   const claimBonus = useCallback(
@@ -164,42 +151,50 @@ export function useVestige() {
         userTokenAccount
       );
 
-      const signature = await transactWithWallet(async (wallet) => {
-        const signedTxs = await wallet.signAndSendTransactions({
-          transactions: [tx],
-        });
-        return signedTxs[0];
-      });
-
+      const signature = await signAndSendTransaction(tx);
       return signature;
     },
-    [publicKey, getConnection, getClient, transactWithWallet]
+    [publicKey, getConnection, getClient, signAndSendTransaction]
   );
 
-  const creatorWithdraw = useCallback(
+  const creatorClaimFees = useCallback(
     async (launchPda: PublicKey) => {
       if (!publicKey) throw new Error('Wallet not connected');
 
       const connection = getConnection();
       const client = getClient();
 
-      const tx = await buildCreatorWithdrawTx(
+      const tx = await buildCreatorClaimFeesTx(
         client.program,
         connection,
         launchPda,
         publicKey
       );
 
-      const signature = await transactWithWallet(async (wallet) => {
-        const signedTxs = await wallet.signAndSendTransactions({
-          transactions: [tx],
-        });
-        return signedTxs[0];
-      });
-
+      const signature = await signAndSendTransaction(tx);
       return signature;
     },
-    [publicKey, getConnection, getClient, transactWithWallet]
+    [publicKey, getConnection, getClient, signAndSendTransaction]
+  );
+
+  const advanceMilestone = useCallback(
+    async (launchPda: PublicKey) => {
+      if (!publicKey) throw new Error('Wallet not connected');
+
+      const connection = getConnection();
+      const client = getClient();
+
+      const tx = await buildAdvanceMilestoneTx(
+        client.program,
+        connection,
+        launchPda,
+        publicKey
+      );
+
+      const signature = await signAndSendTransaction(tx);
+      return signature;
+    },
+    [publicKey, getConnection, getClient, signAndSendTransaction]
   );
 
   const initializeLaunch = useCallback(
@@ -236,16 +231,10 @@ export function useVestige() {
         graduationTarget
       );
 
-      const signature = await transactWithWallet(async (wallet) => {
-        const signedTxs = await wallet.signAndSendTransactions({
-          transactions: [tx],
-        });
-        return signedTxs[0];
-      });
-
+      const signature = await signAndSendTransaction(tx);
       return signature;
     },
-    [publicKey, getConnection, getClient, transactWithWallet]
+    [publicKey, getConnection, getClient, signAndSendTransaction]
   );
 
   return {
@@ -258,7 +247,8 @@ export function useVestige() {
     buy,
     graduate,
     claimBonus,
-    creatorWithdraw,
+    creatorClaimFees,
+    advanceMilestone,
     initializeLaunch,
     // Helpers
     client: getClient(),

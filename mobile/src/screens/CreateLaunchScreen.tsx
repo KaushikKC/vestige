@@ -102,7 +102,7 @@ export default function CreateLaunchScreen({ navigation }: any) {
       );
 
       setCreatedPda(launchPda.toBase58());
-      Toast.show({ type: 'success', text1: 'Launch created!' });
+      Toast.show({ type: 'success', text1: 'Launch created! Make your initial buy to activate.' });
     } catch (err: any) {
       Toast.show({
         type: 'error',
@@ -125,6 +125,9 @@ export default function CreateLaunchScreen({ navigation }: any) {
     return (
       <View style={styles.successContainer}>
         <Text style={styles.successTitle}>Launch Created!</Text>
+        <Text style={styles.initialBuyNote}>
+          Make your initial buy (min 0.01 SOL) to activate the launch.
+        </Text>
         <Text style={styles.successLabel}>Launch PDA:</Text>
         <TouchableOpacity onPress={copyPda}>
           <Text style={styles.pdaText}>{createdPda}</Text>
@@ -141,7 +144,7 @@ export default function CreateLaunchScreen({ navigation }: any) {
             });
           }}
         >
-          <Text style={styles.openButtonText}>Open Launch</Text>
+          <Text style={styles.openButtonText}>Make Initial Buy</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -240,6 +243,14 @@ export default function CreateLaunchScreen({ navigation }: any) {
       {!connected && (
         <Text style={styles.connectHint}>Connect wallet to create a launch</Text>
       )}
+
+      <View style={styles.feeInfo}>
+        <Text style={styles.feeInfoText}>
+          Every buy has a 1% fee: 0.5% to protocol treasury + 0.5% to creator
+          fee vault (vested). Creator must make initial buy (min 0.01 SOL) to
+          activate the launch.
+        </Text>
+      </View>
     </ScrollView>
   );
 }
@@ -369,6 +380,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: SPACING.lg,
   },
+  initialBuyNote: {
+    color: COLORS.accent,
+    fontSize: FONT_SIZE.sm,
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
+    fontWeight: '600',
+  },
   successLabel: {
     color: COLORS.textSecondary,
     fontSize: FONT_SIZE.sm,
@@ -414,5 +432,16 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
+  },
+  feeInfo: {
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginTop: SPACING.lg,
+  },
+  feeInfoText: {
+    color: COLORS.textMuted,
+    fontSize: FONT_SIZE.xs,
+    textAlign: 'center',
   },
 });

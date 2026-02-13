@@ -1,4 +1,4 @@
-import { Program, BN } from '@coral-xyz/anchor';
+import { BN } from '@coral-xyz/anchor';
 import {
   Connection,
   PublicKey,
@@ -6,12 +6,14 @@ import {
   Transaction,
 } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { VestigeClient, LAUNCH_SEED, POSITION_SEED, VAULT_SEED } from './vestige-client';
-import { PROGRAM_ID } from '../constants/solana';
+import {
+  VestigeClient,
+  PROTOCOL_TREASURY,
+} from './vestige-client';
 
 /**
  * Transaction builders return unsigned Transaction objects.
- * MWA signs them in a transact() session.
+ * Privy signs and sends them via the embedded wallet provider.
  */
 
 async function setRecentBlockhash(
@@ -36,6 +38,7 @@ export async function buildBuyTx(
 ): Promise<Transaction> {
   const [positionPda] = VestigeClient.derivePositionPda(launchPda, user);
   const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
+  const [creatorFeeVaultPda] = VestigeClient.deriveCreatorFeeVaultPda(launchPda);
 
   const tx = await program.methods
     .buy(solAmount)
@@ -43,6 +46,8 @@ export async function buildBuyTx(
       launch: launchPda,
       userPosition: positionPda,
       vault: vaultPda,
+      creatorFeeVault: creatorFeeVaultPda,
+      protocolTreasury: PROTOCOL_TREASURY,
       tokenVault,
       userTokenAccount,
       user,
@@ -96,24 +101,41 @@ export async function buildClaimBonusTx(
   return setRecentBlockhash(connection, tx, user);
 }
 
-export async function buildCreatorWithdrawTx(
+export async function buildCreatorClaimFeesTx(
   program: any,
   connection: Connection,
   launchPda: PublicKey,
   creator: PublicKey
 ): Promise<Transaction> {
-  const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
+  const [creatorFeeVaultPda] = VestigeClient.deriveCreatorFeeVaultPda(launchPda);
 
   const tx = await program.methods
-    .creatorWithdraw()
+    .creatorClaimFees()
     .accounts({
       launch: launchPda,
-      vault: vaultPda,
+      creatorFeeVault: creatorFeeVaultPda,
       creator,
     })
     .transaction();
 
   return setRecentBlockhash(connection, tx, creator);
+}
+
+export async function buildAdvanceMilestoneTx(
+  program: any,
+  connection: Connection,
+  launchPda: PublicKey,
+  authority: PublicKey
+): Promise<Transaction> {
+  const tx = await program.methods
+    .advanceMilestone()
+    .accounts({
+      launch: launchPda,
+      authority,
+    })
+    .transaction();
+
+  return setRecentBlockhash(connection, tx, authority);
 }
 
 export async function buildInitializeLaunchTx(
@@ -133,6 +155,7 @@ export async function buildInitializeLaunchTx(
 ): Promise<Transaction> {
   const [launchPda] = VestigeClient.deriveLaunchPda(creator, tokenMint);
   const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
+  const [creatorFeeVaultPda] = VestigeClient.deriveCreatorFeeVaultPda(launchPda);
 
   const tx = await program.methods
     .initializeLaunch(
@@ -149,6 +172,7 @@ export async function buildInitializeLaunchTx(
     .accounts({
       launch: launchPda,
       vault: vaultPda,
+      creatorFeeVault: creatorFeeVaultPda,
       tokenMint,
       creator,
       systemProgram: SystemProgram.programId,

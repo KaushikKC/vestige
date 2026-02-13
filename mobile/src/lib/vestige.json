@@ -8,10 +8,40 @@
   },
   "instructions": [
     {
+      "name": "advance_milestone",
+      "docs": [
+        "Advance milestone to unlock more creator fees.",
+        "Admin-gated for hackathon (any signer can call; production would be time-locked or DAO-gated)."
+      ],
+      "discriminator": [
+        34,
+        43,
+        135,
+        59,
+        6,
+        56,
+        170,
+        93
+      ],
+      "accounts": [
+        {
+          "name": "launch",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "buy",
       "docs": [
         "Buy tokens using SOL. Immediate token delivery of base tokens.",
-        "Bonus tokens are recorded and delivered at graduation."
+        "Bonus tokens are recorded and delivered at graduation.",
+        "1% total fee: 0.5% protocol treasury + 0.5% creator fee vault.",
+        "Creator must make the first buy (min 0.01 SOL) to activate the launch."
       ],
       "discriminator": [
         102,
@@ -103,6 +133,38 @@
               }
             ]
           }
+        },
+        {
+          "name": "creator_fee_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  102,
+                  101,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "protocol_treasury",
+          "writable": true
         },
         {
           "name": "token_vault",
@@ -227,24 +289,25 @@
       "args": []
     },
     {
-      "name": "creator_withdraw",
+      "name": "creator_claim_fees",
       "docs": [
-        "Creator withdraws collected SOL after graduation.",
-        "Direct lamport debit from vault PDA to creator."
+        "Creator claims vested fees from the creator_fee_vault after graduation.",
+        "Fees vest based on milestones: 30% at graduation, then 20%, 20%, 30%."
       ],
       "discriminator": [
-        92,
-        117,
-        206,
-        254,
-        174,
-        108,
-        37,
-        106
+        57,
+        168,
+        3,
+        202,
+        236,
+        75,
+        229,
+        190
       ],
       "accounts": [
         {
           "name": "launch",
+          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -272,8 +335,32 @@
           }
         },
         {
-          "name": "vault",
-          "writable": true
+          "name": "creator_fee_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  102,
+                  101,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              }
+            ]
+          }
         },
         {
           "name": "creator",
@@ -368,6 +455,34 @@
                   117,
                   108,
                   116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "launch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator_fee_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  102,
+                  101,
+                  101
                 ]
               },
               {
@@ -593,6 +708,26 @@
       "code": 6026,
       "name": "Overflow",
       "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6027,
+      "name": "CreatorMustBuyFirst",
+      "msg": "Creator must make the first buy"
+    },
+    {
+      "code": 6028,
+      "name": "InitialBuyTooSmall",
+      "msg": "Initial buy must be at least 0.01 SOL"
+    },
+    {
+      "code": 6029,
+      "name": "NoMilestonesUnlocked",
+      "msg": "No milestones unlocked yet"
+    },
+    {
+      "code": 6030,
+      "name": "AllMilestonesUnlocked",
+      "msg": "All milestones already unlocked"
     }
   ],
   "types": [
@@ -672,6 +807,22 @@
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "total_creator_fees",
+            "type": "u64"
+          },
+          {
+            "name": "creator_fees_claimed",
+            "type": "u64"
+          },
+          {
+            "name": "milestones_unlocked",
+            "type": "u8"
+          },
+          {
+            "name": "has_initial_buy",
+            "type": "bool"
           }
         ]
       }

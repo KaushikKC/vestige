@@ -1,114 +1,96 @@
 import React, {
   createContext,
   useContext,
-  useState,
-  useCallback,
   useMemo,
+  useCallback,
   ReactNode,
 } from 'react';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, Connection, Transaction } from '@solana/web3.js';
 import {
-  transact,
-  Web3MobileWallet,
-} from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
-
-const APP_IDENTITY = {
-  name: 'Vestige',
-  uri: 'https://vestige.app',
-  icon: 'favicon.ico',
-};
+  usePrivy,
+  useLoginWithOAuth,
+  useEmbeddedSolanaWallet,
+  isConnected,
+} from '@privy-io/expo';
+import { RPC_ENDPOINT } from '../constants/solana';
 
 interface WalletContextType {
   publicKey: PublicKey | null;
-  authToken: string | null;
   connected: boolean;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
-  transactWithWallet: <T>(
-    callback: (wallet: Web3MobileWallet) => Promise<T>
-  ) => Promise<T>;
+  signAndSendTransaction: (tx: Transaction) => Promise<string>;
 }
 
 const WalletContext = createContext<WalletContextType>({
   publicKey: null,
-  authToken: null,
   connected: false,
   connect: async () => {},
   disconnect: async () => {},
-  transactWithWallet: async () => {
+  signAndSendTransaction: async () => {
     throw new Error('Wallet not initialized');
   },
 });
 
 export function WalletProvider({ children }: { children: ReactNode }) {
-  const [publicKey, setPublicKey] = useState<PublicKey | null>(null);
-  const [authToken, setAuthToken] = useState<string | null>(null);
+  const { user, logout } = usePrivy();
+  const { login } = useLoginWithOAuth();
+  const solanaWallet = useEmbeddedSolanaWallet();
 
-  const connect = useCallback(async () => {
-    const result = await transact(async (wallet: Web3MobileWallet) => {
-      const auth = await wallet.authorize({
-        cluster: 'devnet',
-        identity: APP_IDENTITY,
-      });
-      return auth;
-    });
+  const walletConnected = isConnected(solanaWallet);
+  const wallet = walletConnected ? solanaWallet.wallets[0] : null;
 
-    setPublicKey(new PublicKey(result.accounts[0].address));
-    setAuthToken(result.auth_token);
-  }, []);
-
-  const disconnect = useCallback(async () => {
-    if (authToken) {
+  const publicKey = useMemo(() => {
+    if (wallet?.address) {
       try {
-        await transact(async (wallet: Web3MobileWallet) => {
-          await wallet.deauthorize({ auth_token: authToken });
-        });
+        return new PublicKey(wallet.address);
       } catch {
-        // Ignore deauthorize errors
+        return null;
       }
     }
-    setPublicKey(null);
-    setAuthToken(null);
-  }, [authToken]);
+    return null;
+  }, [wallet?.address]);
 
-  const transactWithWallet = useCallback(
-    async <T,>(
-      callback: (wallet: Web3MobileWallet) => Promise<T>
-    ): Promise<T> => {
-      return transact(async (wallet: Web3MobileWallet) => {
-        // Reauthorize with stored token, or authorize fresh
-        if (authToken) {
-          const reauth = await wallet.reauthorize({
-            auth_token: authToken,
-            identity: APP_IDENTITY,
-          });
-          setAuthToken(reauth.auth_token);
-          setPublicKey(new PublicKey(reauth.accounts[0].address));
-        } else {
-          const auth = await wallet.authorize({
-            cluster: 'devnet',
-            identity: APP_IDENTITY,
-          });
-          setAuthToken(auth.auth_token);
-          setPublicKey(new PublicKey(auth.accounts[0].address));
-        }
+  const connected = !!user && !!publicKey;
 
-        return callback(wallet);
+  const connect = useCallback(async () => {
+    if (!user) {
+      await login({ provider: 'google' });
+    }
+  }, [user, login]);
+
+  const disconnect = useCallback(async () => {
+    await logout();
+  }, [logout]);
+
+  const signAndSendTransaction = useCallback(
+    async (tx: Transaction): Promise<string> => {
+      if (!wallet) throw new Error('Wallet not connected');
+      const provider = await wallet.getProvider();
+      const connection = new Connection(RPC_ENDPOINT, 'confirmed');
+
+      const { signature } = await provider.request({
+        method: 'signAndSendTransaction',
+        params: {
+          transaction: tx,
+          connection,
+        },
       });
+
+      return signature;
     },
-    [authToken]
+    [wallet]
   );
 
   const value = useMemo(
     () => ({
       publicKey,
-      authToken,
-      connected: publicKey !== null,
+      connected,
       connect,
       disconnect,
-      transactWithWallet,
+      signAndSendTransaction,
     }),
-    [publicKey, authToken, connect, disconnect, transactWithWallet]
+    [publicKey, connected, connect, disconnect, signAndSendTransaction]
   );
 
   return (
