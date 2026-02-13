@@ -6,9 +6,9 @@ import { PrivyProvider } from "@privy-io/expo";
 import { WalletProvider } from "./src/lib/use-wallet";
 import RootNavigator from "./src/navigation/RootNavigator";
 
-// TODO: Replace with your Privy App ID and Client ID from dashboard.privy.io
-const PRIVY_APP_ID = "YOUR_PRIVY_APP_ID";
-const PRIVY_CLIENT_ID = "YOUR_PRIVY_CLIENT_ID";
+// Load from .env
+const PRIVY_APP_ID = process.env.EXPO_PUBLIC_PRIVY_APP_ID ?? "";
+const PRIVY_CLIENT_ID = process.env.EXPO_PUBLIC_PRIVY_CLIENT_ID ?? "";
 
 export default function App() {
   return (
