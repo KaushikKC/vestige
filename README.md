@@ -1,6 +1,6 @@
 # Vestige
 
-**Privacy-preserving token launchpad on Solana.** Commit SOL in private using MagicBlock Ephemeral Rollups (TEE); reveal totals only at graduation. Fair price discovery without revealing your hand.
+**Inverted bonding-curve token launchpad on Solana.** Time-based price and risk-weight curves reward participation toward graduation; base tokens on buy, bonus tokens and creator-fee vesting unlock at graduation.
 
 ---
 
@@ -13,48 +13,48 @@
 
 ---
 
-## Our ideology: Inverted pump.fun
+## Ideology: Inverted pump.fun
 
-Vestige flips the usual token-launch risk/reward curve so that the best time to act is **at graduation**, not before.
+Vestige inverts the usual token-launch risk/reward so the best time to act is **toward graduation**, not only early.
 
-| | **pump.fun (traditional)** | **Inverted pump.fun (Vestige)** |
+| | **Traditional (e.g. pump.fun)** | **Vestige (inverted)** |
 |---|---|---|
 | **Reward** | High for early entry, decreases toward graduation | Low early, **increases** toward graduation |
 | **Risk** | Low early, **increases** toward graduation | High early, **decreases** toward graduation |
-| **Optimal strategy** | Front-run early (reveals intent, copyable) | **Buy / commit at graduation** — max reward, min risk |
+| **Optimal strategy** | Front-run early (reveals intent) | **Buy toward graduation** — max reward, min risk |
 
-In the traditional model, early entrants get high reward but everyone can see who’s in, which encourages front-running and copy-trading. In Vestige, **commitments are private** until graduation. Price discovery happens inside the TEE; only at the **Graduation Point** do we settle to Solana and reveal totals. The “Buy Strategy” is at graduation: participants finalize and claim when risk is lowest and reward is highest.
-
-![Vestige ideology: Inverted pump.fun — Risk vs Reward over Time of Entry](docs/ideology-diagram.png)
+Price decreases linearly over the launch window (`p_max` → `p_min`, fixed 10:1 ratio); risk weight decreases from `r_best` to `r_min`. Base tokens are delivered immediately; bonus tokens are earned from the current risk weight and claimed after graduation.
 
 ---
 
 ## What we built
 
-### For creators
+### Program (Anchor, Solana)
 
-1. **Create Launch** — Set token supply, graduation target (SOL), min/max commitment, duration. We create the SPL mint, initialize the launch and vault PDAs, create your token vault (ATA), and mint the full supply so claims work.
-2. **Launch PDA in the UI** — After creation, the Launch PDA is shown and copyable; **“Open launch page”** takes you straight to the launch detail.
-3. **Enable Private Mode (TEE)** — One-click: create permission, delegate commitment pool + vault + ephemeral SOL accounts to MagicBlock’s TEE validator, mark launch as delegated. Private commits are now allowed.
-4. **Graduate & Settle** — **Graduate & Undelegate** (atomic on Ephemeral Rollup) then **Finalize graduation** on Solana to sync pool totals to the launch account.
-5. **Withdraw Collected SOL** — Pull SOL from the launch vault to your wallet.
+- **Program ID:** `4RQMkiv5Lp4p862UeQxQs6YgWRPBud2fwLMR5GcSo1bf`
+- **PDAs:** Launch (creator + token_mint), Vault (SOL), CreatorFeeVault, UserPosition (launch + user)
+- **Instructions:**
+  - **initialize_launch** — Creator sets token supply, bonus pool, start/end time, curve bounds (`p_max`/`p_min`, `r_best`/`r_min`), graduation target. Creates Launch + vault PDAs. Creator must create the SPL mint and mint full supply into a token vault (Launch PDA as authority) before or in the same flow.
+  - **buy** — User sends SOL. 1% fee (0.5% protocol, 0.5% creator). Net SOL goes to vault; **base tokens** transfer immediately from token vault to user. **Bonus** = base × (risk_weight − 1) when weight > 1, recorded on UserPosition and claimed later. Creator must do the **first buy** (min 0.01 SOL) to activate the launch.
+  - **graduate** — Permissionless when `total_sol_collected >= graduation_target` OR `clock > end_time`. Sets `is_graduated`, unlocks first creator-fee milestone (30%).
+  - **claim_bonus** — After graduation, user claims bonus tokens from token vault.
+  - **creator_claim_fees** — Creator withdraws from CreatorFeeVault; vesting 30% → 50% → 70% → 100% via four milestones.
+  - **advance_milestone** — Authority-gated; unlocks next creator-fee tier (used after graduation).
 
-### For participants
+### Frontend (Next.js)
 
-1. **Discover / Open by PDA** — Discover page lists launches (or paste a Launch PDA from the creator).
-2. **Commit privately** — On launch detail: enter amount, commit. SOL is funded into your **ephemeral SOL** account on Solana, then **private_commit** runs on the TEE so amount and timing are hidden on-chain until graduation.
-3. **After graduation** — **Undelegate my commitment** and **Undelegate my ephemeral SOL** (so accounts return to Solana), then **Sweep my ephemeral SOL to Vault** (moves your committed SOL into the launch vault).
-4. **My Commitments** — Enter Launch PDA → **Load** → **Calculate Allocation** (time-weighted + early bonus). If needed, **Create token account** then **Claim tokens**.
+- **VestigeClient** (`lib/vestige-client.ts`) — Anchor Program + PDA derivation, curve/risk math (`getCurrentCurvePrice`, `getCurrentRiskWeight`), fee-aware **estimateBuy**, and all RPC/tx methods: `getAllLaunches`, `getLaunch`, `getUserPosition`, `initializeLaunch`, `buy`, `graduate`, `claimBonus`, `creatorClaimFees`, `advanceMilestone`.
+- **useVestige** (`lib/use-vestige.ts`) — React hook that provides the client (read-only when wallet disconnected), balance, and all actions; re-exports VestigeClient statics (e.g. `lamportsToSol`, `getTimeRemaining`, `getProgress`).
+- **CreateLaunchForm** — Creates SPL mint (Keypair), mints full supply to token vault ATA (authority derived for Launch PDA), then calls **initialize_launch**. Shows Launch PDA and “Open launch page”.
+- **Launch detail page** — Fetches launch + user position; live curve price and risk weight; buy form with estimates and validation (creator-only initial buy ≥ 0.01 SOL); actions: Graduate, Claim bonus, Creator claim fees, Advance milestone.
 
-### Tech highlights
+### Mobile (React Native)
 
-- **Solana (Anchor):** PDAs for launch, commitment pool, user commitment, vault, ephemeral SOL; SPL mint/ATA; full flow from `initialize_launch` to `claim_tokens` and `withdraw_funds`.
-- **MagicBlock Ephemeral Rollups:** `ephemeral_rollups_sdk` (v0.8); TEE for private commits; delegate/undelegate lifecycle; permission program; routing so private instructions run on TEE RPC and settlement on Solana.
-- **Frontend (Next.js):** Wallet connect, Create Launch (with PDA + open launch page), Launch Detail with MagicBlock controls, Discover, My Commitments / Allocation (load by PDA, calculate, create ATA, claim). Toasts instead of alerts; live-ticking stats and charts for demo feel.
+- Shared **vestige-client** and **use-vestige**-style hook; **PortfolioScreen** lists user positions across all launches (getAllLaunches + getUserPosition per launch).
 
 ---
 
-## Architecture (high level)
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -63,30 +63,18 @@ In the traditional model, early entrants get high reward but everyone can see wh
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  Frontend (Next.js) — vestige-eight.vercel.app                          │
-│  Wallet adapter, Vestige client, MagicBlock client (base vs TEE routing) │
+│  Frontend (Next.js) / Mobile (React Native)                             │
+│  Wallet adapter, VestigeClient (Anchor), useVestige hook                │
 └────────────────────────────────┬───────────────────────────────────────┘
                                  │
-         ┌───────────────────────┼───────────────────────┐
-         ▼                       ▼                       ▼
-┌─────────────────┐   ┌─────────────────────┐   ┌─────────────────────────┐
-│  Solana (base)  │   │  MagicBlock ER/TEE  │   │  Magic Router            │
-│  Init, delegate │   │  private_commit     │   │  Route by account state  │
-│  finalize,      │   │  graduate_and_      │   │  (base vs ER)            │
-│  claim, withdraw│   │  undelegate         │   │                          │
-└─────────────────┘   └─────────────────────┘   └─────────────────────────┘
+                                 ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Solana — Vestige program (Anchor)                                       │
+│  PDAs: launch, vault, creator_fee_vault, user_position                   │
+│  Flow: initialize_launch → buy (base + bonus entitlement)               │
+│        → graduate → claim_bonus / creator_claim_fees / advance_milestone│
+└─────────────────────────────────────────────────────────────────────────┘
 ```
-
-- **Base layer (Solana):** Launch and vault PDAs, SPL mint/ATA, user commitment and ephemeral SOL PDAs; init, delegate, fund_ephemeral, sweep_ephemeral_to_vault, finalize_graduation, calculate_allocation, claim_tokens, withdraw_funds.
-- **Ephemeral Rollup (TEE):** Delegated accounts only. private_commit (amount/timing hidden), graduate_and_undelegate (atomic settlement back to Solana).
-- **Router:** Picks base vs ER RPC so the right instructions hit the right layer.
-
----
-
-## Sponsor technologies
-
-- **Solana** — Program deployment, PDAs, SPL token (mint, ATA, transfer), SOL vault, Clock for launch timing.
-- **MagicBlock Ephemeral Rollups** — `ephemeral_rollups_sdk` with Anchor and access-control; TEE validator for private execution; delegate/undelegate; CPI for delegation and `commit_and_undelegate_accounts`; permission program. Private commitments and graduation run on the Ephemeral Rollup so on-chain data stays hidden until settlement.
 
 ---
 
@@ -94,12 +82,12 @@ In the traditional model, early entrants get high reward but everyone can see wh
 
 ```
 Vestige/
-├── programs/vestige/     # Anchor program (Solana + MagicBlock ER flows)
-├── frontend/             # Next.js app (Discover, Creator, Launch Detail, Allocation)
-├── lib/                  # vestige-client, magicblock-client, use-vestige
+├── programs/vestige/    # Anchor program (inverted curve, fees, vesting)
+├── frontend/            # Next.js (Discover, Creator, Launch Detail)
+├── mobile/              # React Native (portfolio, shared vestige client)
 ├── migrations/
 ├── tests/
-└── docs/                 # ideology-diagram.png (add your diagram here)
+└── docs/                # ideology-diagram.png (optional)
 ```
 
 ---
@@ -122,17 +110,21 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Use **Discover → Open a launch by PDA** or **Creator → Create Launch** to get a Launch PDA, then open the launch and follow Enable Private Mode → Commit (as participant) → Graduate → Finalize → Sweep → Claim.
+Open [http://localhost:3000](http://localhost:3000). Use **Creator → Create Launch** to create a mint + launch and get the Launch PDA, then open the launch page to buy, graduate, and claim.
+
+**Mobile**
+
+```bash
+cd mobile
+npm install
+npx expo start
+```
 
 ---
 
-## Roadmap
+## Tech summary (one paragraph)
 
-- **Discovery:** Index active/graduated launches from chain or indexer so Discover shows real list + “Open by PDA”.
-- **Post-graduation analytics:** Commitment distribution, time-weighted stats, export for creators.
-- **Program:** Optional cap on total allocated vs supply; configurable early-bonus curve.
-- **UX:** “My Launches” / “My Commitments” from history; notifications when a launch graduates or allocation is ready.
-- **Security & docs:** Audit of delegate/undelegate and sweep; runbooks for creators and participants.
+Vestige is a Solana token launchpad built on an **Anchor program** that uses an **inverted, time-based bonding curve**: price decreases linearly from `p_max` to `p_min` (10:1 ratio) and a risk weight from `r_best` to `r_min` over a configurable launch window. Creators **initialize_launch** with an SPL mint (supply + bonus pool), curve and weight bounds, and a graduation target; the program derives PDAs for the launch, SOL vault, creator-fee vault, and per-user positions. Users **buy** with SOL: 1% is split (0.5% protocol, 0.5% creator); net SOL goes to the vault and base tokens are delivered immediately; bonus tokens are computed from the current risk weight and **claimed after graduation**. Graduation is **permissionless** when total SOL collected reaches the target or the launch end time passes; it unlocks the first **creator-fee milestone** (30%). Creator fees vest in four milestones (30% → 50% → 70% → 100%) via **creator_claim_fees** and **advance_milestone**. The **frontend** (Next.js) and **mobile** (React Native) share a TypeScript **VestigeClient** (PDA derivation, curve/risk math, fee-aware buy estimates) and a **useVestige** hook; the web app handles mint creation, full supply mint-to-vault, and **initialize_launch**, and the launch-detail page exposes live curve price and all on-chain actions with client-side validation (e.g. creator-only initial buy ≥ 0.01 SOL).
 
 ---
 
