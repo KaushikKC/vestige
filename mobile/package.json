@@ -4,6 +4,8 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
+    "start:go": "expo start --go",
+    "start:tunnel": "expo start --tunnel",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web"

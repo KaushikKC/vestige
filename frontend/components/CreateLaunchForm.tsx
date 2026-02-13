@@ -155,6 +155,7 @@ export default function CreateLaunchForm({
       // Initialize launch
       const program = (client as any).program;
       const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
+      const [creatorFeeVaultPda] = VestigeClient.deriveCreatorFeeVaultPda(launchPda);
 
       const tx = await program.methods
         .initializeLaunch(
@@ -171,6 +172,7 @@ export default function CreateLaunchForm({
         .accounts({
           launch: launchPda,
           vault: vaultPda,
+          creatorFeeVault: creatorFeeVaultPda,
           tokenMint: tokenMint,
           creator: publicKey,
           systemProgram: SystemProgram.programId,
@@ -257,8 +259,11 @@ export default function CreateLaunchForm({
         <h3 className="text-2xl font-bold mb-4 text-[#0B0D17]">
           Launch Created
         </h3>
-        <p className="text-sm text-[#6B7280] mb-4">
+        <p className="text-sm text-[#6B7280] mb-2">
           Your inverted bonding curve launch has been deployed to Solana.
+        </p>
+        <p className="text-sm font-semibold text-orange-600 mb-4">
+          Make your initial buy (min 0.01 SOL) on the launch page to activate it.
         </p>
 
         <div className="mb-4 p-4 bg-[#F5F6FA] rounded-xl border border-[#E6E8EF] text-left">
@@ -287,7 +292,7 @@ export default function CreateLaunchForm({
               className="py-3 px-6 bg-[#1D04E1] text-white rounded-xl font-bold hover:bg-[#1603C0] flex items-center justify-center gap-2"
             >
               <ExternalLink size={18} />
-              Open launch page
+              Make Initial Buy
             </button>
           )}
           <a
@@ -490,7 +495,10 @@ export default function CreateLaunchForm({
         <strong>How it works:</strong> Price drops from p_max to p_min over the
         duration. Early buyers pay more but earn a higher risk weight, giving
         them bonus tokens at graduation. Real tokens are delivered immediately on
-        buy.
+        buy. After creating, you must make an initial buy (min 0.01 SOL) to
+        activate the launch. A 1% fee applies (0.5% protocol + 0.5% creator
+        vested fees). Collected SOL is locked for LP; creators earn from vested
+        fee rewards unlocked at milestones.
       </div>
     </div>
   );

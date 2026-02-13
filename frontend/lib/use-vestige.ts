@@ -18,6 +18,8 @@ export function useVestige() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Always create a read-only client so fetches work without a wallet.
+  // When wallet connects, upgrade to a signing client.
   useEffect(() => {
     if (
       wallet.publicKey &&
@@ -39,7 +41,19 @@ export function useVestige() {
 
       vestigeClient.getBalance(wallet.publicKey).then(setBalance);
     } else {
-      setClient(null);
+      // Read-only client: create a dummy provider so RPC reads still work
+      const { Keypair } = require("@solana/web3.js");
+      const dummyKeypair = Keypair.generate();
+      const readOnlyProvider = new AnchorProvider(
+        connection,
+        {
+          publicKey: dummyKeypair.publicKey,
+          signTransaction: async (tx: any) => tx,
+          signAllTransactions: async (txs: any[]) => txs,
+        },
+        { commitment: "confirmed" }
+      );
+      setClient(new VestigeClient(readOnlyProvider));
       setBalance(0);
     }
   }, [
@@ -187,7 +201,7 @@ export function useVestige() {
     [client, wallet.publicKey]
   );
 
-  const creatorWithdraw = useCallback(
+  const creatorClaimFees = useCallback(
     async (launchPda: PublicKey): Promise<string | null> => {
       if (!client || !wallet.publicKey) {
         setError("Wallet not connected");
@@ -196,18 +210,40 @@ export function useVestige() {
       setLoading(true);
       setError(null);
       try {
-        const tx = await client.creatorWithdraw(launchPda, wallet.publicKey);
+        const tx = await client.creatorClaimFees(launchPda, wallet.publicKey);
         await refreshBalance();
         return tx;
       } catch (e) {
         setError(e instanceof Error ? e.message : "Unknown error");
-        console.error("Creator withdraw error:", e);
+        console.error("Creator claim fees error:", e);
         return null;
       } finally {
         setLoading(false);
       }
     },
     [client, wallet.publicKey, refreshBalance]
+  );
+
+  const advanceMilestone = useCallback(
+    async (launchPda: PublicKey): Promise<string | null> => {
+      if (!client || !wallet.publicKey) {
+        setError("Wallet not connected");
+        return null;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const tx = await client.advanceMilestone(launchPda, wallet.publicKey);
+        return tx;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Unknown error");
+        console.error("Advance milestone error:", e);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [client, wallet.publicKey]
   );
 
   return {
@@ -224,7 +260,8 @@ export function useVestige() {
     buy,
     graduate,
     claimBonus,
-    creatorWithdraw,
+    creatorClaimFees,
+    advanceMilestone,
     refreshBalance,
 
     connect: wallet.connect,

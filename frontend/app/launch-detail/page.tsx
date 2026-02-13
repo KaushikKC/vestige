@@ -9,6 +9,8 @@ import {
   Award,
   CheckCircle2,
   Wallet,
+  Lock,
+  Milestone,
 } from "lucide-react";
 import { ViewState, Launch } from "../types";
 import { useVestige } from "../../lib/use-vestige";
@@ -17,6 +19,10 @@ import {
   LaunchData,
   UserPositionData,
   TOKEN_PRECISION,
+  PROTOCOL_FEE_BPS,
+  CREATOR_FEE_BPS,
+  BPS_DENOMINATOR,
+  MIN_INITIAL_BUY,
 } from "../../lib/vestige-client";
 import { PublicKey } from "@solana/web3.js";
 import {
@@ -51,7 +57,8 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
     buy,
     graduate,
     claimBonus,
-    creatorWithdraw,
+    creatorClaimFees,
+    advanceMilestone,
     client,
   } = useVestige();
   const wallet = useWallet();
@@ -66,7 +73,7 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
       const pos = await fetchUserPosition(launchPda);
       setPosition(pos);
     }
-  }, [launchPda?.toBase58(), publicKey?.toBase58()]);
+  }, [launchPda?.toBase58(), publicKey?.toBase58(), fetchLaunch, fetchUserPosition]);
 
   useEffect(() => {
     loadData();
@@ -87,6 +94,7 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
   if (!launch) return null;
 
   const isGraduated = launchData?.isGraduated ?? false;
+  const hasInitialBuy = launchData?.hasInitialBuy ?? false;
   const progress = launchData ? VestigeClient.getProgress(launchData) : 0;
   const timeLeft = launchData
     ? VestigeClient.getTimeRemaining(launchData.endTime)
@@ -96,12 +104,15 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
       ? publicKey.equals(launchData.creator)
       : false;
 
-  // Buy estimate
+  // Fee & buy estimate
   const solAmountNum = parseFloat(amount) || 0;
   const solAmountLamports = solAmountNum * 1e9;
+  const protocolFee = Math.floor((solAmountLamports * PROTOCOL_FEE_BPS) / BPS_DENOMINATOR);
+  const creatorFee = Math.floor((solAmountLamports * CREATOR_FEE_BPS) / BPS_DENOMINATOR);
+  const netAmount = solAmountLamports - protocolFee - creatorFee;
   const estimatedBase =
     curvePrice > 0
-      ? Math.floor((solAmountLamports * TOKEN_PRECISION) / curvePrice)
+      ? Math.floor((netAmount * TOKEN_PRECISION) / curvePrice)
       : 0;
   const weightScaled = riskWeight * 1000;
   const estimatedBonus =
@@ -112,8 +123,30 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
   const effectivePrice =
     estimatedTotal > 0 ? solAmountLamports / estimatedTotal : 0;
 
+  // Creator fee vesting info
+  const claimableCreatorFees = launchData ? VestigeClient.getClaimableCreatorFees(launchData) : 0;
+  const milestoneLevel = launchData?.milestonesUnlocked ?? 0;
+  const totalCreatorFees = launchData?.totalCreatorFees?.toNumber() ?? 0;
+  const creatorFeesClaimed = launchData?.creatorFeesClaimed?.toNumber() ?? 0;
+
+  // Check if non-creator tries to buy before initial buy
+  const waitingForCreatorBuy = !hasInitialBuy && connected && !isCreator;
+
   const handleBuy = async () => {
     if (!client || !publicKey || !launchPda || !launchData) return;
+
+    // Client-side validation for initial buy
+    if (!hasInitialBuy) {
+      if (!isCreator) {
+        toast.error("Waiting for creator's initial buy to activate this launch.");
+        return;
+      }
+      if (solAmountLamports < MIN_INITIAL_BUY) {
+        toast.error("Initial buy must be at least 0.01 SOL.");
+        return;
+      }
+    }
+
     try {
       const connection = (client as any).connection;
 
@@ -204,11 +237,20 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
     }
   };
 
-  const handleCreatorWithdraw = async () => {
+  const handleCreatorClaimFees = async () => {
     if (!launchPda) return;
-    const tx = await creatorWithdraw(launchPda);
+    const tx = await creatorClaimFees(launchPda);
     if (tx) {
-      toast.success("SOL withdrawn!");
+      toast.success("Creator fees claimed!");
+      await loadData();
+    }
+  };
+
+  const handleAdvanceMilestone = async () => {
+    if (!launchPda) return;
+    const tx = await advanceMilestone(launchPda);
+    if (tx) {
+      toast.success("Milestone advanced!");
       await loadData();
     }
   };
@@ -345,22 +387,87 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
               </button>
             )}
 
-            {/* Creator withdraw */}
-            {isGraduated && isCreator && (
-              <button
-                onClick={handleCreatorWithdraw}
-                disabled={loading}
-                className="mt-4 w-full py-3 bg-[#09090A] text-white font-bold rounded-xl hover:bg-[#222] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <Wallet size={16} />
-                )}
-                Withdraw Collected SOL
-              </button>
+            {/* SOL Locked for Liquidity indicator */}
+            {isGraduated && (
+              <div className="mt-4 p-3 bg-blue-50 rounded-xl border border-blue-200 flex items-center gap-3">
+                <Lock size={18} className="text-blue-600 shrink-0" />
+                <div>
+                  <p className="text-sm font-bold text-blue-800">SOL Locked for Liquidity</p>
+                  <p className="text-xs text-blue-600">
+                    {launchData
+                      ? `${VestigeClient.lamportsToSol(
+                          launchData.totalSolCollected.toNumber()
+                        ).toFixed(4)} SOL`
+                      : "--"}{" "}
+                    locked in vault for future Raydium LP
+                  </p>
+                </div>
+              </div>
             )}
           </div>
+
+          {/* Creator Vested Fees Section */}
+          {isGraduated && isCreator && launchData && (
+            <div className="bg-white p-6 rounded-2xl border border-[#E6E8EF] shadow-sm">
+              <h3 className="font-bold text-[#0B0D17] mb-4 flex items-center gap-2">
+                <Milestone size={18} className="text-[#1D04E1]" />
+                Creator Vested Fees
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div>
+                  <p className="text-xs text-[#6B7280]">Total Accumulated</p>
+                  <p className="font-bold text-[#0B0D17] font-mono">
+                    {VestigeClient.lamportsToSol(totalCreatorFees).toFixed(6)} SOL
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-[#6B7280]">Already Claimed</p>
+                  <p className="font-bold text-[#0B0D17] font-mono">
+                    {VestigeClient.lamportsToSol(creatorFeesClaimed).toFixed(6)} SOL
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-[#6B7280]">Milestone</p>
+                  <p className="font-bold text-[#0B0D17] font-mono">
+                    {milestoneLevel}/4
+                  </p>
+                  <p className="text-[10px] text-[#6B7280]">
+                    {VestigeClient.getMilestoneDescription(milestoneLevel)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-[#6B7280]">Claimable Now</p>
+                  <p className="font-bold text-green-600 font-mono">
+                    {VestigeClient.lamportsToSol(claimableCreatorFees).toFixed(6)} SOL
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCreatorClaimFees}
+                  disabled={loading || claimableCreatorFees <= 0}
+                  className="flex-1 py-3 bg-[#09090A] text-white font-bold rounded-xl hover:bg-[#222] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Wallet size={16} />
+                  )}
+                  Claim Vested Fees
+                </button>
+                {milestoneLevel < 4 && (
+                  <button
+                    onClick={handleAdvanceMilestone}
+                    disabled={loading}
+                    className="py-3 px-4 bg-[#1D04E1] text-white font-bold rounded-xl hover:bg-[#1603C0] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    Advance Milestone
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* User Position */}
           {position && (
@@ -455,6 +562,13 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
                   launchData.totalBonusReserved.toNumber() / TOKEN_PRECISION
                 ).toLocaleString()}
               </p>
+              <p>
+                <strong>Protocol Fee:</strong> 0.5% | <strong>Creator Fee:</strong> 0.5% | <strong>Total Fee:</strong> 1%
+              </p>
+              <p>
+                <strong>Initial Buy:</strong>{" "}
+                {hasInitialBuy ? "Completed" : "Pending (creator must buy first)"}
+              </p>
             </div>
           )}
         </div>
@@ -480,6 +594,19 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
                   This launch has graduated. Claim your bonus tokens if eligible.
                 </p>
               </div>
+            ) : waitingForCreatorBuy ? (
+              <div className="text-center py-8">
+                <Lock
+                  size={48}
+                  className="text-orange-400 mx-auto mb-4"
+                />
+                <h4 className="font-bold text-[#0B0D17] mb-2">
+                  Waiting for Creator
+                </h4>
+                <p className="text-sm text-[#6B7280]">
+                  The creator must make an initial buy (min 0.01 SOL) to activate this launch before others can participate.
+                </p>
+              </div>
             ) : (
               <>
                 <div className="space-y-4 mb-6">
@@ -492,13 +619,18 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
                         type="number"
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
-                        placeholder="0.00"
+                        placeholder={!hasInitialBuy && isCreator ? "Min 0.01" : "0.00"}
                         className="w-full bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl px-4 py-3 text-lg font-bold text-[#0B0D17] focus:outline-none focus:ring-2 focus:ring-[#1D04E1] transition-all"
                       />
                       <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold bg-white px-2 py-1 rounded shadow-sm text-[#0B0D17]">
                         SOL
                       </div>
                     </div>
+                    {!hasInitialBuy && isCreator && (
+                      <p className="text-xs text-orange-600 mt-1 font-semibold">
+                        Initial buy required (min 0.01 SOL) to activate launch
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex justify-between text-xs">
@@ -511,7 +643,7 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
                   </div>
                 </div>
 
-                {/* Buy Estimate */}
+                {/* Buy Estimate with Fee Breakdown */}
                 {solAmountNum > 0 && (
                   <div className="p-4 bg-[#F5F6FA] rounded-xl mb-6 space-y-2">
                     <div className="flex justify-between text-xs">
@@ -524,28 +656,54 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
                           : "--"}
                       </span>
                     </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-[#6B7280]">
-                        Base tokens (delivered now)
-                      </span>
-                      <span className="font-bold text-[#0B0D17]">
-                        {(estimatedBase / TOKEN_PRECISION).toFixed(4)}
-                      </span>
+
+                    {/* Fee breakdown */}
+                    <div className="border-t border-[#E6E8EF] pt-2 mt-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-[#6B7280]">Protocol fee (0.5%)</span>
+                        <span className="font-mono text-[#6B7280]">
+                          {(protocolFee / 1e9).toFixed(6)} SOL
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-[#6B7280]">Creator fee (0.5%)</span>
+                        <span className="font-mono text-[#6B7280]">
+                          {(creatorFee / 1e9).toFixed(6)} SOL
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-[#6B7280] font-semibold">Net to liquidity</span>
+                        <span className="font-bold text-[#0B0D17]">
+                          {(netAmount / 1e9).toFixed(6)} SOL
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-[#6B7280]">Your risk weight</span>
-                      <span className="font-bold text-[#1D04E1]">
-                        {riskWeight.toFixed(2)}x
-                      </span>
+
+                    <div className="border-t border-[#E6E8EF] pt-2 mt-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-[#6B7280]">
+                          Base tokens (delivered now)
+                        </span>
+                        <span className="font-bold text-[#0B0D17]">
+                          {(estimatedBase / TOKEN_PRECISION).toFixed(4)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-[#6B7280]">Your risk weight</span>
+                        <span className="font-bold text-[#1D04E1]">
+                          {riskWeight.toFixed(2)}x
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-[#6B7280]">
+                          Bonus at graduation
+                        </span>
+                        <span className="font-bold text-green-600">
+                          +{(estimatedBonus / TOKEN_PRECISION).toFixed(4)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-[#6B7280]">
-                        Bonus at graduation
-                      </span>
-                      <span className="font-bold text-green-600">
-                        +{(estimatedBonus / TOKEN_PRECISION).toFixed(4)}
-                      </span>
-                    </div>
+
                     <div className="border-t border-[#E6E8EF] pt-2 mt-2">
                       <div className="flex justify-between text-xs">
                         <span className="text-[#6B7280] font-bold">
@@ -590,6 +748,8 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
                     </>
                   ) : !connected ? (
                     "Connect Wallet to Buy"
+                  ) : !hasInitialBuy && isCreator ? (
+                    "Make Initial Buy"
                   ) : (
                     "Buy Tokens"
                   )}
@@ -597,7 +757,7 @@ const LaunchDetail: React.FC<LaunchDetailProps> = ({ setView, launch }) => {
 
                 <p className="text-[10px] text-center text-[#6B7280] mt-4">
                   Base tokens are transferred immediately. Bonus tokens are
-                  delivered at graduation.
+                  delivered at graduation. 1% fee (0.5% protocol + 0.5% creator).
                 </p>
               </>
             )}

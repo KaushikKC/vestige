@@ -8,11 +8,29 @@ declare_id!("4RQMkiv5Lp4p862UeQxQs6YgWRPBud2fwLMR5GcSo1bf");
 pub const LAUNCH_SEED: &[u8] = b"launch";
 pub const POSITION_SEED: &[u8] = b"position";
 pub const VAULT_SEED: &[u8] = b"vault";
+pub const CREATOR_FEE_VAULT_SEED: &[u8] = b"creator_fee";
 
 // Constants
 pub const WEIGHT_PRECISION: u128 = 1_000;
 pub const PRICE_RATIO: u64 = 10;
 pub const TOKEN_PRECISION: u128 = 1_000_000_000;
+
+// Fee constants (basis points)
+pub const PROTOCOL_FEE_BPS: u64 = 50;   // 0.5%
+pub const CREATOR_FEE_BPS: u64 = 50;    // 0.5%
+pub const BPS_DENOMINATOR: u64 = 10_000;
+
+// Minimum initial buy (0.01 SOL)
+pub const MIN_INITIAL_BUY: u64 = 10_000_000;
+
+// Vesting milestone BPS (out of 10_000)
+pub const VEST_GRADUATION: u64 = 3000;  // 30%
+pub const VEST_M1: u64 = 2000;          // 20% (cumulative 50%)
+pub const VEST_M2: u64 = 2000;          // 20% (cumulative 70%)
+pub const VEST_M3: u64 = 3000;          // 30% (cumulative 100%)
+
+// Protocol treasury — replace with your actual wallet
+pub const PROTOCOL_TREASURY: Pubkey = pubkey!("GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb3Jy9N2Ce");
 
 // ============== Helper Functions ==============
 
@@ -124,6 +142,10 @@ pub mod vestige {
         launch.total_participants = 0;
         launch.is_graduated = false;
         launch.bump = ctx.bumps.launch;
+        launch.total_creator_fees = 0;
+        launch.creator_fees_claimed = 0;
+        launch.milestones_unlocked = 0;
+        launch.has_initial_buy = false;
 
         // Create vault PDA (program-owned, holds lamports)
         let vault = &ctx.accounts.vault;
@@ -147,6 +169,27 @@ pub mod vestige {
             &crate::ID,
         )?;
 
+        // Create creator_fee_vault PDA (program-owned, holds lamports for creator fees)
+        let creator_fee_vault = &ctx.accounts.creator_fee_vault;
+        let (_, fee_vault_bump) = Pubkey::find_program_address(
+            &[CREATOR_FEE_VAULT_SEED, launch.key().as_ref()],
+            ctx.program_id,
+        );
+        let fee_vault_lamports = rent.minimum_balance(0);
+        system_program::create_account(
+            CpiContext::new_with_signer(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::CreateAccount {
+                    from: ctx.accounts.creator.to_account_info(),
+                    to: creator_fee_vault.to_account_info(),
+                },
+                &[&[CREATOR_FEE_VAULT_SEED, launch.key().as_ref(), &[fee_vault_bump]]],
+            ),
+            fee_vault_lamports,
+            0,
+            &crate::ID,
+        )?;
+
         msg!("Vestige Launch Initialized!");
         msg!("Token Supply: {}, Bonus Pool: {}", token_supply, bonus_pool);
         msg!("Price: {} -> {} lamports", p_max, p_min);
@@ -158,6 +201,8 @@ pub mod vestige {
 
     /// Buy tokens using SOL. Immediate token delivery of base tokens.
     /// Bonus tokens are recorded and delivered at graduation.
+    /// 1% total fee: 0.5% protocol treasury + 0.5% creator fee vault.
+    /// Creator must make the first buy (min 0.01 SOL) to activate the launch.
     pub fn buy(ctx: Context<Buy>, sol_amount: u64) -> Result<()> {
         require!(sol_amount > 0, VestigeError::InvalidSolAmount);
 
@@ -168,14 +213,37 @@ pub mod vestige {
         require!(clock.unix_timestamp <= launch.end_time, VestigeError::LaunchEnded);
         require!(!launch.is_graduated, VestigeError::AlreadyGraduated);
 
+        // Initial buy check: creator must buy first
+        if !launch.has_initial_buy {
+            require!(
+                ctx.accounts.user.key() == launch.creator,
+                VestigeError::CreatorMustBuyFirst
+            );
+            require!(
+                sol_amount >= MIN_INITIAL_BUY,
+                VestigeError::InitialBuyTooSmall
+            );
+        }
+
+        // Calculate fees
+        let protocol_fee = sol_amount
+            .checked_mul(PROTOCOL_FEE_BPS).ok_or(VestigeError::Overflow)?
+            .checked_div(BPS_DENOMINATOR).ok_or(VestigeError::Overflow)?;
+        let creator_fee = sol_amount
+            .checked_mul(CREATOR_FEE_BPS).ok_or(VestigeError::Overflow)?
+            .checked_div(BPS_DENOMINATOR).ok_or(VestigeError::Overflow)?;
+        let net_amount = sol_amount
+            .checked_sub(protocol_fee).ok_or(VestigeError::Overflow)?
+            .checked_sub(creator_fee).ok_or(VestigeError::Overflow)?;
+
         // Calculate curve price and risk weight at current time
         let curve_price = get_curve_price(launch, clock.unix_timestamp);
         require!(curve_price > 0, VestigeError::ZeroCurvePrice);
 
         let weight_scaled = get_risk_weight_scaled(launch, clock.unix_timestamp);
 
-        // Calculate base tokens and bonus
-        let base_tokens = calculate_base_tokens(sol_amount, curve_price)?;
+        // Calculate base tokens and bonus using net_amount (post-fee)
+        let base_tokens = calculate_base_tokens(net_amount, curve_price)?;
         require!(base_tokens > 0, VestigeError::ZeroBaseTokens);
 
         let bonus = calculate_bonus(base_tokens, weight_scaled)?;
@@ -190,7 +258,31 @@ pub mod vestige {
             VestigeError::BonusPoolExceeded
         );
 
-        // Transfer SOL from user to vault
+        // Transfer protocol fee to treasury
+        system_program::transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::Transfer {
+                    from: ctx.accounts.user.to_account_info(),
+                    to: ctx.accounts.protocol_treasury.to_account_info(),
+                },
+            ),
+            protocol_fee,
+        )?;
+
+        // Transfer creator fee to creator_fee_vault PDA
+        system_program::transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::Transfer {
+                    from: ctx.accounts.user.to_account_info(),
+                    to: ctx.accounts.creator_fee_vault.to_account_info(),
+                },
+            ),
+            creator_fee,
+        )?;
+
+        // Transfer net_amount to vault (for liquidity)
         system_program::transfer(
             CpiContext::new(
                 ctx.accounts.system_program.to_account_info(),
@@ -199,7 +291,7 @@ pub mod vestige {
                     to: ctx.accounts.vault.to_account_info(),
                 },
             ),
-            sol_amount,
+            net_amount,
         )?;
 
         // Transfer base_tokens from token_vault to user ATA (Launch PDA signs)
@@ -245,13 +337,18 @@ pub mod vestige {
         launch.total_bonus_reserved = launch.total_bonus_reserved
             .checked_add(bonus).ok_or(VestigeError::Overflow)?;
         launch.total_sol_collected = launch.total_sol_collected
-            .checked_add(sol_amount).ok_or(VestigeError::Overflow)?;
+            .checked_add(net_amount).ok_or(VestigeError::Overflow)?;
+        launch.total_creator_fees = launch.total_creator_fees
+            .checked_add(creator_fee).ok_or(VestigeError::Overflow)?;
         if is_new {
             launch.total_participants = launch.total_participants
                 .checked_add(1).ok_or(VestigeError::Overflow)?;
         }
+        if !launch.has_initial_buy {
+            launch.has_initial_buy = true;
+        }
 
-        msg!("Buy: {} lamports -> {} base tokens + {} bonus entitled", sol_amount, base_tokens, bonus);
+        msg!("Buy: {} lamports (net {} after fees) -> {} base tokens + {} bonus entitled", sol_amount, net_amount, base_tokens, bonus);
 
         Ok(())
     }
@@ -270,6 +367,7 @@ pub mod vestige {
         require!(target_reached || time_expired, VestigeError::GraduationConditionsNotMet);
 
         launch.is_graduated = true;
+        launch.milestones_unlocked = 1; // Unlock 30% of creator fees
 
         msg!("=== LAUNCH GRADUATED ===");
         msg!("Total SOL: {}", launch.total_sol_collected);
@@ -320,25 +418,61 @@ pub mod vestige {
         Ok(())
     }
 
-    /// Creator withdraws collected SOL after graduation.
-    /// Direct lamport debit from vault PDA to creator.
-    pub fn creator_withdraw(ctx: Context<CreatorWithdraw>) -> Result<()> {
+    /// Creator claims vested fees from the creator_fee_vault after graduation.
+    /// Fees vest based on milestones: 30% at graduation, then 20%, 20%, 30%.
+    pub fn creator_claim_fees(ctx: Context<CreatorClaimFees>) -> Result<()> {
         let launch = &ctx.accounts.launch;
 
         require!(launch.is_graduated, VestigeError::NotGraduated);
         require!(ctx.accounts.creator.key() == launch.creator, VestigeError::Unauthorized);
+        require!(launch.milestones_unlocked > 0, VestigeError::NoMilestonesUnlocked);
 
-        let vault_info = ctx.accounts.vault.to_account_info();
-        let vault_balance = vault_info.lamports();
-        let rent = Rent::get()?.minimum_balance(0);
-        let withdrawable = vault_balance.saturating_sub(rent);
-        require!(withdrawable > 0, VestigeError::NothingToWithdraw);
+        // Calculate unlocked percentage based on milestone level
+        let unlocked_bps: u64 = match launch.milestones_unlocked {
+            1 => VEST_GRADUATION,                                    // 3000 = 30%
+            2 => VEST_GRADUATION + VEST_M1,                          // 5000 = 50%
+            3 => VEST_GRADUATION + VEST_M1 + VEST_M2,                // 7000 = 70%
+            _ => BPS_DENOMINATOR,                                     // 10000 = 100%
+        };
 
-        **vault_info.try_borrow_mut_lamports()? -= withdrawable;
-        **ctx.accounts.creator.to_account_info().try_borrow_mut_lamports()? += withdrawable;
+        let total_unlocked = launch.total_creator_fees
+            .checked_mul(unlocked_bps).ok_or(VestigeError::Overflow)?
+            .checked_div(BPS_DENOMINATOR).ok_or(VestigeError::Overflow)?;
 
-        msg!("=== SOL WITHDRAWN ===");
-        msg!("Amount: {} lamports", withdrawable);
+        let claimable = total_unlocked
+            .checked_sub(launch.creator_fees_claimed).ok_or(VestigeError::Overflow)?;
+        require!(claimable > 0, VestigeError::NothingToWithdraw);
+
+        // Transfer from creator_fee_vault to creator (direct lamport manipulation)
+        let vault_info = ctx.accounts.creator_fee_vault.to_account_info();
+        **vault_info.try_borrow_mut_lamports()? -= claimable;
+        **ctx.accounts.creator.to_account_info().try_borrow_mut_lamports()? += claimable;
+
+        // Update claimed amount
+        let launch = &mut ctx.accounts.launch;
+        launch.creator_fees_claimed = launch.creator_fees_claimed
+            .checked_add(claimable).ok_or(VestigeError::Overflow)?;
+
+        msg!("=== CREATOR FEES CLAIMED ===");
+        msg!("Amount: {} lamports", claimable);
+        msg!("Milestone: {}/4", launch.milestones_unlocked);
+
+        Ok(())
+    }
+
+    /// Advance milestone to unlock more creator fees.
+    /// Admin-gated for hackathon (any signer can call; production would be time-locked or DAO-gated).
+    pub fn advance_milestone(ctx: Context<AdvanceMilestone>) -> Result<()> {
+        let launch = &mut ctx.accounts.launch;
+
+        require!(launch.is_graduated, VestigeError::NotGraduated);
+        require!(launch.milestones_unlocked < 4, VestigeError::AllMilestonesUnlocked);
+
+        launch.milestones_unlocked = launch.milestones_unlocked
+            .checked_add(1).ok_or(VestigeError::Overflow)?;
+
+        msg!("=== MILESTONE ADVANCED ===");
+        msg!("New milestone level: {}/4", launch.milestones_unlocked);
 
         Ok(())
     }
@@ -366,11 +500,15 @@ pub struct Launch {
     pub total_participants: u64,      // 8
     pub is_graduated: bool,           // 1
     pub bump: u8,                     // 1
+    pub total_creator_fees: u64,      // 8
+    pub creator_fees_claimed: u64,    // 8
+    pub milestones_unlocked: u8,      // 1
+    pub has_initial_buy: bool,        // 1
 }
 
 impl Launch {
-    // 8 (discriminator) + 32 + 32 + 8*12 + 1 + 1 = 170
-    pub const SIZE: usize = 8 + 32 + 32 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 1 + 1;
+    // 8 (discriminator) + 32 + 32 + 8*12 + 1 + 1 + 8 + 8 + 1 + 1 = 188
+    pub const SIZE: usize = 8 + 32 + 32 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 1 + 1 + 8 + 8 + 1 + 1;
 }
 
 #[account]
@@ -410,6 +548,14 @@ pub struct InitializeLaunch<'info> {
     )]
     pub vault: AccountInfo<'info>,
 
+    /// CHECK: Creator fee vault PDA for holding creator fees (program-owned, 0 data)
+    #[account(
+        mut,
+        seeds = [CREATOR_FEE_VAULT_SEED, launch.key().as_ref()],
+        bump
+    )]
+    pub creator_fee_vault: AccountInfo<'info>,
+
     pub token_mint: Account<'info, Mint>,
 
     #[account(mut)]
@@ -443,6 +589,21 @@ pub struct Buy<'info> {
         bump
     )]
     pub vault: AccountInfo<'info>,
+
+    /// CHECK: Creator fee vault PDA
+    #[account(
+        mut,
+        seeds = [CREATOR_FEE_VAULT_SEED, launch.key().as_ref()],
+        bump
+    )]
+    pub creator_fee_vault: AccountInfo<'info>,
+
+    /// CHECK: Protocol treasury account — must match hardcoded PROTOCOL_TREASURY
+    #[account(
+        mut,
+        constraint = protocol_treasury.key() == PROTOCOL_TREASURY @ VestigeError::Unauthorized
+    )]
+    pub protocol_treasury: AccountInfo<'info>,
 
     #[account(
         mut,
@@ -507,25 +668,32 @@ pub struct ClaimBonus<'info> {
 }
 
 #[derive(Accounts)]
-pub struct CreatorWithdraw<'info> {
+pub struct CreatorClaimFees<'info> {
     #[account(
+        mut,
         seeds = [LAUNCH_SEED, launch.creator.as_ref(), launch.token_mint.as_ref()],
         bump = launch.bump
     )]
     pub launch: Account<'info, Launch>,
 
-    /// CHECK: Vault PDA holding SOL
+    /// CHECK: Creator fee vault PDA holding accumulated creator fees
     #[account(
         mut,
-        constraint = vault.key() == Pubkey::find_program_address(
-            &[VAULT_SEED, launch.key().as_ref()],
-            &crate::ID
-        ).0
+        seeds = [CREATOR_FEE_VAULT_SEED, launch.key().as_ref()],
+        bump
     )]
-    pub vault: UncheckedAccount<'info>,
+    pub creator_fee_vault: AccountInfo<'info>,
 
     #[account(mut)]
     pub creator: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct AdvanceMilestone<'info> {
+    #[account(mut)]
+    pub launch: Account<'info, Launch>,
+
+    pub authority: Signer<'info>,
 }
 
 // ============== Errors ==============
@@ -586,4 +754,12 @@ pub enum VestigeError {
     PositionMismatch,
     #[msg("Arithmetic overflow")]
     Overflow,
+    #[msg("Creator must make the first buy")]
+    CreatorMustBuyFirst,
+    #[msg("Initial buy must be at least 0.01 SOL")]
+    InitialBuyTooSmall,
+    #[msg("No milestones unlocked yet")]
+    NoMilestonesUnlocked,
+    #[msg("All milestones already unlocked")]
+    AllMilestonesUnlocked,
 }

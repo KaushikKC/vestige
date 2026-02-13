@@ -11,11 +11,25 @@ export const PROGRAM_ID = new PublicKey(
 export const LAUNCH_SEED = Buffer.from("launch");
 export const POSITION_SEED = Buffer.from("position");
 export const VAULT_SEED = Buffer.from("vault");
+export const CREATOR_FEE_VAULT_SEED = Buffer.from("creator_fee");
 
 // Constants (matching on-chain)
 export const WEIGHT_PRECISION = 1_000;
 export const PRICE_RATIO = 10;
 export const TOKEN_PRECISION = 1_000_000_000;
+
+// Fee constants (basis points, matching on-chain)
+export const PROTOCOL_FEE_BPS = 50;    // 0.5%
+export const CREATOR_FEE_BPS = 50;     // 0.5%
+export const BPS_DENOMINATOR = 10_000;
+
+// Minimum initial buy (0.01 SOL in lamports)
+export const MIN_INITIAL_BUY = 10_000_000;
+
+// Protocol treasury (must match on-chain constant)
+export const PROTOCOL_TREASURY = new PublicKey(
+  "GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb3Jy9N2Ce"
+);
 
 // ============== Interfaces ==============
 
@@ -39,6 +53,10 @@ export interface LaunchData {
   totalParticipants: number;
   isGraduated: boolean;
   bump: number;
+  totalCreatorFees: BN;
+  creatorFeesClaimed: BN;
+  milestonesUnlocked: number;
+  hasInitialBuy: boolean;
 }
 
 export interface UserPositionData {
@@ -58,6 +76,9 @@ export interface BuyEstimate {
   effectivePrice: number;
   riskWeight: number;
   curvePrice: number;
+  protocolFee: number;
+  creatorFee: number;
+  netAmount: number;
 }
 
 // ============== Client ==============
@@ -102,6 +123,13 @@ export class VestigeClient {
     );
   }
 
+  static deriveCreatorFeeVaultPda(launch: PublicKey): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [CREATOR_FEE_VAULT_SEED, launch.toBuffer()],
+      PROGRAM_ID
+    );
+  }
+
   // ============== Static Math ==============
 
   static getCurrentCurvePrice(launch: LaunchData): number {
@@ -136,8 +164,14 @@ export class VestigeClient {
     const curvePrice = VestigeClient.getCurrentCurvePrice(launch);
     const riskWeight = VestigeClient.getCurrentRiskWeight(launch);
 
+    // Calculate fees
+    const protocolFee = Math.floor((solAmountLamports * PROTOCOL_FEE_BPS) / BPS_DENOMINATOR);
+    const creatorFee = Math.floor((solAmountLamports * CREATOR_FEE_BPS) / BPS_DENOMINATOR);
+    const netAmount = solAmountLamports - protocolFee - creatorFee;
+
+    // Token calculation uses net amount (post-fee)
     const baseTokens = Math.floor(
-      (solAmountLamports * TOKEN_PRECISION) / curvePrice
+      (netAmount * TOKEN_PRECISION) / curvePrice
     );
     const weightScaled = riskWeight * WEIGHT_PRECISION;
     const bonus =
@@ -150,7 +184,7 @@ export class VestigeClient {
     const effectivePrice =
       total > 0 ? solAmountLamports / total : solAmountLamports;
 
-    return { baseTokens, bonus, effectivePrice, riskWeight, curvePrice };
+    return { baseTokens, bonus, effectivePrice, riskWeight, curvePrice, protocolFee, creatorFee, netAmount };
   }
 
   // ============== Static Utils ==============
@@ -182,6 +216,34 @@ export class VestigeClient {
     return Math.min(100, (launch.totalSolCollected.toNumber() / target) * 100);
   }
 
+  /** Returns claimable creator fees in lamports based on current milestone */
+  static getClaimableCreatorFees(launch: LaunchData): number {
+    if (launch.milestonesUnlocked === 0) return 0;
+    const totalFees = launch.totalCreatorFees.toNumber();
+    const claimed = launch.creatorFeesClaimed.toNumber();
+    let unlockedBps: number;
+    switch (launch.milestonesUnlocked) {
+      case 1: unlockedBps = 3000; break;  // 30%
+      case 2: unlockedBps = 5000; break;  // 50%
+      case 3: unlockedBps = 7000; break;  // 70%
+      default: unlockedBps = 10000; break; // 100%
+    }
+    const totalUnlocked = Math.floor((totalFees * unlockedBps) / BPS_DENOMINATOR);
+    return Math.max(0, totalUnlocked - claimed);
+  }
+
+  /** Returns human-readable milestone description */
+  static getMilestoneDescription(level: number): string {
+    switch (level) {
+      case 0: return "No milestones (pre-graduation)";
+      case 1: return "Graduation (30% unlocked)";
+      case 2: return "Milestone 2 (50% unlocked)";
+      case 3: return "Milestone 3 (70% unlocked)";
+      case 4: return "All milestones (100% unlocked)";
+      default: return `Milestone ${level}`;
+    }
+  }
+
   // ============== RPC Reads ==============
 
   private parseAccount(a: any): any {
@@ -202,6 +264,10 @@ export class VestigeClient {
         typeof a.totalParticipants === "number"
           ? a.totalParticipants
           : a.totalParticipants.toNumber(),
+      milestonesUnlocked:
+        typeof a.milestonesUnlocked === "number"
+          ? a.milestonesUnlocked
+          : a.milestonesUnlocked.toNumber(),
     };
   }
 
@@ -262,6 +328,7 @@ export class VestigeClient {
   ): Promise<string> {
     const [launchPda] = VestigeClient.deriveLaunchPda(creator, tokenMint);
     const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
+    const [creatorFeeVaultPda] = VestigeClient.deriveCreatorFeeVaultPda(launchPda);
 
     const tx = await this.program.methods
       .initializeLaunch(
@@ -278,6 +345,7 @@ export class VestigeClient {
       .accounts({
         launch: launchPda,
         vault: vaultPda,
+        creatorFeeVault: creatorFeeVaultPda,
         tokenMint,
         creator,
         systemProgram: SystemProgram.programId,
@@ -296,6 +364,7 @@ export class VestigeClient {
   ): Promise<string> {
     const [positionPda] = VestigeClient.derivePositionPda(launchPda, user);
     const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
+    const [creatorFeeVaultPda] = VestigeClient.deriveCreatorFeeVaultPda(launchPda);
 
     const tx = await this.program.methods
       .buy(solAmount)
@@ -303,6 +372,8 @@ export class VestigeClient {
         launch: launchPda,
         userPosition: positionPda,
         vault: vaultPda,
+        creatorFeeVault: creatorFeeVaultPda,
+        protocolTreasury: PROTOCOL_TREASURY,
         tokenVault,
         userTokenAccount,
         user,
@@ -349,18 +420,33 @@ export class VestigeClient {
     return tx;
   }
 
-  async creatorWithdraw(
+  async creatorClaimFees(
     launchPda: PublicKey,
     creator: PublicKey
   ): Promise<string> {
-    const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
+    const [creatorFeeVaultPda] = VestigeClient.deriveCreatorFeeVaultPda(launchPda);
 
     const tx = await this.program.methods
-      .creatorWithdraw()
+      .creatorClaimFees()
       .accounts({
         launch: launchPda,
-        vault: vaultPda,
+        creatorFeeVault: creatorFeeVaultPda,
         creator,
+      })
+      .rpc({ skipPreflight: true });
+
+    return tx;
+  }
+
+  async advanceMilestone(
+    launchPda: PublicKey,
+    authority: PublicKey
+  ): Promise<string> {
+    const tx = await this.program.methods
+      .advanceMilestone()
+      .accounts({
+        launch: launchPda,
+        authority,
       })
       .rpc({ skipPreflight: true });
 
