@@ -1,13 +1,13 @@
+// Learn more https://docs.expo.io/guides/customizing-metro
 const { getDefaultConfig } = require('expo/metro-config');
 
+/** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
 
+// Add polyfill resolvers for Node.js built-ins used by Solana libs
 config.resolver.extraNodeModules = {
+  crypto: require.resolve('expo-crypto'),
   buffer: require.resolve('buffer/'),
 };
-
-// Force jose (used by Privy) to use its browser build instead of Node.js build
-// This avoids imports of Node-only modules like 'crypto' and 'util'
-config.resolver.unstable_conditionNames = ['browser', 'require', 'import'];
 
 module.exports = config;
