@@ -1,3 +1,5 @@
+// iOS App entry — uses Privy for wallet
+// Android uses App.android.tsx instead (resolved by Metro automatically)
 import React from "react";
 import { StatusBar } from "expo-status-bar";
 import { NavigationContainer } from "@react-navigation/native";
@@ -6,7 +8,6 @@ import { PrivyProvider } from "@privy-io/expo";
 import { WalletProvider } from "./src/lib/use-wallet";
 import RootNavigator from "./src/navigation/RootNavigator";
 
-// Load from .env
 const PRIVY_APP_ID = process.env.EXPO_PUBLIC_PRIVY_APP_ID ?? "";
 const PRIVY_CLIENT_ID = process.env.EXPO_PUBLIC_PRIVY_CLIENT_ID ?? "";
 
