@@ -7,20 +7,37 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
-  ActivityIndicator,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PublicKey } from '@solana/web3.js';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../constants/theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import { LaunchData } from '../lib/vestige-client';
 import { useVestige } from '../lib/use-vestige';
 import LaunchCard from '../components/LaunchCard';
 import WalletButton from '../components/WalletButton';
+import SkeletonLoader from '../components/SkeletonLoader';
 import { DiscoverStackParamList } from '../navigation/RootNavigator';
 
 type Props = {
   navigation: NativeStackNavigationProp<DiscoverStackParamList, 'DiscoverList'>;
 };
+
+function SkeletonCard() {
+  return (
+    <View style={skeletonStyles.card}>
+      <View style={skeletonStyles.header}>
+        <SkeletonLoader width={80} height={20} />
+        <SkeletonLoader width={60} height={20} borderRadius={RADIUS.full} />
+      </View>
+      <View style={skeletonStyles.statsRow}>
+        <SkeletonLoader width="30%" height={32} />
+        <SkeletonLoader width="25%" height={24} />
+        <SkeletonLoader width="25%" height={24} />
+      </View>
+      <SkeletonLoader width="100%" height={6} borderRadius={3} />
+    </View>
+  );
+}
 
 export default function DiscoverScreen({ navigation }: Props) {
   const { getAllLaunches } = useVestige();
@@ -68,28 +85,37 @@ export default function DiscoverScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      {/* Hero section */}
+      <View style={styles.hero}>
+        <View style={styles.heroText}>
+          <Text style={styles.heroTitle}>Discover</Text>
+          <Text style={styles.heroSubtitle}>Find the next big launch</Text>
+        </View>
         <WalletButton />
       </View>
 
       <View style={styles.searchRow}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Paste Launch PDA..."
-          placeholderTextColor={COLORS.textMuted}
-          value={pdaInput}
-          onChangeText={setPdaInput}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+        <View style={styles.searchInputWrap}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Paste Launch PDA..."
+            placeholderTextColor={COLORS.textMuted}
+            value={pdaInput}
+            onChangeText={setPdaInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
         <TouchableOpacity style={styles.goButton} onPress={handlePdaSearch}>
           <Text style={styles.goButtonText}>Go</Text>
         </TouchableOpacity>
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+        <View style={styles.skeletonList}>
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
         </View>
       ) : (
         <FlatList
@@ -110,11 +136,18 @@ export default function DiscoverScreen({ navigation }: Props) {
             />
           }
           ListEmptyComponent={
-            <View style={styles.center}>
-              <Text style={styles.emptyText}>No launches found</Text>
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>{'\uD83D\uDE80'}</Text>
+              <Text style={styles.emptyTitle}>No launches found</Text>
               <Text style={styles.emptySubtext}>
                 Pull to refresh or paste a Launch PDA above
               </Text>
+              <TouchableOpacity
+                style={styles.emptyCta}
+                onPress={() => navigation.getParent()?.navigate('Create')}
+              >
+                <Text style={styles.emptyCtaText}>Create a Launch</Text>
+              </TouchableOpacity>
             </View>
           }
         />
@@ -123,64 +156,112 @@ export default function DiscoverScreen({ navigation }: Props) {
   );
 }
 
+const skeletonStyles = StyleSheet.create({
+  card: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    gap: SPACING.md,
+    ...SHADOWS.md,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+});
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  header: {
+  hero: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.md,
+  },
+  heroText: {},
+  heroTitle: {
+    ...TYPOGRAPHY.h1,
+  },
+  heroSubtitle: {
+    color: COLORS.textMuted,
+    fontSize: FONT_SIZE.sm,
+    marginTop: SPACING.xs,
   },
   searchRow: {
     flexDirection: 'row',
     paddingHorizontal: SPACING.md,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
     gap: SPACING.sm,
   },
-  searchInput: {
+  searchInputWrap: {
     flex: 1,
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.md,
+    ...SHADOWS.sm,
+  },
+  searchInput: {
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    paddingVertical: SPACING.sm + 4,
     color: COLORS.text,
     fontSize: FONT_SIZE.sm,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   goButton: {
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.full,
     paddingHorizontal: SPACING.lg,
     justifyContent: 'center',
+    ...SHADOWS.sm,
   },
   goButtonText: {
-    color: COLORS.text,
+    color: '#FFFFFF',
     fontWeight: '700',
     fontSize: FONT_SIZE.sm,
+  },
+  skeletonList: {
+    paddingHorizontal: SPACING.md,
   },
   list: {
     paddingHorizontal: SPACING.md,
     paddingBottom: SPACING.xxl,
   },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
+  emptyState: {
     alignItems: 'center',
-    paddingTop: SPACING.xxl,
+    paddingTop: SPACING.xxl + 16,
   },
-  emptyText: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '600',
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: SPACING.md,
+  },
+  emptyTitle: {
+    ...TYPOGRAPHY.h3,
     marginBottom: SPACING.sm,
   },
   emptySubtext: {
     color: COLORS.textMuted,
     fontSize: FONT_SIZE.sm,
     textAlign: 'center',
+    marginBottom: SPACING.lg,
+  },
+  emptyCta: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING.sm + 4,
+    paddingHorizontal: SPACING.xl,
+  },
+  emptyCtaText: {
+    color: '#FFFFFF',
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
   },
 });

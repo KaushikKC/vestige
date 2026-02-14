@@ -15,7 +15,7 @@ export default function App() {
     <PrivyProvider appId={PRIVY_APP_ID} clientId={PRIVY_CLIENT_ID}>
       <WalletProvider>
         <NavigationContainer>
-          <StatusBar style="light" />
+          <StatusBar style="dark" />
           <RootNavigator />
           <Toast />
         </NavigationContainer>

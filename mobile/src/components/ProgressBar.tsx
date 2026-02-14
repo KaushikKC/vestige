@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../constants/theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS } from '../constants/theme';
 
 interface ProgressBarProps {
   progress: number;
@@ -24,9 +24,15 @@ export default function ProgressBar({
           style={[styles.fill, { width: `${Math.min(100, progress)}%` }]}
         />
       </View>
-      <View style={styles.labelRow}>
-        <Text style={styles.amount}>{collected} SOL</Text>
-        <Text style={styles.amount}>{target} SOL</Text>
+      <View style={styles.amountRow}>
+        <View>
+          <Text style={styles.amountLabel}>Raised</Text>
+          <Text style={styles.amount}>{collected} SOL</Text>
+        </View>
+        <View style={styles.amountRight}>
+          <Text style={styles.amountLabel}>Target</Text>
+          <Text style={styles.amount}>{target} SOL</Text>
+        </View>
       </View>
     </View>
   );
@@ -34,11 +40,10 @@ export default function ProgressBar({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.md,
     padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    ...SHADOWS.sm,
   },
   labelRow: {
     flexDirection: 'row',
@@ -49,26 +54,43 @@ const styles = StyleSheet.create({
   label: {
     color: COLORS.textSecondary,
     fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
   },
   percent: {
     color: COLORS.accent,
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
+    fontSize: FONT_SIZE.md,
+    fontWeight: '800',
   },
   track: {
-    height: 8,
+    height: 10,
     backgroundColor: COLORS.surfaceLight,
-    borderRadius: 4,
+    borderRadius: 5,
     overflow: 'hidden',
     marginBottom: SPACING.sm,
   },
   fill: {
     height: '100%',
     backgroundColor: COLORS.accent,
-    borderRadius: 4,
+    borderRadius: 5,
+  },
+  amountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  amountRight: {
+    alignItems: 'flex-end',
+  },
+  amountLabel: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
   amount: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.xs,
+    color: COLORS.text,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
   },
 });

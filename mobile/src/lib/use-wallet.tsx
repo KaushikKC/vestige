@@ -12,6 +12,7 @@ import {
   useEmbeddedSolanaWallet,
   isConnected,
 } from '@privy-io/expo';
+import Toast from 'react-native-toast-message';
 import { RPC_ENDPOINT } from '../constants/solana';
 
 interface WalletContextType {
@@ -55,12 +56,29 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const connect = useCallback(async () => {
     if (!user) {
-      await login({ provider: 'google' });
+      try {
+        await login({ provider: 'google' });
+      } catch (err: any) {
+        console.error('Privy login error:', err);
+        // Don't show toast for user-cancelled flows
+        if (err?.message?.includes('cancelled') || err?.message?.includes('canceled')) {
+          return;
+        }
+        Toast.show({
+          type: 'error',
+          text1: 'Login failed',
+          text2: err?.message || 'Could not connect wallet',
+        });
+      }
     }
   }, [user, login]);
 
   const disconnect = useCallback(async () => {
-    await logout();
+    try {
+      await logout();
+    } catch (err: any) {
+      console.error('Logout error:', err);
+    }
   }, [logout]);
 
   const signAndSendTransaction = useCallback(

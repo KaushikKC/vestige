@@ -7,7 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../constants/theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS } from '../constants/theme';
 import {
   LaunchData,
   VestigeClient,
@@ -21,6 +21,8 @@ interface BuyPanelProps {
   disabled?: boolean;
   isCreator?: boolean;
 }
+
+const QUICK_AMOUNTS = [0.1, 0.5, 1.0, 5.0];
 
 export default function BuyPanel({
   launch,
@@ -89,6 +91,20 @@ export default function BuyPanel({
         <Text style={styles.inputSuffix}>SOL</Text>
       </View>
 
+      {/* Quick amount pills */}
+      <View style={styles.quickRow}>
+        {QUICK_AMOUNTS.map((amt) => (
+          <TouchableOpacity
+            key={amt}
+            style={styles.quickPill}
+            onPress={() => setSolInput(amt.toString())}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.quickPillText}>{amt}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       {showInitialBuyHint && (
         <Text style={styles.initialBuyHint}>
           Initial buy required (min 0.01 SOL) to activate launch
@@ -97,7 +113,6 @@ export default function BuyPanel({
 
       {estimate && (
         <View style={styles.estimateBox}>
-          {/* Fee Breakdown */}
           <View style={styles.estimateRow}>
             <Text style={styles.estimateLabel}>Protocol fee (0.5%)</Text>
             <Text style={styles.feeValue}>
@@ -110,15 +125,16 @@ export default function BuyPanel({
               {(estimate.creatorFee / 1e9).toFixed(6)} SOL
             </Text>
           </View>
-          <View style={[styles.estimateRow, styles.borderTop]}>
+          <View style={styles.hairline} />
+          <View style={styles.estimateRow}>
             <Text style={styles.netLabel}>Net to liquidity</Text>
             <Text style={styles.netValue}>
               {(estimate.netAmount / 1e9).toFixed(6)} SOL
             </Text>
           </View>
 
-          {/* Token Breakdown */}
-          <View style={[styles.estimateRow, styles.borderTop]}>
+          <View style={styles.hairline} />
+          <View style={styles.estimateRow}>
             <Text style={styles.estimateLabel}>Base tokens (now)</Text>
             <Text style={styles.estimateValue}>
               {formatTokens(estimate.baseTokens)}
@@ -132,7 +148,8 @@ export default function BuyPanel({
               +{formatTokens(estimate.bonus)}
             </Text>
           </View>
-          <View style={[styles.estimateRow, styles.totalRow]}>
+          <View style={styles.hairline} />
+          <View style={styles.estimateRow}>
             <Text style={styles.totalLabel}>Total after graduation</Text>
             <Text style={styles.totalValue}>
               {formatTokens(estimate.baseTokens + estimate.bonus)}
@@ -154,9 +171,10 @@ export default function BuyPanel({
         ]}
         onPress={handleBuy}
         disabled={disabled || loading || !solInput || parseFloat(solInput) <= 0}
+        activeOpacity={0.8}
       >
         {loading ? (
-          <ActivityIndicator color={COLORS.background} />
+          <ActivityIndicator color="#1A1A2E" />
         ) : (
           <Text style={styles.buyButtonText}>
             {showInitialBuyHint ? 'Make Initial Buy' : 'Buy Tokens'}
@@ -174,16 +192,15 @@ export default function BuyPanel({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    padding: SPACING.md + 4,
+    ...SHADOWS.lg,
   },
   title: {
     color: COLORS.text,
     fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
+    fontWeight: '800',
     marginBottom: SPACING.md,
   },
   inputRow: {
@@ -197,13 +214,30 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     color: COLORS.text,
-    fontSize: FONT_SIZE.xl,
-    fontWeight: '600',
+    fontSize: FONT_SIZE.xxl,
+    fontWeight: '700',
     paddingVertical: SPACING.md,
   },
   inputSuffix: {
     color: COLORS.textMuted,
     fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+  },
+  quickRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  quickPill: {
+    flex: 1,
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: RADIUS.full,
+    paddingVertical: SPACING.sm,
+    alignItems: 'center',
+  },
+  quickPillText: {
+    color: COLORS.textSecondary,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '600',
   },
   initialBuyHint: {
@@ -223,6 +257,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: SPACING.xs,
+  },
+  hairline: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: COLORS.border,
+    marginVertical: SPACING.xs,
   },
   estimateLabel: {
     color: COLORS.textSecondary,
@@ -253,18 +292,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     fontWeight: '600',
   },
-  borderTop: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    marginTop: SPACING.xs,
-    paddingTop: SPACING.sm,
-  },
-  totalRow: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    marginTop: SPACING.xs,
-    paddingTop: SPACING.sm,
-  },
   totalLabel: {
     color: COLORS.accent,
     fontSize: FONT_SIZE.xs,
@@ -277,17 +304,17 @@ const styles = StyleSheet.create({
   },
   buyButton: {
     backgroundColor: COLORS.accent,
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING.md + 2,
     alignItems: 'center',
   },
   buyButtonDisabled: {
     opacity: 0.5,
   },
   buyButtonText: {
-    color: COLORS.background,
-    fontSize: FONT_SIZE.md,
-    fontWeight: '700',
+    color: '#1A1A2E',
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '800',
   },
   disclaimer: {
     color: COLORS.textMuted,

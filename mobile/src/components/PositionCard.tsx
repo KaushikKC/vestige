@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../constants/theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS } from '../constants/theme';
 import { UserPositionData, VestigeClient } from '../lib/vestige-client';
 
 interface PositionCardProps {
@@ -38,12 +38,16 @@ export default function PositionCard({
         </Text>
       </View>
 
+      <View style={styles.divider} />
+
       <View style={styles.row}>
         <Text style={styles.label}>Base Tokens</Text>
         <Text style={styles.value}>
           {formatTokens(position.totalBaseTokens.toNumber())}
         </Text>
       </View>
+
+      <View style={styles.divider} />
 
       <View style={styles.row}>
         <Text style={styles.label}>Bonus Entitled</Text>
@@ -52,16 +56,19 @@ export default function PositionCard({
         </Text>
       </View>
 
+      <View style={styles.divider} />
+
       <View style={styles.row}>
         <Text style={styles.label}>Bonus Claimed</Text>
-        <Text
-          style={[
-            styles.value,
-            position.hasClaimedBonus ? styles.claimed : styles.unclaimed,
-          ]}
-        >
-          {position.hasClaimedBonus ? 'Yes' : 'No'}
-        </Text>
+        {position.hasClaimedBonus ? (
+          <View style={styles.claimedPill}>
+            <Text style={styles.claimedPillText}>Claimed</Text>
+          </View>
+        ) : (
+          <View style={styles.pendingPill}>
+            <Text style={styles.pendingPillText}>Pending</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -69,11 +76,10 @@ export default function PositionCard({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    padding: SPACING.md + 4,
+    ...SHADOWS.sm,
   },
   title: {
     color: COLORS.text,
@@ -91,7 +97,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: SPACING.xs,
+    paddingVertical: SPACING.sm,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: COLORS.surfaceLight,
   },
   label: {
     color: COLORS.textSecondary,
@@ -102,10 +112,26 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     fontWeight: '600',
   },
-  claimed: {
-    color: COLORS.success,
+  claimedPill: {
+    backgroundColor: COLORS.success + '20',
+    paddingHorizontal: SPACING.sm + 4,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.full,
   },
-  unclaimed: {
+  claimedPillText: {
+    color: COLORS.success,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+  },
+  pendingPill: {
+    backgroundColor: COLORS.warning + '20',
+    paddingHorizontal: SPACING.sm + 4,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.full,
+  },
+  pendingPillText: {
     color: COLORS.warning,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
   },
 });

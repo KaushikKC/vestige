@@ -8,13 +8,12 @@ import {
   StyleSheet,
   ActivityIndicator,
   Switch,
-  Alert,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 import Toast from 'react-native-toast-message';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../constants/theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import { useVestige } from '../lib/use-vestige';
 import { useWallet } from '../lib/use-wallet';
 import { VestigeClient } from '../lib/vestige-client';
@@ -75,12 +74,9 @@ export default function CreateLaunchScreen({ navigation }: any) {
 
       const now = Math.floor(Date.now() / 1000);
       const durationSec = parseInt(durationMinutes) * 60;
-      const startTime = new BN(now + 5); // starts in 5 seconds
+      const startTime = new BN(now + 5);
       const endTime = new BN(now + 5 + durationSec);
 
-      // Generate a new token mint keypair
-      // In a real app, the mint would be created separately
-      // For now we use a random pubkey as placeholder
       const mintKeypair = Keypair.generate();
 
       await initializeLaunch(
@@ -124,12 +120,13 @@ export default function CreateLaunchScreen({ navigation }: any) {
   if (createdPda) {
     return (
       <View style={styles.successContainer}>
+        <Text style={styles.successCheckmark}>{'\u2705'}</Text>
         <Text style={styles.successTitle}>Launch Created!</Text>
         <Text style={styles.initialBuyNote}>
           Make your initial buy (min 0.01 SOL) to activate the launch.
         </Text>
         <Text style={styles.successLabel}>Launch PDA:</Text>
-        <TouchableOpacity onPress={copyPda}>
+        <TouchableOpacity onPress={copyPda} style={styles.pdaWrap}>
           <Text style={styles.pdaText}>{createdPda}</Text>
           <Text style={styles.tapToCopy}>Tap to copy</Text>
         </TouchableOpacity>
@@ -174,7 +171,7 @@ export default function CreateLaunchScreen({ navigation }: any) {
           value={testMode}
           onValueChange={applyTestMode}
           trackColor={{ true: COLORS.accent, false: COLORS.surfaceLight }}
-          thumbColor={COLORS.text}
+          thumbColor={COLORS.surface}
         />
       </View>
       {testMode && (
@@ -234,7 +231,7 @@ export default function CreateLaunchScreen({ navigation }: any) {
         disabled={!connected || loading}
       >
         {loading ? (
-          <ActivityIndicator color={COLORS.background} />
+          <ActivityIndicator color="#1A1A2E" />
         ) : (
           <Text style={styles.createButtonText}>Create Launch</Text>
         )}
@@ -245,6 +242,7 @@ export default function CreateLaunchScreen({ navigation }: any) {
       )}
 
       <View style={styles.feeInfo}>
+        <View style={styles.feeAccent} />
         <Text style={styles.feeInfoText}>
           Every buy has a 1% fee: 0.5% to protocol treasury + 0.5% to creator
           fee vault (vested). Creator must make initial buy (min 0.01 SOL) to
@@ -268,16 +266,22 @@ function FormField({
   keyboardType?: 'default' | 'numeric' | 'decimal-pad';
   hint?: string;
 }) {
+  const [focused, setFocused] = useState(false);
+
   return (
     <View style={fieldStyles.container}>
       <Text style={fieldStyles.label}>{label}</Text>
-      <TextInput
-        style={fieldStyles.input}
-        value={value}
-        onChangeText={onChangeText}
-        keyboardType={keyboardType}
-        placeholderTextColor={COLORS.textMuted}
-      />
+      <View style={[fieldStyles.inputWrap, focused && fieldStyles.inputWrapFocused]}>
+        <TextInput
+          style={fieldStyles.input}
+          value={value}
+          onChangeText={onChangeText}
+          keyboardType={keyboardType}
+          placeholderTextColor={COLORS.textMuted}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+        />
+      </View>
       {hint && <Text style={fieldStyles.hint}>{hint}</Text>}
     </View>
   );
@@ -288,19 +292,24 @@ const fieldStyles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   label: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.sm,
-    marginBottom: SPACING.xs,
+    ...TYPOGRAPHY.label,
+    marginBottom: SPACING.xs + 2,
   },
-  input: {
+  inputWrap: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.md,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    ...SHADOWS.sm,
+  },
+  inputWrapFocused: {
+    borderColor: COLORS.primary,
+  },
+  input: {
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    paddingVertical: SPACING.md - 2,
     color: COLORS.text,
     fontSize: FONT_SIZE.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   hint: {
     color: COLORS.textMuted,
@@ -327,12 +336,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.md,
     padding: SPACING.md,
     marginBottom: SPACING.sm,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    ...SHADOWS.sm,
   },
   toggleLabel: {
     color: COLORS.text,
@@ -340,25 +348,27 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   testHint: {
-    color: COLORS.accent,
+    color: COLORS.accentDark,
     fontSize: FONT_SIZE.xs,
     marginBottom: SPACING.md,
     textAlign: 'center',
+    fontWeight: '600',
   },
   createButton: {
     backgroundColor: COLORS.accent,
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING.md + 2,
     alignItems: 'center',
     marginTop: SPACING.md,
+    ...SHADOWS.md,
   },
   createButtonDisabled: {
     opacity: 0.5,
   },
   createButtonText: {
-    color: COLORS.background,
-    fontSize: FONT_SIZE.md,
-    fontWeight: '700',
+    color: '#1A1A2E',
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '800',
   },
   connectHint: {
     color: COLORS.textMuted,
@@ -374,59 +384,63 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: SPACING.lg,
   },
+  successCheckmark: {
+    fontSize: 64,
+    marginBottom: SPACING.md,
+  },
   successTitle: {
+    ...TYPOGRAPHY.h1,
     color: COLORS.success,
-    fontSize: FONT_SIZE.xxl,
-    fontWeight: '700',
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.sm,
   },
   initialBuyNote: {
-    color: COLORS.accent,
+    color: COLORS.accentDark,
     fontSize: FONT_SIZE.sm,
     textAlign: 'center',
     marginBottom: SPACING.lg,
     fontWeight: '600',
   },
   successLabel: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.sm,
+    ...TYPOGRAPHY.label,
     marginBottom: SPACING.sm,
+  },
+  pdaWrap: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    alignItems: 'center',
+    ...SHADOWS.sm,
   },
   pdaText: {
     color: COLORS.text,
     fontSize: FONT_SIZE.sm,
     fontFamily: 'monospace',
     textAlign: 'center',
-    backgroundColor: COLORS.surface,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    overflow: 'hidden',
   },
   tapToCopy: {
     color: COLORS.textMuted,
     fontSize: FONT_SIZE.xs,
-    textAlign: 'center',
     marginTop: SPACING.xs,
   },
   openButton: {
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.lg,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.xl,
     marginTop: SPACING.lg,
+    ...SHADOWS.md,
   },
   openButtonText: {
-    color: COLORS.text,
+    color: '#FFFFFF',
     fontSize: FONT_SIZE.md,
     fontWeight: '700',
   },
   newButton: {
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.lg,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.xl,
     marginTop: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    backgroundColor: COLORS.surfaceLight,
   },
   newButtonText: {
     color: COLORS.textSecondary,
@@ -434,14 +448,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   feeInfo: {
-    backgroundColor: COLORS.surfaceLight,
+    flexDirection: 'row',
+    backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.md,
-    padding: SPACING.md,
     marginTop: SPACING.lg,
+    overflow: 'hidden',
+    ...SHADOWS.sm,
+  },
+  feeAccent: {
+    width: 4,
+    backgroundColor: COLORS.primary,
   },
   feeInfoText: {
-    color: COLORS.textMuted,
+    flex: 1,
+    color: COLORS.textSecondary,
     fontSize: FONT_SIZE.xs,
-    textAlign: 'center',
+    padding: SPACING.md,
+    lineHeight: 18,
   },
 });

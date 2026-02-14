@@ -8,8 +8,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { PublicKey } from '@solana/web3.js';
+import * as Clipboard from 'expo-clipboard';
 import Toast from 'react-native-toast-message';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../constants/theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import {
   LaunchData,
   UserPositionData,
@@ -23,10 +24,39 @@ import StatBox from '../components/StatBox';
 import ProgressBar from '../components/ProgressBar';
 import BuyPanel from '../components/BuyPanel';
 import PositionCard from '../components/PositionCard';
+import SkeletonLoader from '../components/SkeletonLoader';
 
 type Props = {
   route: { params: { launchPda: string } };
 };
+
+function LoadingSkeleton() {
+  return (
+    <View style={styles.content}>
+      {/* Mint pill skeleton */}
+      <View style={{ alignItems: 'center', marginBottom: SPACING.lg }}>
+        <SkeletonLoader width={200} height={28} borderRadius={RADIUS.full} />
+      </View>
+      {/* Stats row skeleton */}
+      <View style={styles.statsRow}>
+        <SkeletonLoader width="48%" height={72} borderRadius={RADIUS.md} />
+        <SkeletonLoader width="48%" height={72} borderRadius={RADIUS.md} />
+      </View>
+      <View style={styles.statsRow}>
+        <SkeletonLoader width="48%" height={72} borderRadius={RADIUS.md} />
+        <SkeletonLoader width="48%" height={72} borderRadius={RADIUS.md} />
+      </View>
+      {/* Progress bar skeleton */}
+      <View style={styles.section}>
+        <SkeletonLoader width="100%" height={80} borderRadius={RADIUS.md} />
+      </View>
+      {/* Buy panel skeleton */}
+      <View style={styles.section}>
+        <SkeletonLoader width="100%" height={200} borderRadius={RADIUS.lg} />
+      </View>
+    </View>
+  );
+}
 
 export default function LaunchDetailScreen({ route }: Props) {
   const { launchPda: launchPdaStr } = route.params;
@@ -48,7 +78,6 @@ export default function LaunchDetailScreen({ route }: Props) {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Live-updating display values
   const [curvePrice, setCurvePrice] = useState(0);
   const [riskWeight, setRiskWeight] = useState(0);
   const [timeLeft, setTimeLeft] = useState('');
@@ -73,7 +102,6 @@ export default function LaunchDetailScreen({ route }: Props) {
     fetchData();
   }, [fetchData]);
 
-  // Live price/weight updates
   useEffect(() => {
     if (!launch) return;
     const update = () => {
@@ -89,7 +117,6 @@ export default function LaunchDetailScreen({ route }: Props) {
   const handleBuy = async (solAmount: number) => {
     if (!launch) return;
 
-    // Client-side validation for initial buy
     if (!launch.hasInitialBuy) {
       if (!isCreator) {
         Toast.show({
@@ -190,17 +217,28 @@ export default function LaunchDetailScreen({ route }: Props) {
     }
   };
 
+  const copyMintAddress = async () => {
+    if (launch) {
+      await Clipboard.setStringAsync(launch.tokenMint.toBase58());
+      Toast.show({ type: 'success', text1: 'Mint address copied' });
+    }
+  };
+
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: SPACING.xxl }}
+      >
+        <LoadingSkeleton />
+      </ScrollView>
     );
   }
 
   if (!launch) {
     return (
       <View style={styles.center}>
+        <Text style={styles.errorIcon}>{'\u274C'}</Text>
         <Text style={styles.errorText}>Launch not found</Text>
         <Text style={styles.errorSubtext}>{launchPdaStr}</Text>
       </View>
@@ -217,13 +255,11 @@ export default function LaunchDetailScreen({ route }: Props) {
     !position.hasClaimedBonus &&
     position.totalBonusEntitled.toNumber() > 0;
 
-  // Fee vesting info
   const claimableCreatorFees = VestigeClient.getClaimableCreatorFees(launch);
   const milestoneLevel = launch.milestonesUnlocked;
   const totalCreatorFees = launch.totalCreatorFees.toNumber();
   const creatorFeesClaimed = launch.creatorFeesClaimed.toNumber();
 
-  // Waiting for creator's initial buy
   const waitingForCreatorBuy =
     !launch.hasInitialBuy && connected && !isCreator;
 
@@ -232,12 +268,15 @@ export default function LaunchDetailScreen({ route }: Props) {
       style={styles.container}
       contentContainerStyle={styles.content}
     >
-      {/* Token Mint */}
-      <Text style={styles.mintAddress}>
-        {launch.tokenMint.toBase58()}
-      </Text>
+      {/* Token Mint Pill */}
+      <TouchableOpacity style={styles.mintPill} onPress={copyMintAddress} activeOpacity={0.7}>
+        <Text style={styles.mintAddress}>
+          {launch.tokenMint.toBase58().slice(0, 8)}...{launch.tokenMint.toBase58().slice(-8)}
+        </Text>
+        <Text style={styles.mintCopyHint}>Tap to copy</Text>
+      </TouchableOpacity>
 
-      {/* Stats Row */}
+      {/* Stats Rows */}
       <View style={styles.statsRow}>
         <StatBox label="Price" value={`${priceSol.toFixed(6)}`} />
         <StatBox label="Risk" value={`${riskWeight.toFixed(2)}x`} />
@@ -249,6 +288,7 @@ export default function LaunchDetailScreen({ route }: Props) {
 
       {/* Progress */}
       <View style={styles.section}>
+        <Text style={styles.sectionHeader}>Progress</Text>
         <ProgressBar
           progress={progress}
           collected={VestigeClient.lamportsToSol(
@@ -260,6 +300,27 @@ export default function LaunchDetailScreen({ route }: Props) {
         />
       </View>
 
+      {/* Milestone Dots */}
+      {launch.isGraduated && isCreator && (
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>Milestones</Text>
+          <View style={styles.milestoneDots}>
+            {[0, 1, 2, 3].map((i) => (
+              <View
+                key={i}
+                style={[
+                  styles.milestoneDot,
+                  i < milestoneLevel && styles.milestoneDotFilled,
+                ]}
+              />
+            ))}
+          </View>
+          <Text style={styles.milestoneLabel}>
+            {VestigeClient.getMilestoneDescription(milestoneLevel)}
+          </Text>
+        </View>
+      )}
+
       {/* Graduate button */}
       {!launch.isGraduated && connected && (
         <View style={styles.section}>
@@ -269,7 +330,7 @@ export default function LaunchDetailScreen({ route }: Props) {
             disabled={actionLoading}
           >
             {actionLoading ? (
-              <ActivityIndicator color={COLORS.text} />
+              <ActivityIndicator color="#FFFFFF" />
             ) : (
               <Text style={styles.graduateButtonText}>Graduate Launch</Text>
             )}
@@ -335,13 +396,6 @@ export default function LaunchDetailScreen({ route }: Props) {
               </Text>
             </View>
             <View style={styles.vestedItem}>
-              <Text style={styles.vestedLabel}>Milestone</Text>
-              <Text style={styles.vestedValue}>{milestoneLevel}/4</Text>
-              <Text style={styles.milestoneDesc}>
-                {VestigeClient.getMilestoneDescription(milestoneLevel)}
-              </Text>
-            </View>
-            <View style={styles.vestedItem}>
               <Text style={styles.vestedLabel}>Claimable Now</Text>
               <Text style={styles.claimableValue}>
                 {VestigeClient.lamportsToSol(claimableCreatorFees).toFixed(6)}{' '}
@@ -384,6 +438,7 @@ export default function LaunchDetailScreen({ route }: Props) {
       {/* User Position */}
       {position && (
         <View style={styles.section}>
+          <Text style={styles.sectionHeader}>Your Position</Text>
           <PositionCard position={position} />
         </View>
       )}
@@ -397,7 +452,7 @@ export default function LaunchDetailScreen({ route }: Props) {
             disabled={actionLoading}
           >
             {actionLoading ? (
-              <ActivityIndicator color={COLORS.background} />
+              <ActivityIndicator color="#1A1A2E" />
             ) : (
               <Text style={styles.claimBonusButtonText}>
                 Claim Bonus Tokens
@@ -409,31 +464,35 @@ export default function LaunchDetailScreen({ route }: Props) {
 
       {/* Launch Info */}
       {launch && (
-        <View style={styles.infoBox}>
-          <Text style={styles.infoText}>
-            Price Range:{' '}
-            {(launch.pMax.toNumber() / 1e9).toFixed(4)} SOL {'->'}{' '}
-            {(launch.pMin.toNumber() / 1e9).toFixed(4)} SOL
-          </Text>
-          <Text style={styles.infoText}>
-            Weight Range: {launch.rBest}x {'->'} {launch.rMin}x
-          </Text>
-          <Text style={styles.infoText}>
-            Token Supply:{' '}
-            {(launch.tokenSupply.toNumber() / TOKEN_PRECISION).toLocaleString()}
-          </Text>
-          <Text style={styles.infoText}>
-            Fee: 0.5% protocol + 0.5% creator = 1% total
-          </Text>
-          <Text style={styles.infoText}>
-            Initial Buy: {launch.hasInitialBuy ? 'Completed' : 'Pending'}
-          </Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>Launch Details</Text>
+          <View style={styles.infoBox}>
+            <Text style={styles.infoText}>
+              Price Range:{' '}
+              {(launch.pMax.toNumber() / 1e9).toFixed(4)} SOL {'->'}{' '}
+              {(launch.pMin.toNumber() / 1e9).toFixed(4)} SOL
+            </Text>
+            <Text style={styles.infoText}>
+              Weight Range: {launch.rBest}x {'->'} {launch.rMin}x
+            </Text>
+            <Text style={styles.infoText}>
+              Token Supply:{' '}
+              {(launch.tokenSupply.toNumber() / TOKEN_PRECISION).toLocaleString()}
+            </Text>
+            <Text style={styles.infoText}>
+              Fee: 0.5% protocol + 0.5% creator = 1% total
+            </Text>
+            <Text style={styles.infoText}>
+              Initial Buy: {launch.hasInitialBuy ? 'Completed' : 'Pending'}
+            </Text>
+          </View>
         </View>
       )}
 
       {/* Graduated Badge */}
       {launch.isGraduated && (
         <View style={styles.graduatedBox}>
+          <Text style={styles.graduatedCheckmark}>{'\u2705'}</Text>
           <Text style={styles.graduatedLabel}>
             This launch has graduated
           </Text>
@@ -458,20 +517,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.background,
   },
+  // Mint pill
+  mintPill: {
+    alignSelf: 'center',
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.lg,
+    alignItems: 'center',
+  },
   mintAddress: {
-    color: COLORS.textMuted,
+    color: COLORS.textSecondary,
     fontSize: FONT_SIZE.xs,
     fontFamily: 'monospace',
-    textAlign: 'center',
-    marginBottom: SPACING.md,
   },
+  mintCopyHint: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    marginTop: 2,
+  },
+  // Stats
   statsRow: {
     flexDirection: 'row',
     gap: SPACING.sm,
     marginBottom: SPACING.sm,
   },
   section: {
-    marginTop: SPACING.md,
+    marginTop: SPACING.lg,
+  },
+  sectionHeader: {
+    ...TYPOGRAPHY.label,
+    marginBottom: SPACING.sm,
   },
   connectHint: {
     color: COLORS.textMuted,
@@ -479,45 +556,62 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: SPACING.sm,
   },
+  // Milestones
+  milestoneDots: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  milestoneDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: COLORS.surfaceLight,
+  },
+  milestoneDotFilled: {
+    backgroundColor: COLORS.accent,
+  },
+  milestoneLabel: {
+    color: COLORS.textMuted,
+    fontSize: FONT_SIZE.xs,
+  },
   // Graduate button
   graduateButton: {
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.lg,
     paddingVertical: SPACING.md,
     alignItems: 'center',
+    ...SHADOWS.md,
   },
   graduateButtonText: {
-    color: COLORS.text,
+    color: '#FFFFFF',
     fontSize: FONT_SIZE.md,
     fontWeight: '700',
   },
   // SOL Locked
   lockedBox: {
-    backgroundColor: '#1D04E1' + '15',
+    backgroundColor: COLORS.primaryLight,
     borderRadius: RADIUS.md,
     padding: SPACING.md,
-    marginTop: SPACING.md,
-    borderWidth: 1,
-    borderColor: '#1D04E1' + '40',
+    marginTop: SPACING.lg,
   },
   lockedTitle: {
-    color: '#6B8AFF',
+    color: COLORS.primary,
     fontSize: FONT_SIZE.sm,
     fontWeight: '700',
     marginBottom: SPACING.xs,
   },
   lockedSubtext: {
-    color: '#6B8AFF',
+    color: COLORS.primary,
     fontSize: FONT_SIZE.xs,
   },
   // Waiting for creator
   waitingBox: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.warning + '40',
+    ...SHADOWS.sm,
   },
   waitingTitle: {
     color: COLORS.warning,
@@ -532,12 +626,11 @@ const styles = StyleSheet.create({
   },
   // Vested Fees
   vestedSection: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    marginTop: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    padding: SPACING.md + 4,
+    marginTop: SPACING.lg,
+    ...SHADOWS.sm,
   },
   vestedTitle: {
     color: COLORS.text,
@@ -557,6 +650,9 @@ const styles = StyleSheet.create({
   vestedLabel: {
     color: COLORS.textMuted,
     fontSize: FONT_SIZE.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
     marginBottom: 2,
   },
   vestedValue: {
@@ -564,11 +660,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     fontWeight: '700',
     fontFamily: 'monospace',
-  },
-  milestoneDesc: {
-    color: COLORS.textMuted,
-    fontSize: 10,
-    marginTop: 2,
   },
   claimableValue: {
     color: COLORS.success,
@@ -586,8 +677,6 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     paddingVertical: SPACING.md,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   claimFeesButtonText: {
     color: COLORS.text,
@@ -600,9 +689,10 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
     alignItems: 'center',
+    ...SHADOWS.sm,
   },
   advanceButtonText: {
-    color: COLORS.text,
+    color: '#FFFFFF',
     fontSize: FONT_SIZE.sm,
     fontWeight: '700',
   },
@@ -612,46 +702,54 @@ const styles = StyleSheet.create({
   // Claim Bonus
   claimBonusButton: {
     backgroundColor: COLORS.accent,
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING.md + 2,
     alignItems: 'center',
+    ...SHADOWS.md,
   },
   claimBonusButtonText: {
-    color: COLORS.background,
+    color: '#1A1A2E',
     fontSize: FONT_SIZE.md,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   // Launch Info
   infoBox: {
-    backgroundColor: COLORS.surfaceLight,
+    backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.md,
     padding: SPACING.md,
-    marginTop: SPACING.md,
-    gap: SPACING.xs,
+    gap: SPACING.xs + 2,
+    ...SHADOWS.sm,
   },
   infoText: {
-    color: COLORS.textMuted,
+    color: COLORS.textSecondary,
     fontSize: FONT_SIZE.xs,
   },
   // Graduated Badge
   graduatedBox: {
     backgroundColor: COLORS.success + '15',
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.lg,
     padding: SPACING.md,
     marginTop: SPACING.lg,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.success + '40',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+  },
+  graduatedCheckmark: {
+    fontSize: 20,
   },
   graduatedLabel: {
     color: COLORS.success,
     fontSize: FONT_SIZE.md,
-    fontWeight: '600',
+    fontWeight: '700',
+  },
+  errorIcon: {
+    fontSize: 48,
+    marginBottom: SPACING.md,
   },
   errorText: {
+    ...TYPOGRAPHY.h3,
     color: COLORS.error,
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '600',
     marginBottom: SPACING.sm,
   },
   errorSubtext: {

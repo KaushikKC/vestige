@@ -1,7 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, View } from 'react-native';
 import { useWallet } from '../lib/use-wallet';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../constants/theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS } from '../constants/theme';
 
 export default function WalletButton() {
   const { connected, publicKey, connect, disconnect } = useWallet();
@@ -14,9 +14,10 @@ export default function WalletButton() {
     <TouchableOpacity
       style={[styles.button, connected && styles.connectedButton]}
       onPress={connected ? disconnect : connect}
+      activeOpacity={0.7}
     >
       <View style={[styles.dot, connected ? styles.dotGreen : styles.dotGray]} />
-      <Text style={styles.text}>
+      <Text style={[styles.text, connected && styles.connectedText]}>
         {connected ? shortAddress : 'Connect Wallet'}
       </Text>
     </TouchableOpacity>
@@ -28,15 +29,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md + 4,
+    paddingVertical: SPACING.sm + 4,
     borderRadius: RADIUS.xl,
     gap: SPACING.sm,
+    ...SHADOWS.md,
   },
   connectedButton: {
     backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   dot: {
     width: 8,
@@ -50,8 +50,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.textMuted,
   },
   text: {
-    color: COLORS.text,
+    color: '#FFFFFF',
     fontSize: FONT_SIZE.sm,
     fontWeight: '600',
+  },
+  connectedText: {
+    color: COLORS.text,
   },
 });

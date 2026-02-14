@@ -6,19 +6,18 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
-  ActivityIndicator,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../constants/theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import {
   LaunchData,
   UserPositionData,
-  VestigeClient,
 } from '../lib/vestige-client';
 import { useVestige } from '../lib/use-vestige';
 import { useWallet } from '../lib/use-wallet';
 import PositionCard from '../components/PositionCard';
 import WalletButton from '../components/WalletButton';
+import SkeletonLoader from '../components/SkeletonLoader';
 import { PortfolioStackParamList } from '../navigation/RootNavigator';
 
 type Props = {
@@ -31,6 +30,28 @@ type Props = {
 interface PositionWithLaunch {
   position: UserPositionData;
   launch: LaunchData;
+}
+
+function SkeletonPositionCard() {
+  return (
+    <View style={skeletonStyles.card}>
+      <SkeletonLoader width={120} height={18} />
+      <View style={skeletonStyles.row}>
+        <SkeletonLoader width={80} height={14} />
+        <SkeletonLoader width={100} height={14} />
+      </View>
+      <SkeletonLoader width="100%" height={1} />
+      <View style={skeletonStyles.row}>
+        <SkeletonLoader width={80} height={14} />
+        <SkeletonLoader width={80} height={14} />
+      </View>
+      <SkeletonLoader width="100%" height={1} />
+      <View style={skeletonStyles.row}>
+        <SkeletonLoader width={90} height={14} />
+        <SkeletonLoader width={60} height={24} borderRadius={RADIUS.full} />
+      </View>
+    </View>
+  );
 }
 
 export default function PortfolioScreen({ navigation }: Props) {
@@ -82,7 +103,8 @@ export default function PortfolioScreen({ navigation }: Props) {
 
   if (!connected) {
     return (
-      <View style={styles.center}>
+      <View style={styles.emptyCenter}>
+        <Text style={styles.emptyIcon}>{'\uD83D\uDD12'}</Text>
         <Text style={styles.emptyTitle}>Connect Your Wallet</Text>
         <Text style={styles.emptySubtext}>
           Connect your wallet to view your positions
@@ -97,13 +119,20 @@ export default function PortfolioScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Your Positions</Text>
+        <View>
+          <Text style={styles.headerTitle}>Portfolio</Text>
+          <Text style={styles.headerSubtitle}>
+            {positions.length} position{positions.length !== 1 ? 's' : ''}
+          </Text>
+        </View>
         <WalletButton />
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+        <View style={styles.skeletonList}>
+          <SkeletonPositionCard />
+          <View style={{ height: SPACING.md }} />
+          <SkeletonPositionCard />
         </View>
       ) : (
         <FlatList
@@ -131,11 +160,18 @@ export default function PortfolioScreen({ navigation }: Props) {
             />
           }
           ListEmptyComponent={
-            <View style={styles.emptyCenter}>
+            <View style={styles.emptyListCenter}>
+              <Text style={styles.emptyIcon}>{'\uD83D\uDCE6'}</Text>
               <Text style={styles.emptyTitle}>No Positions</Text>
               <Text style={styles.emptySubtext}>
                 Buy tokens in a launch to see your positions here
               </Text>
+              <TouchableOpacity
+                style={styles.emptyCta}
+                onPress={() => navigation.getParent()?.navigate('Discover')}
+              >
+                <Text style={styles.emptyCtaText}>Discover Launches</Text>
+              </TouchableOpacity>
             </View>
           }
         />
@@ -143,6 +179,20 @@ export default function PortfolioScreen({ navigation }: Props) {
     </View>
   );
 }
+
+const skeletonStyles = StyleSheet.create({
+  card: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md + 4,
+    gap: SPACING.sm,
+    ...SHADOWS.sm,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -152,14 +202,21 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.md,
   },
   headerTitle: {
-    color: COLORS.text,
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
+    ...TYPOGRAPHY.h1,
+  },
+  headerSubtitle: {
+    color: COLORS.textMuted,
+    fontSize: FONT_SIZE.sm,
+    marginTop: SPACING.xs,
+  },
+  skeletonList: {
+    paddingHorizontal: SPACING.md,
   },
   list: {
     paddingHorizontal: SPACING.md,
@@ -168,20 +225,23 @@ const styles = StyleSheet.create({
   separator: {
     height: SPACING.md,
   },
-  center: {
+  emptyCenter: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: COLORS.background,
+    padding: SPACING.lg,
   },
-  emptyCenter: {
-    paddingTop: SPACING.xxl,
+  emptyListCenter: {
     alignItems: 'center',
+    paddingTop: SPACING.xxl + 16,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: SPACING.md,
   },
   emptyTitle: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '600',
+    ...TYPOGRAPHY.h3,
     marginBottom: SPACING.sm,
   },
   emptySubtext: {
@@ -189,6 +249,18 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     textAlign: 'center',
     maxWidth: 250,
+    marginBottom: SPACING.lg,
+  },
+  emptyCta: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING.sm + 4,
+    paddingHorizontal: SPACING.xl,
+  },
+  emptyCtaText: {
+    color: '#FFFFFF',
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
   },
   walletButtonWrap: {
     marginTop: SPACING.lg,

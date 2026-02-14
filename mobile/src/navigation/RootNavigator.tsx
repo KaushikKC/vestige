@@ -2,7 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Text } from 'react-native';
-import { COLORS, FONT_SIZE } from '../constants/theme';
+import { COLORS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 
 import DiscoverScreen from '../screens/DiscoverScreen';
 import LaunchDetailScreen from '../screens/LaunchDetailScreen';
@@ -28,8 +28,9 @@ function DiscoverNavigator() {
     <DiscoverStack.Navigator
       screenOptions={{
         headerStyle: { backgroundColor: COLORS.background },
+        headerShadowVisible: false,
         headerTintColor: COLORS.text,
-        headerTitleStyle: { fontWeight: '700' },
+        headerTitleStyle: { ...TYPOGRAPHY.h3 },
         contentStyle: { backgroundColor: COLORS.background },
       }}
     >
@@ -52,8 +53,9 @@ function PortfolioNavigator() {
     <PortfolioStack.Navigator
       screenOptions={{
         headerStyle: { backgroundColor: COLORS.background },
+        headerShadowVisible: false,
         headerTintColor: COLORS.text,
-        headerTitleStyle: { fontWeight: '700' },
+        headerTitleStyle: { ...TYPOGRAPHY.h3 },
         contentStyle: { backgroundColor: COLORS.background },
       }}
     >
@@ -73,16 +75,15 @@ function PortfolioNavigator() {
 
 function TabIcon({ label, focused }: { label: string; focused: boolean }) {
   const icons: Record<string, string> = {
-    Discover: '{}',
-    Create: '+',
-    Portfolio: '$',
+    Discover: '\uD83D\uDD0D',
+    Create: '\u2795',
+    Portfolio: '\uD83D\uDCC8',
   };
   return (
     <Text
       style={{
-        fontSize: FONT_SIZE.lg,
+        fontSize: 22,
         color: focused ? COLORS.tabBarActive : COLORS.tabBarInactive,
-        fontWeight: '700',
       }}
     >
       {icons[label] || '?'}
@@ -97,11 +98,18 @@ export default function RootNavigator() {
         headerShown: false,
         tabBarStyle: {
           backgroundColor: COLORS.tabBarBg,
-          borderTopColor: COLORS.tabBarBorder,
-          borderTopWidth: 1,
+          borderTopWidth: 0,
+          height: 88,
+          paddingBottom: 24,
+          paddingTop: 8,
+          ...SHADOWS.tabBar,
         },
         tabBarActiveTintColor: COLORS.tabBarActive,
         tabBarInactiveTintColor: COLORS.tabBarInactive,
+        tabBarLabelStyle: {
+          fontSize: FONT_SIZE.xs,
+          fontWeight: '600',
+        },
         tabBarIcon: ({ focused }) => (
           <TabIcon label={route.name} focused={focused} />
         ),
@@ -114,8 +122,9 @@ export default function RootNavigator() {
         options={{
           headerShown: true,
           headerStyle: { backgroundColor: COLORS.background },
+          headerShadowVisible: false,
           headerTintColor: COLORS.text,
-          headerTitleStyle: { fontWeight: '700' },
+          headerTitleStyle: { ...TYPOGRAPHY.h3 },
           title: 'Create Launch',
         }}
       />
