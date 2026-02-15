@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import {
   getAssociatedTokenAddressSync,
 } from '@solana/spl-token';
@@ -18,7 +18,7 @@ import {
   buildAdvanceMilestoneTx,
   buildInitializeLaunchTx,
 } from './vestige-transactions';
-import { RPC_ENDPOINT } from '../constants/solana';
+import { RPC_ENDPOINT, fetchWithRetry } from '../constants/solana';
 
 export function useVestige() {
   const { publicKey, signAndSendTransaction } = useWallet();
@@ -27,7 +27,10 @@ export function useVestige() {
 
   const getConnection = useCallback(() => {
     if (!connectionRef.current) {
-      connectionRef.current = new Connection(RPC_ENDPOINT, 'confirmed');
+      connectionRef.current = new Connection(RPC_ENDPOINT, {
+        commitment: 'confirmed',
+        fetch: fetchWithRetry,
+      });
     }
     return connectionRef.current;
   }, []);
@@ -199,7 +202,7 @@ export function useVestige() {
 
   const initializeLaunch = useCallback(
     async (
-      tokenMint: PublicKey,
+      mintKeypair: Keypair,
       tokenSupply: BN,
       bonusPool: BN,
       startTime: BN,
@@ -218,7 +221,7 @@ export function useVestige() {
       const tx = await buildInitializeLaunchTx(
         client.program,
         connection,
-        tokenMint,
+        mintKeypair,
         publicKey,
         tokenSupply,
         bonusPool,
@@ -231,7 +234,7 @@ export function useVestige() {
         graduationTarget
       );
 
-      const signature = await signAndSendTransaction(tx);
+      const signature = await signAndSendTransaction(tx, [mintKeypair]);
       return signature;
     },
     [publicKey, getConnection, getClient, signAndSendTransaction]

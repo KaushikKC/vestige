@@ -6,7 +6,7 @@ import {
   LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
 import IDL from './vestige.json';
-import { RPC_ENDPOINT, PROGRAM_ID } from '../constants/solana';
+import { RPC_ENDPOINT, PROGRAM_ID, fetchWithRetry } from '../constants/solana';
 
 // Seeds
 export const LAUNCH_SEED = Buffer.from('launch');
@@ -111,7 +111,10 @@ export class VestigeClient {
   public connection: Connection;
 
   constructor(connection?: Connection) {
-    const conn = connection || new Connection(RPC_ENDPOINT, 'confirmed');
+    const conn = connection || new Connection(RPC_ENDPOINT, {
+      commitment: 'confirmed',
+      fetch: fetchWithRetry,
+    });
     const wallet = new ReadOnlyWallet();
     this.provider = new AnchorProvider(conn, wallet, {
       commitment: 'confirmed',
@@ -325,12 +328,25 @@ export class VestigeClient {
   }
 
   async getAllLaunches(): Promise<LaunchData[]> {
-    const accounts = await this.program.account.launch.all();
-    return accounts.map((a: any) => ({
-      publicKey: a.publicKey,
-      ...a.account,
-      ...this.parseAccount(a.account),
-    }));
+    // Use dataSize filter to skip accounts from older program versions
+    // that have a different struct layout (avoids "beyond buffer length" errors).
+    // Expected size: 8 (discriminator) + 196 (fields) = 204 bytes.
+    const accounts = await this.program.account.launch.all([
+      { dataSize: 204 },
+    ]);
+    const results: LaunchData[] = [];
+    for (const a of accounts) {
+      try {
+        results.push({
+          publicKey: a.publicKey,
+          ...a.account,
+          ...this.parseAccount(a.account),
+        });
+      } catch {
+        // Skip accounts that fail to parse (old schema)
+      }
+    }
+    return results;
   }
 
   async getLaunch(launchPda: PublicKey): Promise<LaunchData | null> {

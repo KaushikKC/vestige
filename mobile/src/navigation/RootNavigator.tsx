@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 
 import DiscoverScreen from '../screens/DiscoverScreen';
@@ -74,20 +74,18 @@ function PortfolioNavigator() {
 }
 
 function TabIcon({ label, focused }: { label: string; focused: boolean }) {
-  const icons: Record<string, string> = {
-    Discover: '\uD83D\uDD0D',
-    Create: '\u2795',
-    Portfolio: '\uD83D\uDCC8',
+  const iconMap: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionicons.glyphMap]> = {
+    Discover: ['search-outline', 'search'],
+    Create: ['add-circle-outline', 'add-circle'],
+    Portfolio: ['trending-up-outline', 'trending-up'],
   };
+  const [outline, filled] = iconMap[label] || ['help-outline', 'help'];
   return (
-    <Text
-      style={{
-        fontSize: 22,
-        color: focused ? COLORS.tabBarActive : COLORS.tabBarInactive,
-      }}
-    >
-      {icons[label] || '?'}
-    </Text>
+    <Ionicons
+      name={focused ? filled : outline}
+      size={24}
+      color={focused ? COLORS.tabBarActive : COLORS.tabBarInactive}
+    />
   );
 }
 

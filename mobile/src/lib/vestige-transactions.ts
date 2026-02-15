@@ -1,11 +1,20 @@
 import { BN } from '@coral-xyz/anchor';
 import {
   Connection,
+  Keypair,
   PublicKey,
   SystemProgram,
   Transaction,
 } from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import {
+  TOKEN_PROGRAM_ID,
+  MINT_SIZE,
+  createInitializeMintInstruction,
+  getAssociatedTokenAddressSync,
+  createAssociatedTokenAccountInstruction,
+  createMintToInstruction,
+  createTransferInstruction,
+} from '@solana/spl-token';
 import {
   VestigeClient,
   PROTOCOL_TREASURY,
@@ -141,7 +150,7 @@ export async function buildAdvanceMilestoneTx(
 export async function buildInitializeLaunchTx(
   program: any,
   connection: Connection,
-  tokenMint: PublicKey,
+  mintKeypair: Keypair,
   creator: PublicKey,
   tokenSupply: BN,
   bonusPool: BN,
@@ -153,11 +162,54 @@ export async function buildInitializeLaunchTx(
   rMin: BN,
   graduationTarget: BN
 ): Promise<Transaction> {
+  const tokenMint = mintKeypair.publicKey;
   const [launchPda] = VestigeClient.deriveLaunchPda(creator, tokenMint);
   const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
   const [creatorFeeVaultPda] = VestigeClient.deriveCreatorFeeVaultPda(launchPda);
 
-  const tx = await program.methods
+  const tx = new Transaction();
+
+  // 1. Create the mint account
+  const mintRent = await connection.getMinimumBalanceForRentExemption(MINT_SIZE);
+  tx.add(
+    SystemProgram.createAccount({
+      fromPubkey: creator,
+      newAccountPubkey: tokenMint,
+      space: MINT_SIZE,
+      lamports: mintRent,
+      programId: TOKEN_PROGRAM_ID,
+    })
+  );
+
+  // 2. Initialize mint (9 decimals, creator as mint authority)
+  tx.add(
+    createInitializeMintInstruction(tokenMint, 9, creator, null)
+  );
+
+  // 3. Create creator's ATA for this token
+  const creatorAta = getAssociatedTokenAddressSync(tokenMint, creator);
+  tx.add(
+    createAssociatedTokenAccountInstruction(creator, creatorAta, creator, tokenMint)
+  );
+
+  // 4. Mint full token supply to creator
+  tx.add(
+    createMintToInstruction(tokenMint, creatorAta, creator, BigInt(tokenSupply.toString()))
+  );
+
+  // 5. Create the launch PDA's token vault ATA
+  const launchTokenVault = getAssociatedTokenAddressSync(tokenMint, launchPda, true);
+  tx.add(
+    createAssociatedTokenAccountInstruction(creator, launchTokenVault, launchPda, tokenMint)
+  );
+
+  // 6. Transfer full supply to the launch vault
+  tx.add(
+    createTransferInstruction(creatorAta, launchTokenVault, creator, BigInt(tokenSupply.toString()))
+  );
+
+  // 7. The Anchor initializeLaunch instruction
+  const anchorIx = await program.methods
     .initializeLaunch(
       tokenSupply,
       bonusPool,
@@ -179,5 +231,9 @@ export async function buildInitializeLaunchTx(
     })
     .transaction();
 
-  return setRecentBlockhash(connection, tx, creator);
+  tx.add(...anchorIx.instructions);
+
+  // Don't set blockhash here — the wallet provider sets a fresh one
+  // inside the transact() callback to avoid stale blockhash issues.
+  return tx;
 }
