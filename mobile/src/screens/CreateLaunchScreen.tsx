@@ -30,30 +30,33 @@ export default function CreateLaunchScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [createdPda, setCreatedPda] = useState<string | null>(null);
 
-  // Form fields
+  // Form fields (values in SOL / human-readable units, matching web frontend)
   const [tokenSupply, setTokenSupply] = useState('1000000');
-  const [bonusPool, setBonusPool] = useState('200000');
-  const [pMax, setPMax] = useState('10000');
-  const [rBest, setRBest] = useState('20');
+  const [bonusPool, setBonusPool] = useState('500000');
+  const [pMax, setPMax] = useState('1');
+  const [rBest, setRBest] = useState('15');
   const [rMin, setRMin] = useState('1');
-  const [graduationTarget, setGraduationTarget] = useState('5');
-  const [durationMinutes, setDurationMinutes] = useState('60');
+  const [graduationTarget, setGraduationTarget] = useState('10');
+  const [durationMinutes, setDurationMinutes] = useState('1440');
 
   const applyTestMode = (enabled: boolean) => {
     setTestMode(enabled);
     if (enabled) {
-      setDurationMinutes('3');
-      setGraduationTarget('0.5');
-      setTokenSupply('100000');
-      setBonusPool('20000');
-      setPMax('10000');
-      setRBest('20');
+      setTokenSupply('1000');
+      setBonusPool('500');
+      setPMax('1');
+      setRBest('15');
       setRMin('1');
+      setGraduationTarget('0.5');
+      setDurationMinutes('3');
     } else {
-      setDurationMinutes('60');
-      setGraduationTarget('5');
       setTokenSupply('1000000');
-      setBonusPool('200000');
+      setBonusPool('500000');
+      setPMax('1');
+      setRBest('15');
+      setRMin('1');
+      setGraduationTarget('10');
+      setDurationMinutes('1440');
     }
   };
 
@@ -65,13 +68,13 @@ export default function CreateLaunchScreen({ navigation }: any) {
 
     setLoading(true);
     try {
-      const supply = new BN(parseFloat(tokenSupply) * LAMPORTS);
-      const bonus = new BN(parseFloat(bonusPool) * LAMPORTS);
-      const pMaxVal = new BN(parseInt(pMax));
-      const pMinVal = new BN(Math.floor(parseInt(pMax) / 10));
+      const supply = new BN(Math.floor(parseFloat(tokenSupply) * LAMPORTS));
+      const bonus = new BN(Math.floor(parseFloat(bonusPool) * LAMPORTS));
+      const pMaxVal = VestigeClient.solToLamports(parseFloat(pMax));
+      const pMinVal = VestigeClient.solToLamports(parseFloat(pMax) / 10);
       const rBestVal = new BN(parseInt(rBest));
       const rMinVal = new BN(parseInt(rMin));
-      const target = new BN(Math.floor(parseFloat(graduationTarget) * LAMPORTS));
+      const target = VestigeClient.solToLamports(parseFloat(graduationTarget));
 
       const now = Math.floor(Date.now() / 1000);
       const durationSec = parseInt(durationMinutes) * 60;
@@ -195,11 +198,11 @@ export default function CreateLaunchScreen({ navigation }: any) {
         keyboardType="numeric"
       />
       <FormField
-        label="Price Max (pMax, lamports)"
+        label="Starting Price (SOL) — pMax"
         value={pMax}
         onChangeText={setPMax}
-        keyboardType="numeric"
-        hint={`pMin = ${pMax ? Math.floor(parseInt(pMax) / 10) : 0} (auto: pMax/10)`}
+        keyboardType="decimal-pad"
+        hint={`Price drops from ${pMax || '?'} SOL to ${pMax ? (parseFloat(pMax) / 10).toString() : '0'} SOL (10:1 ratio)`}
       />
       <FormField
         label="Risk Weight Best (rBest)"
@@ -245,9 +248,9 @@ export default function CreateLaunchScreen({ navigation }: any) {
       <View style={styles.feeInfo}>
         <View style={styles.feeAccent} />
         <Text style={styles.feeInfoText}>
-          Every buy has a 1% fee: 0.5% to protocol treasury + 0.5% to creator
-          fee vault (vested). Creator must make initial buy (min 0.01 SOL) to
-          activate the launch.
+          One transaction creates the token, initializes the launch, and funds
+          the vault. Every buy has a 1% fee: 0.5% protocol + 0.5% creator
+          (vested). Creator must make initial buy (min 0.01 SOL) to activate.
         </Text>
       </View>
     </ScrollView>

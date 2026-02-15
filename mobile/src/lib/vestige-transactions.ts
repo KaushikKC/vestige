@@ -13,7 +13,6 @@ import {
   getAssociatedTokenAddressSync,
   createAssociatedTokenAccountInstruction,
   createMintToInstruction,
-  createTransferInstruction,
 } from '@solana/spl-token';
 import {
   VestigeClient,
@@ -43,13 +42,29 @@ export async function buildBuyTx(
   solAmount: BN,
   user: PublicKey,
   tokenVault: PublicKey,
-  userTokenAccount: PublicKey
+  userTokenAccount: PublicKey,
+  tokenMint: PublicKey
 ): Promise<Transaction> {
   const [positionPda] = VestigeClient.derivePositionPda(launchPda, user);
   const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
   const [creatorFeeVaultPda] = VestigeClient.deriveCreatorFeeVaultPda(launchPda);
 
-  const tx = await program.methods
+  const tx = new Transaction();
+
+  // Check if user's token ATA exists; if not, create it in the same transaction
+  const existing = await connection.getAccountInfo(userTokenAccount);
+  if (!existing) {
+    tx.add(
+      createAssociatedTokenAccountInstruction(
+        user,
+        userTokenAccount,
+        user,
+        tokenMint
+      )
+    );
+  }
+
+  const buyIx = await program.methods
     .buy(solAmount)
     .accounts({
       launch: launchPda,
@@ -63,7 +78,9 @@ export async function buildBuyTx(
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
     })
-    .transaction();
+    .instruction();
+
+  tx.add(buyIx);
 
   return setRecentBlockhash(connection, tx, user);
 }
@@ -147,6 +164,23 @@ export async function buildAdvanceMilestoneTx(
   return setRecentBlockhash(connection, tx, authority);
 }
 
+/**
+ * Single transaction: Create mint + initialize launch + fund vault.
+ *
+ * On mobile (MWA / Privy embedded wallet), signAndSendTransaction is a single
+ * wallet prompt regardless of how many instructions are in the transaction.
+ * So we pack everything into 1 tx for best UX (1 prompt instead of 2).
+ *
+ * 5 instructions (~800 bytes, well under the 1232-byte limit):
+ *   1. SystemProgram.createAccount (mint)
+ *   2. initializeMint
+ *   3. initializeLaunch (Anchor — creates Launch PDA + vault PDAs)
+ *   4. createAssociatedTokenAccount (launch vault ATA)
+ *   5. mintTo (supply + bonus directly to vault)
+ *
+ * Web frontend uses 2 separate transactions because each wallet.signTransaction()
+ * call triggers a browser wallet popup. Mobile doesn't have that constraint.
+ */
 export async function buildInitializeLaunchTx(
   program: any,
   connection: Connection,
@@ -186,30 +220,8 @@ export async function buildInitializeLaunchTx(
     createInitializeMintInstruction(tokenMint, 9, creator, null)
   );
 
-  // 3. Create creator's ATA for this token
-  const creatorAta = getAssociatedTokenAddressSync(tokenMint, creator);
-  tx.add(
-    createAssociatedTokenAccountInstruction(creator, creatorAta, creator, tokenMint)
-  );
-
-  // 4. Mint full token supply to creator
-  tx.add(
-    createMintToInstruction(tokenMint, creatorAta, creator, BigInt(tokenSupply.toString()))
-  );
-
-  // 5. Create the launch PDA's token vault ATA
-  const launchTokenVault = getAssociatedTokenAddressSync(tokenMint, launchPda, true);
-  tx.add(
-    createAssociatedTokenAccountInstruction(creator, launchTokenVault, launchPda, tokenMint)
-  );
-
-  // 6. Transfer full supply to the launch vault
-  tx.add(
-    createTransferInstruction(creatorAta, launchTokenVault, creator, BigInt(tokenSupply.toString()))
-  );
-
-  // 7. The Anchor initializeLaunch instruction
-  const anchorIx = await program.methods
+  // 3. initializeLaunch (creates Launch PDA, vault PDA, creator fee vault PDA)
+  const initLaunchIx = await program.methods
     .initializeLaunch(
       tokenSupply,
       bonusPool,
@@ -229,9 +241,20 @@ export async function buildInitializeLaunchTx(
       creator,
       systemProgram: SystemProgram.programId,
     })
-    .transaction();
+    .instruction();
+  tx.add(initLaunchIx);
 
-  tx.add(...anchorIx.instructions);
+  // 4. Create the launch PDA's token vault ATA
+  const launchTokenVault = getAssociatedTokenAddressSync(tokenMint, launchPda, true);
+  tx.add(
+    createAssociatedTokenAccountInstruction(creator, launchTokenVault, launchPda, tokenMint)
+  );
+
+  // 5. Mint supply + bonus directly to vault (no intermediate creator ATA needed)
+  const totalMintRaw = BigInt(tokenSupply.toString()) + BigInt(bonusPool.toString());
+  tx.add(
+    createMintToInstruction(tokenMint, launchTokenVault, creator, totalMintRaw)
+  );
 
   // Don't set blockhash here — the wallet provider sets a fresh one
   // inside the transact() callback to avoid stale blockhash issues.

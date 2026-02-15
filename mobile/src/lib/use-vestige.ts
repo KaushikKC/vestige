@@ -99,7 +99,8 @@ export function useVestige() {
         lamports,
         publicKey,
         tokenVault,
-        userTokenAccount
+        userTokenAccount,
+        launch.tokenMint
       );
 
       const signature = await signAndSendTransaction(tx);
@@ -218,6 +219,9 @@ export function useVestige() {
       const connection = getConnection();
       const client = getClient();
 
+      // Single transaction: create mint + initialize launch + fund vault
+      // Mobile wallets prompt once per signAndSendTransaction call,
+      // so 1 tx with 5 instructions = 1 wallet prompt (best UX).
       const tx = await buildInitializeLaunchTx(
         client.program,
         connection,

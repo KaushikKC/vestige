@@ -1,7 +1,10 @@
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey } from "@solana/web3.js";
 
-export const RPC_ENDPOINT = 'https://api.devnet.solana.com';
-export const PROGRAM_ID = new PublicKey('4RQMkiv5Lp4p862UeQxQs6YgWRPBud2fwLMR5GcSo1bf');
+export const RPC_ENDPOINT =
+  process.env.EXPO_PUBLIC_SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
+export const PROGRAM_ID = new PublicKey(
+  "4RQMkiv5Lp4p862UeQxQs6YgWRPBud2fwLMR5GcSo1bf",
+);
 
 /**
  * Custom fetch wrapper that retries on 429 (rate limit) with exponential backoff.
