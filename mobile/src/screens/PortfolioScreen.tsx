@@ -8,6 +8,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import {
   LaunchData,
@@ -104,7 +105,7 @@ export default function PortfolioScreen({ navigation }: Props) {
   if (!connected) {
     return (
       <View style={styles.emptyCenter}>
-        <Text style={styles.emptyIcon}>{'\uD83D\uDD12'}</Text>
+        <Ionicons name="lock-closed-outline" size={48} color={COLORS.textMuted} style={styles.emptyIcon} />
         <Text style={styles.emptyTitle}>Connect Your Wallet</Text>
         <Text style={styles.emptySubtext}>
           Connect your wallet to view your positions
@@ -161,7 +162,7 @@ export default function PortfolioScreen({ navigation }: Props) {
           }
           ListEmptyComponent={
             <View style={styles.emptyListCenter}>
-              <Text style={styles.emptyIcon}>{'\uD83D\uDCE6'}</Text>
+              <Ionicons name="cube-outline" size={48} color={COLORS.textMuted} style={styles.emptyIcon} />
               <Text style={styles.emptyTitle}>No Positions</Text>
               <Text style={styles.emptySubtext}>
                 Buy tokens in a launch to see your positions here

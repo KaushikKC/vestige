@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PublicKey } from '@solana/web3.js';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import { LaunchData } from '../lib/vestige-client';
 import { useVestige } from '../lib/use-vestige';
@@ -137,7 +138,7 @@ export default function DiscoverScreen({ navigation }: Props) {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>{'\uD83D\uDE80'}</Text>
+              <Ionicons name="rocket-outline" size={48} color={COLORS.textMuted} style={styles.emptyIcon} />
               <Text style={styles.emptyTitle}>No launches found</Text>
               <Text style={styles.emptySubtext}>
                 Pull to refresh or paste a Launch PDA above

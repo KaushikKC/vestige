@@ -13,6 +13,7 @@ import * as Clipboard from 'expo-clipboard';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 import Toast from 'react-native-toast-message';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import { useVestige } from '../lib/use-vestige';
 import { useWallet } from '../lib/use-wallet';
@@ -80,7 +81,7 @@ export default function CreateLaunchScreen({ navigation }: any) {
       const mintKeypair = Keypair.generate();
 
       await initializeLaunch(
-        mintKeypair.publicKey,
+        mintKeypair,
         supply,
         bonus,
         startTime,
@@ -120,7 +121,7 @@ export default function CreateLaunchScreen({ navigation }: any) {
   if (createdPda) {
     return (
       <View style={styles.successContainer}>
-        <Text style={styles.successCheckmark}>{'\u2705'}</Text>
+        <Ionicons name="checkmark-circle" size={64} color={COLORS.success} style={styles.successCheckmark} />
         <Text style={styles.successTitle}>Launch Created!</Text>
         <Text style={styles.initialBuyNote}>
           Make your initial buy (min 0.01 SOL) to activate the launch.

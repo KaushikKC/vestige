@@ -10,6 +10,7 @@ import {
 import { PublicKey } from '@solana/web3.js';
 import * as Clipboard from 'expo-clipboard';
 import Toast from 'react-native-toast-message';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import {
   LaunchData,
@@ -238,7 +239,7 @@ export default function LaunchDetailScreen({ route }: Props) {
   if (!launch) {
     return (
       <View style={styles.center}>
-        <Text style={styles.errorIcon}>{'\u274C'}</Text>
+        <Ionicons name="close-circle-outline" size={48} color={COLORS.error} style={styles.errorIcon} />
         <Text style={styles.errorText}>Launch not found</Text>
         <Text style={styles.errorSubtext}>{launchPdaStr}</Text>
       </View>
@@ -492,7 +493,7 @@ export default function LaunchDetailScreen({ route }: Props) {
       {/* Graduated Badge */}
       {launch.isGraduated && (
         <View style={styles.graduatedBox}>
-          <Text style={styles.graduatedCheckmark}>{'\u2705'}</Text>
+          <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
           <Text style={styles.graduatedLabel}>
             This launch has graduated
           </Text>
