@@ -88,38 +88,7 @@ export default function CreateLaunchForm({
     try {
       const connection = (client as any).connection;
       const mintKeypair = Keypair.generate();
-
-      // Create SPL token mint
-      const lamports = await getMinimumBalanceForRentExemptMint(connection);
-      const transaction = new Transaction().add(
-        SystemProgram.createAccount({
-          fromPubkey: publicKey,
-          newAccountPubkey: mintKeypair.publicKey,
-          space: MINT_SIZE,
-          lamports,
-          programId: TOKEN_PROGRAM_ID,
-        }),
-        createInitializeMint2Instruction(
-          mintKeypair.publicKey,
-          9, // 9 decimals to match TOKEN_PRECISION
-          publicKey,
-          publicKey,
-          TOKEN_PROGRAM_ID
-        )
-      );
-
-      const { blockhash } = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = publicKey;
-      const signedTx = await wallet.signTransaction!(transaction);
-      signedTx.partialSign(mintKeypair);
-      const mintTxSig = await connection.sendRawTransaction(
-        signedTx.serialize()
-      );
-      await connection.confirmTransaction(mintTxSig, "confirmed");
       const tokenMint = mintKeypair.publicKey;
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Derive launch PDA
       const [launchPda] = VestigeClient.deriveLaunchPda(publicKey, tokenMint);
@@ -131,33 +100,39 @@ export default function CreateLaunchForm({
       const endTime = new BN(now + durationSeconds);
 
       // Token amounts (raw, 9 decimals matching TOKEN_PRECISION)
-      const tokenSupplyRaw = Math.floor(
-        parseFloat(formData.tokenSupply) * 1e9
-      );
+      const tokenSupplyRaw = Math.floor(parseFloat(formData.tokenSupply) * 1e9);
       const bonusPoolRaw = Math.floor(parseFloat(formData.bonusPool) * 1e9);
       const tokenSupply = new BN(tokenSupplyRaw);
       const bonusPool = new BN(bonusPoolRaw);
 
-      // Price in lamports: pMax SOL * 1e9
       const pMaxLamports = VestigeClient.solToLamports(
-        parseFloat(formData.pMax)
+        parseFloat(formData.pMax),
       );
       const pMinLamports = VestigeClient.solToLamports(
-        parseFloat(formData.pMax) / 10
+        parseFloat(formData.pMax) / 10,
       );
 
       const rBest = new BN(parseInt(formData.rBest));
       const rMin = new BN(parseInt(formData.rMin));
       const graduationTarget = VestigeClient.solToLamports(
-        parseFloat(formData.graduationTarget)
+        parseFloat(formData.graduationTarget),
       );
 
-      // Initialize launch
       const program = (client as any).program;
       const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
-      const [creatorFeeVaultPda] = VestigeClient.deriveCreatorFeeVaultPda(launchPda);
+      const [creatorFeeVaultPda] =
+        VestigeClient.deriveCreatorFeeVaultPda(launchPda);
 
-      const tx = await program.methods
+      // Single transaction: 1 user action = 1 wallet prompt
+      // 5 instructions packed into one tx (~800 bytes, well under 1232 limit):
+      //   1. createAccount (mint)
+      //   2. initializeMint
+      //   3. initializeLaunch (Anchor — creates Launch PDA + vault PDAs)
+      //   4. createAssociatedTokenAccount (launch vault ATA)
+      //   5. mintTo (supply + bonus directly to vault)
+      const lamports = await getMinimumBalanceForRentExemptMint(connection);
+
+      const initLaunchIx = await program.methods
         .initializeLaunch(
           tokenSupply,
           bonusPool,
@@ -167,65 +142,80 @@ export default function CreateLaunchForm({
           pMinLamports,
           rBest,
           rMin,
-          graduationTarget
+          graduationTarget,
         )
         .accounts({
           launch: launchPda,
           vault: vaultPda,
           creatorFeeVault: creatorFeeVaultPda,
-          tokenMint: tokenMint,
+          tokenMint,
           creator: publicKey,
           systemProgram: SystemProgram.programId,
         })
-        .rpc({ skipPreflight: true });
+        .instruction();
 
-      await connection.confirmTransaction(tx, "confirmed");
-
-      // Create ATA for Launch PDA (token vault) and mint supply + bonus
       const launchTokenVault = getAssociatedTokenAddressSync(
         tokenMint,
         launchPda,
-        true, // allowOwnerOffCurve - PDA owner
+        true,
         TOKEN_PROGRAM_ID,
-        ASSOCIATED_TOKEN_PROGRAM_ID
+        ASSOCIATED_TOKEN_PROGRAM_ID,
       );
-
       const totalMint = tokenSupplyRaw + bonusPoolRaw;
 
-      const vaultTx = new Transaction();
-      const existingVault = await connection.getAccountInfo(launchTokenVault);
-      if (!existingVault) {
-        vaultTx.add(
+      const tx = new Transaction()
+        .add(
+          SystemProgram.createAccount({
+            fromPubkey: publicKey,
+            newAccountPubkey: tokenMint,
+            space: MINT_SIZE,
+            lamports,
+            programId: TOKEN_PROGRAM_ID,
+          }),
+        )
+        .add(
+          createInitializeMint2Instruction(
+            tokenMint,
+            9,
+            publicKey,
+            publicKey,
+            TOKEN_PROGRAM_ID,
+          ),
+        )
+        .add(initLaunchIx)
+        .add(
           createAssociatedTokenAccountInstruction(
             publicKey,
             launchTokenVault,
             launchPda,
             tokenMint,
             TOKEN_PROGRAM_ID,
-            ASSOCIATED_TOKEN_PROGRAM_ID
-          )
-        );
-      }
-      vaultTx.add(
-        createMintToInstruction(
-          tokenMint,
-          launchTokenVault,
-          publicKey,
-          totalMint,
-          [],
-          TOKEN_PROGRAM_ID
+            ASSOCIATED_TOKEN_PROGRAM_ID,
+          ),
         )
-      );
-      const { blockhash: bh2 } = await connection.getLatestBlockhash();
-      vaultTx.recentBlockhash = bh2;
-      vaultTx.feePayer = publicKey;
-      const signedVault = await wallet.signTransaction!(vaultTx);
-      const vaultTxSig = await connection.sendRawTransaction(
-        signedVault.serialize()
-      );
-      await connection.confirmTransaction(vaultTxSig, "confirmed");
+        .add(
+          createMintToInstruction(
+            tokenMint,
+            launchTokenVault,
+            publicKey,
+            totalMint,
+            [],
+            TOKEN_PROGRAM_ID,
+          ),
+        );
 
-      setTxSignature(tx);
+      const { blockhash } = await connection.getLatestBlockhash();
+      tx.recentBlockhash = blockhash;
+      tx.feePayer = publicKey;
+
+      // partialSign with mintKeypair BEFORE the wallet signs
+      tx.partialSign(mintKeypair);
+      const signedTx = await wallet.signTransaction!(tx);
+
+      const sig = await connection.sendRawTransaction(signedTx.serialize());
+      await connection.confirmTransaction(sig, "confirmed");
+
+      setTxSignature(sig);
       setLaunchPdaCreated(launchPda.toBase58());
       toast.success("Launch created successfully!");
     } catch (error: unknown) {
@@ -240,9 +230,7 @@ export default function CreateLaunchForm({
   if (!connected) {
     return (
       <div className="bg-white rounded-2xl p-8 shadow-lg border border-[#E6E8EF] text-center">
-        <p className="text-[#6B7280]">
-          Connect your wallet to create a launch
-        </p>
+        <p className="text-[#6B7280]">Connect your wallet to create a launch</p>
       </div>
     );
   }
@@ -263,7 +251,8 @@ export default function CreateLaunchForm({
           Your inverted bonding curve launch has been deployed to Solana.
         </p>
         <p className="text-sm font-semibold text-orange-600 mb-4">
-          Make your initial buy (min 0.01 SOL) on the launch page to activate it.
+          Make your initial buy (min 0.01 SOL) on the launch page to activate
+          it.
         </p>
 
         <div className="mb-4 p-4 bg-[#F5F6FA] rounded-xl border border-[#E6E8EF] text-left">
@@ -391,9 +380,7 @@ export default function CreateLaunchForm({
           <input
             type="number"
             value={formData.pMax}
-            onChange={(e) =>
-              setFormData({ ...formData, pMax: e.target.value })
-            }
+            onChange={(e) => setFormData({ ...formData, pMax: e.target.value })}
             className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
             placeholder="1"
             step="0.01"
@@ -469,7 +456,7 @@ export default function CreateLaunchForm({
           <p className="text-xs text-[#6B7280] mt-1">
             {parseInt(formData.durationMinutes) >= 60
               ? `= ${(parseInt(formData.durationMinutes) / 60).toFixed(
-                  1
+                  1,
                 )} hours`
               : `${formData.durationMinutes} minutes`}
           </p>
@@ -494,12 +481,16 @@ export default function CreateLaunchForm({
       <div className="mt-6 p-4 bg-blue-50 rounded-xl text-sm text-[#6B7280]">
         <strong>How it works:</strong> Price drops from p_max to p_min over the
         duration. Early buyers pay more but earn a higher risk weight, giving
-        them bonus tokens at graduation. Real tokens are delivered immediately on
-        buy. After creating, you must make an initial buy (min 0.01 SOL) to
+        them bonus tokens at graduation. Real tokens are delivered immediately
+        on buy. After creating, you must make an initial buy (min 0.01 SOL) to
         activate the launch. A 1% fee applies (0.5% protocol + 0.5% creator
         vested fees). Collected SOL is locked for LP; creators earn from vested
         fee rewards unlocked at milestones.
       </div>
+      <p className="mt-3 text-xs text-[#6B7280]">
+        You will be asked to confirm <strong>1 transaction</strong> that creates
+        the token, initializes the launch, and funds the vault.
+      </p>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import IDL from "./vestige.json";
 
 export const PROGRAM_ID = new PublicKey(
-  "4RQMkiv5Lp4p862UeQxQs6YgWRPBud2fwLMR5GcSo1bf"
+  "4RQMkiv5Lp4p862UeQxQs6YgWRPBud2fwLMR5GcSo1bf",
 );
 
 // Seeds
@@ -19,8 +19,8 @@ export const PRICE_RATIO = 10;
 export const TOKEN_PRECISION = 1_000_000_000;
 
 // Fee constants (basis points, matching on-chain)
-export const PROTOCOL_FEE_BPS = 50;    // 0.5%
-export const CREATOR_FEE_BPS = 50;     // 0.5%
+export const PROTOCOL_FEE_BPS = 50; // 0.5%
+export const CREATOR_FEE_BPS = 50; // 0.5%
 export const BPS_DENOMINATOR = 10_000;
 
 // Minimum initial buy (0.01 SOL in lamports)
@@ -28,7 +28,7 @@ export const MIN_INITIAL_BUY = 10_000_000;
 
 // Protocol treasury (must match on-chain constant)
 export const PROTOCOL_TREASURY = new PublicKey(
-  "GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb3Jy9N2Ce"
+  "GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb3Jy9N2Ce",
 );
 
 // ============== Interfaces ==============
@@ -98,35 +98,35 @@ export class VestigeClient {
 
   static deriveLaunchPda(
     creator: PublicKey,
-    tokenMint: PublicKey
+    tokenMint: PublicKey,
   ): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
       [LAUNCH_SEED, creator.toBuffer(), tokenMint.toBuffer()],
-      PROGRAM_ID
+      PROGRAM_ID,
     );
   }
 
   static derivePositionPda(
     launch: PublicKey,
-    user: PublicKey
+    user: PublicKey,
   ): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
       [POSITION_SEED, launch.toBuffer(), user.toBuffer()],
-      PROGRAM_ID
+      PROGRAM_ID,
     );
   }
 
   static deriveVaultPda(launch: PublicKey): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
       [VAULT_SEED, launch.toBuffer()],
-      PROGRAM_ID
+      PROGRAM_ID,
     );
   }
 
   static deriveCreatorFeeVaultPda(launch: PublicKey): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
       [CREATOR_FEE_VAULT_SEED, launch.toBuffer()],
-      PROGRAM_ID
+      PROGRAM_ID,
     );
   }
 
@@ -159,32 +159,43 @@ export class VestigeClient {
 
   static estimateBuy(
     launch: LaunchData,
-    solAmountLamports: number
+    solAmountLamports: number,
   ): BuyEstimate {
     const curvePrice = VestigeClient.getCurrentCurvePrice(launch);
     const riskWeight = VestigeClient.getCurrentRiskWeight(launch);
 
     // Calculate fees
-    const protocolFee = Math.floor((solAmountLamports * PROTOCOL_FEE_BPS) / BPS_DENOMINATOR);
-    const creatorFee = Math.floor((solAmountLamports * CREATOR_FEE_BPS) / BPS_DENOMINATOR);
+    const protocolFee = Math.floor(
+      (solAmountLamports * PROTOCOL_FEE_BPS) / BPS_DENOMINATOR,
+    );
+    const creatorFee = Math.floor(
+      (solAmountLamports * CREATOR_FEE_BPS) / BPS_DENOMINATOR,
+    );
     const netAmount = solAmountLamports - protocolFee - creatorFee;
 
     // Token calculation uses net amount (post-fee)
-    const baseTokens = Math.floor(
-      (netAmount * TOKEN_PRECISION) / curvePrice
-    );
+    const baseTokens = Math.floor((netAmount * TOKEN_PRECISION) / curvePrice);
     const weightScaled = riskWeight * WEIGHT_PRECISION;
     const bonus =
       weightScaled > WEIGHT_PRECISION
         ? Math.floor(
-            (baseTokens * (weightScaled - WEIGHT_PRECISION)) / WEIGHT_PRECISION
+            (baseTokens * (weightScaled - WEIGHT_PRECISION)) / WEIGHT_PRECISION,
           )
         : 0;
     const total = baseTokens + bonus;
     const effectivePrice =
       total > 0 ? solAmountLamports / total : solAmountLamports;
 
-    return { baseTokens, bonus, effectivePrice, riskWeight, curvePrice, protocolFee, creatorFee, netAmount };
+    return {
+      baseTokens,
+      bonus,
+      effectivePrice,
+      riskWeight,
+      curvePrice,
+      protocolFee,
+      creatorFee,
+      netAmount,
+    };
   }
 
   // ============== Static Utils ==============
@@ -223,24 +234,40 @@ export class VestigeClient {
     const claimed = launch.creatorFeesClaimed.toNumber();
     let unlockedBps: number;
     switch (launch.milestonesUnlocked) {
-      case 1: unlockedBps = 3000; break;  // 30%
-      case 2: unlockedBps = 5000; break;  // 50%
-      case 3: unlockedBps = 7000; break;  // 70%
-      default: unlockedBps = 10000; break; // 100%
+      case 1:
+        unlockedBps = 3000;
+        break; // 30%
+      case 2:
+        unlockedBps = 5000;
+        break; // 50%
+      case 3:
+        unlockedBps = 7000;
+        break; // 70%
+      default:
+        unlockedBps = 10000;
+        break; // 100%
     }
-    const totalUnlocked = Math.floor((totalFees * unlockedBps) / BPS_DENOMINATOR);
+    const totalUnlocked = Math.floor(
+      (totalFees * unlockedBps) / BPS_DENOMINATOR,
+    );
     return Math.max(0, totalUnlocked - claimed);
   }
 
   /** Returns human-readable milestone description */
   static getMilestoneDescription(level: number): string {
     switch (level) {
-      case 0: return "No milestones (pre-graduation)";
-      case 1: return "Graduation (30% unlocked)";
-      case 2: return "Milestone 2 (50% unlocked)";
-      case 3: return "Milestone 3 (70% unlocked)";
-      case 4: return "All milestones (100% unlocked)";
-      default: return `Milestone ${level}`;
+      case 0:
+        return "No milestones (pre-graduation)";
+      case 1:
+        return "Graduation (30% unlocked)";
+      case 2:
+        return "Milestone 2 (50% unlocked)";
+      case 3:
+        return "Milestone 3 (70% unlocked)";
+      case 4:
+        return "All milestones (100% unlocked)";
+      default:
+        return `Milestone ${level}`;
     }
   }
 
@@ -249,17 +276,12 @@ export class VestigeClient {
   private parseAccount(a: any): any {
     return {
       startTime:
-        typeof a.startTime === "number"
-          ? a.startTime
-          : a.startTime.toNumber(),
-      endTime:
-        typeof a.endTime === "number" ? a.endTime : a.endTime.toNumber(),
+        typeof a.startTime === "number" ? a.startTime : a.startTime.toNumber(),
+      endTime: typeof a.endTime === "number" ? a.endTime : a.endTime.toNumber(),
       duration:
         typeof a.duration === "number" ? a.duration : a.duration.toNumber(),
-      rBest:
-        typeof a.rBest === "number" ? a.rBest : a.rBest.toNumber(),
-      rMin:
-        typeof a.rMin === "number" ? a.rMin : a.rMin.toNumber(),
+      rBest: typeof a.rBest === "number" ? a.rBest : a.rBest.toNumber(),
+      rMin: typeof a.rMin === "number" ? a.rMin : a.rMin.toNumber(),
       totalParticipants:
         typeof a.totalParticipants === "number"
           ? a.totalParticipants
@@ -295,7 +317,7 @@ export class VestigeClient {
 
   async getUserPosition(
     launchPda: PublicKey,
-    user: PublicKey
+    user: PublicKey,
   ): Promise<UserPositionData | null> {
     const [positionPda] = VestigeClient.derivePositionPda(launchPda, user);
     try {
@@ -324,11 +346,12 @@ export class VestigeClient {
     pMin: BN,
     rBest: BN,
     rMin: BN,
-    graduationTarget: BN
+    graduationTarget: BN,
   ): Promise<string> {
     const [launchPda] = VestigeClient.deriveLaunchPda(creator, tokenMint);
     const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
-    const [creatorFeeVaultPda] = VestigeClient.deriveCreatorFeeVaultPda(launchPda);
+    const [creatorFeeVaultPda] =
+      VestigeClient.deriveCreatorFeeVaultPda(launchPda);
 
     const tx = await this.program.methods
       .initializeLaunch(
@@ -340,7 +363,7 @@ export class VestigeClient {
         pMin,
         rBest,
         rMin,
-        graduationTarget
+        graduationTarget,
       )
       .accounts({
         launch: launchPda,
@@ -355,19 +378,27 @@ export class VestigeClient {
     return tx;
   }
 
-  async buy(
+  /**
+   * Returns the buy instruction so it can be combined with createAssociatedTokenAccount in one transaction.
+   */
+  getBuyInstruction(
     launchPda: PublicKey,
-    solAmount: BN,
+    solAmountLamports: BN,
     user: PublicKey,
     tokenVault: PublicKey,
-    userTokenAccount: PublicKey
-  ): Promise<string> {
+    userTokenAccount: PublicKey,
+  ) {
     const [positionPda] = VestigeClient.derivePositionPda(launchPda, user);
     const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
-    const [creatorFeeVaultPda] = VestigeClient.deriveCreatorFeeVaultPda(launchPda);
+    const [creatorFeeVaultPda] =
+      VestigeClient.deriveCreatorFeeVaultPda(launchPda);
 
-    const tx = await this.program.methods
-      .buy(solAmount)
+    const amount =
+      solAmountLamports instanceof BN
+        ? solAmountLamports
+        : new BN(Number(solAmountLamports));
+    return this.program.methods
+      .buy(amount)
       .accounts({
         launch: launchPda,
         userPosition: positionPda,
@@ -380,9 +411,38 @@ export class VestigeClient {
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       })
-      .rpc({ skipPreflight: true });
+      .instruction();
+  }
 
-    return tx;
+  async buy(
+    launchPda: PublicKey,
+    solAmount: BN,
+    user: PublicKey,
+    tokenVault: PublicKey,
+    userTokenAccount: PublicKey,
+  ): Promise<string> {
+    const amount =
+      solAmount instanceof BN ? solAmount : new BN(Number(solAmount));
+    const [positionPda] = VestigeClient.derivePositionPda(launchPda, user);
+    const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
+    const [creatorFeeVaultPda] =
+      VestigeClient.deriveCreatorFeeVaultPda(launchPda);
+
+    return this.program.methods
+      .buy(amount)
+      .accounts({
+        launch: launchPda,
+        userPosition: positionPda,
+        vault: vaultPda,
+        creatorFeeVault: creatorFeeVaultPda,
+        protocolTreasury: PROTOCOL_TREASURY,
+        tokenVault,
+        userTokenAccount,
+        user,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc({ skipPreflight: false });
   }
 
   async graduate(launchPda: PublicKey, authority: PublicKey): Promise<string> {
@@ -401,7 +461,7 @@ export class VestigeClient {
     launchPda: PublicKey,
     user: PublicKey,
     tokenVault: PublicKey,
-    userTokenAccount: PublicKey
+    userTokenAccount: PublicKey,
   ): Promise<string> {
     const [positionPda] = VestigeClient.derivePositionPda(launchPda, user);
 
@@ -422,9 +482,10 @@ export class VestigeClient {
 
   async creatorClaimFees(
     launchPda: PublicKey,
-    creator: PublicKey
+    creator: PublicKey,
   ): Promise<string> {
-    const [creatorFeeVaultPda] = VestigeClient.deriveCreatorFeeVaultPda(launchPda);
+    const [creatorFeeVaultPda] =
+      VestigeClient.deriveCreatorFeeVaultPda(launchPda);
 
     const tx = await this.program.methods
       .creatorClaimFees()
@@ -440,7 +501,7 @@ export class VestigeClient {
 
   async advanceMilestone(
     launchPda: PublicKey,
-    authority: PublicKey
+    authority: PublicKey,
   ): Promise<string> {
     const tx = await this.program.methods
       .advanceMilestone()
