@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -61,7 +61,8 @@ function LoadingSkeleton() {
 
 export default function LaunchDetailScreen({ route }: Props) {
   const { launchPda: launchPdaStr } = route.params;
-  const launchPda = new PublicKey(launchPdaStr);
+  // Memoize so it doesn't create a new PublicKey object on every render
+  const launchPda = useMemo(() => new PublicKey(launchPdaStr), [launchPdaStr]);
 
   const {
     getLaunch,
@@ -83,21 +84,30 @@ export default function LaunchDetailScreen({ route }: Props) {
   const [riskWeight, setRiskWeight] = useState(0);
   const [timeLeft, setTimeLeft] = useState('');
 
+  // Stable ref for publicKey string to avoid re-creating fetchData on every render
+  const publicKeyStr = publicKey?.toBase58() ?? null;
+
   const fetchData = useCallback(async () => {
     try {
       const launchData = await getLaunch(launchPda);
-      setLaunch(launchData);
+      if (launchData) {
+        setLaunch(launchData);
+      }
 
-      if (publicKey && launchData) {
-        const pos = await getUserPosition(launchPda, publicKey);
-        setPosition(pos);
+      if (publicKeyStr && launchData) {
+        const userPk = new PublicKey(publicKeyStr);
+        const pos = await getUserPosition(launchPda, userPk);
+        // Only update position if we got a result — don't set null on transient failures
+        if (pos !== undefined) {
+          setPosition(pos);
+        }
       }
     } catch (err) {
       console.warn('Failed to fetch launch:', err);
     } finally {
       setLoading(false);
     }
-  }, [getLaunch, getUserPosition, launchPda, publicKey]);
+  }, [getLaunch, getUserPosition, launchPda, publicKeyStr]);
 
   useEffect(() => {
     fetchData();
@@ -139,7 +149,8 @@ export default function LaunchDetailScreen({ route }: Props) {
     try {
       await buy(launchPda, launch, solAmount);
       Toast.show({ type: 'success', text1: 'Purchase successful!' });
-      fetchData();
+      // Brief delay before refetch so the RPC has time to reflect the new state
+      setTimeout(fetchData, 2000);
     } catch (err: any) {
       Toast.show({
         type: 'error',
@@ -154,7 +165,7 @@ export default function LaunchDetailScreen({ route }: Props) {
     try {
       await graduate(launchPda);
       Toast.show({ type: 'success', text1: 'Launch graduated!' });
-      fetchData();
+      setTimeout(fetchData, 2000);
     } catch (err: any) {
       Toast.show({
         type: 'error',
@@ -172,7 +183,7 @@ export default function LaunchDetailScreen({ route }: Props) {
     try {
       await claimBonus(launchPda, launch);
       Toast.show({ type: 'success', text1: 'Bonus claimed!' });
-      fetchData();
+      setTimeout(fetchData, 2000);
     } catch (err: any) {
       Toast.show({
         type: 'error',
@@ -189,7 +200,7 @@ export default function LaunchDetailScreen({ route }: Props) {
     try {
       await creatorClaimFees(launchPda);
       Toast.show({ type: 'success', text1: 'Creator fees claimed!' });
-      fetchData();
+      setTimeout(fetchData, 2000);
     } catch (err: any) {
       Toast.show({
         type: 'error',
@@ -206,7 +217,7 @@ export default function LaunchDetailScreen({ route }: Props) {
     try {
       await advanceMilestone(launchPda);
       Toast.show({ type: 'success', text1: 'Milestone advanced!' });
-      fetchData();
+      setTimeout(fetchData, 2000);
     } catch (err: any) {
       Toast.show({
         type: 'error',

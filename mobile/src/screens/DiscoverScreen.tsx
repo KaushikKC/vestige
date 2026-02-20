@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { PublicKey } from '@solana/web3.js';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
@@ -47,9 +48,9 @@ export default function DiscoverScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [pdaInput, setPdaInput] = useState('');
 
-  const fetchLaunches = useCallback(async () => {
+  const fetchLaunches = useCallback(async (force = false) => {
     try {
-      const data = await getAllLaunches();
+      const data = await getAllLaunches(force);
       setLaunches(data);
     } catch (err) {
       console.warn('Failed to fetch launches:', err);
@@ -59,13 +60,17 @@ export default function DiscoverScreen({ navigation }: Props) {
     }
   }, [getAllLaunches]);
 
-  useEffect(() => {
-    fetchLaunches();
-  }, [fetchLaunches]);
+  // Refetch every time the screen comes into focus — uses 15s cache so rapid
+  // tab switches don't spam the RPC
+  useFocusEffect(
+    useCallback(() => {
+      fetchLaunches();
+    }, [fetchLaunches])
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchLaunches();
+    fetchLaunches(true); // force bypass cache on pull-to-refresh
   }, [fetchLaunches]);
 
   const goToLaunch = (pda: string) => {

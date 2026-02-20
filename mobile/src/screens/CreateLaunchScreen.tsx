@@ -31,6 +31,9 @@ export default function CreateLaunchScreen({ navigation }: any) {
   const [createdPda, setCreatedPda] = useState<string | null>(null);
 
   // Form fields (values in SOL / human-readable units, matching web frontend)
+  const [tokenName, setTokenName] = useState('');
+  const [tokenSymbol, setTokenSymbol] = useState('');
+  const [tokenUri, setTokenUri] = useState('');
   const [tokenSupply, setTokenSupply] = useState('1000000');
   const [bonusPool, setBonusPool] = useState('500000');
   const [pMax, setPMax] = useState('1');
@@ -93,7 +96,10 @@ export default function CreateLaunchScreen({ navigation }: any) {
         pMinVal,
         rBestVal,
         rMinVal,
-        target
+        target,
+        tokenName || 'Vestige Token',
+        tokenSymbol || 'VSTG',
+        tokenUri || '',
       );
 
       const [launchPda] = VestigeClient.deriveLaunchPda(
@@ -185,6 +191,24 @@ export default function CreateLaunchScreen({ navigation }: any) {
       )}
 
       {/* Form Fields */}
+      <FormField
+        label="Token Name"
+        value={tokenName}
+        onChangeText={setTokenName}
+        hint="Displayed in wallets and explorers (max 32 chars)"
+      />
+      <FormField
+        label="Token Symbol"
+        value={tokenSymbol}
+        onChangeText={setTokenSymbol}
+        hint="Short ticker symbol (max 10 chars)"
+      />
+      <FormField
+        label="Metadata URI (optional)"
+        value={tokenUri}
+        onChangeText={setTokenUri}
+        hint="JSON metadata URL for token image/description"
+      />
       <FormField
         label="Token Supply"
         value={tokenSupply}
