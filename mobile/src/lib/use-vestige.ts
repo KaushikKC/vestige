@@ -12,6 +12,7 @@ import {
 } from './vestige-client';
 import {
   buildBuyTx,
+  buildSellTx,
   buildGraduateTx,
   buildClaimBonusTx,
   buildCreatorClaimFeesTx,
@@ -20,33 +21,89 @@ import {
 } from './vestige-transactions';
 import { RPC_ENDPOINT, fetchWithRetry } from '../constants/solana';
 
+// ============== Shared cache (module-level, shared across all hook instances) ==============
+
+const CACHE_TTL = 15_000; // 15 seconds
+
+let _launchCache: LaunchData[] = [];
+let _launchCacheTime = 0;
+let _launchInflight: Promise<LaunchData[]> | null = null;
+
+// Shared singleton connection + client
+let _sharedConnection: Connection | null = null;
+let _sharedClient: VestigeClient | null = null;
+
+function getSharedConnection(): Connection {
+  if (!_sharedConnection) {
+    _sharedConnection = new Connection(RPC_ENDPOINT, {
+      commitment: 'confirmed',
+      fetch: fetchWithRetry,
+    });
+  }
+  return _sharedConnection;
+}
+
+function getSharedClient(): VestigeClient {
+  if (!_sharedClient) {
+    _sharedClient = new VestigeClient(getSharedConnection());
+  }
+  return _sharedClient;
+}
+
+/**
+ * Cached + deduplicated getAllLaunches.
+ * - Returns cached data if less than CACHE_TTL old.
+ * - If a fetch is already in flight, returns the same promise (dedup).
+ * - force=true bypasses the cache (used after creating a launch).
+ */
+async function cachedGetAllLaunches(force = false): Promise<LaunchData[]> {
+  const now = Date.now();
+
+  // Return cache if fresh
+  if (!force && _launchCache.length > 0 && now - _launchCacheTime < CACHE_TTL) {
+    return _launchCache;
+  }
+
+  // Deduplicate in-flight requests
+  if (_launchInflight) {
+    return _launchInflight;
+  }
+
+  _launchInflight = getSharedClient()
+    .getAllLaunches()
+    .then((data) => {
+      _launchCache = data;
+      _launchCacheTime = Date.now();
+      return data;
+    })
+    .finally(() => {
+      _launchInflight = null;
+    });
+
+  return _launchInflight;
+}
+
+/** Invalidate the launch cache (call after creating/modifying a launch) */
+export function invalidateLaunchCache() {
+  _launchCacheTime = 0;
+}
+
+// ============== Hook ==============
+
 export function useVestige() {
   const { publicKey, signAndSendTransaction } = useWallet();
-  const clientRef = useRef<VestigeClient | null>(null);
-  const connectionRef = useRef<Connection | null>(null);
 
-  const getConnection = useCallback(() => {
-    if (!connectionRef.current) {
-      connectionRef.current = new Connection(RPC_ENDPOINT, {
-        commitment: 'confirmed',
-        fetch: fetchWithRetry,
-      });
-    }
-    return connectionRef.current;
-  }, []);
-
-  const getClient = useCallback(() => {
-    if (!clientRef.current) {
-      clientRef.current = new VestigeClient(getConnection());
-    }
-    return clientRef.current;
-  }, [getConnection]);
+  const getConnection = useCallback(() => getSharedConnection(), []);
+  const getClient = useCallback(() => getSharedClient(), []);
 
   // ============== Read Operations ==============
 
-  const getAllLaunches = useCallback(async (): Promise<LaunchData[]> => {
-    return getClient().getAllLaunches();
-  }, [getClient]);
+  const getAllLaunches = useCallback(
+    async (force = false): Promise<LaunchData[]> => {
+      return cachedGetAllLaunches(force);
+    },
+    []
+  );
 
   const getLaunch = useCallback(
     async (launchPda: PublicKey): Promise<LaunchData | null> => {
@@ -104,6 +161,7 @@ export function useVestige() {
       );
 
       const signature = await signAndSendTransaction(tx);
+      invalidateLaunchCache();
       return signature;
     },
     [publicKey, getConnection, getClient, signAndSendTransaction]
@@ -124,6 +182,7 @@ export function useVestige() {
       );
 
       const signature = await signAndSendTransaction(tx);
+      invalidateLaunchCache();
       return signature;
     },
     [publicKey, getConnection, getClient, signAndSendTransaction]
@@ -196,6 +255,42 @@ export function useVestige() {
       );
 
       const signature = await signAndSendTransaction(tx);
+      invalidateLaunchCache();
+      return signature;
+    },
+    [publicKey, getConnection, getClient, signAndSendTransaction]
+  );
+
+  const sell = useCallback(
+    async (launchPda: PublicKey, launch: LaunchData, tokenAmount: number) => {
+      if (!publicKey) throw new Error('Wallet not connected');
+
+      const connection = getConnection();
+      const client = getClient();
+      const amount = new BN(tokenAmount);
+
+      const tokenVault = getAssociatedTokenAddressSync(
+        launch.tokenMint,
+        launchPda,
+        true
+      );
+      const userTokenAccount = getAssociatedTokenAddressSync(
+        launch.tokenMint,
+        publicKey
+      );
+
+      const tx = await buildSellTx(
+        client.program,
+        connection,
+        launchPda,
+        amount,
+        publicKey,
+        tokenVault,
+        userTokenAccount,
+      );
+
+      const signature = await signAndSendTransaction(tx);
+      invalidateLaunchCache();
       return signature;
     },
     [publicKey, getConnection, getClient, signAndSendTransaction]
@@ -212,16 +307,16 @@ export function useVestige() {
       pMin: BN,
       rBest: BN,
       rMin: BN,
-      graduationTarget: BN
+      graduationTarget: BN,
+      name: string,
+      symbol: string,
+      uri: string,
     ) => {
       if (!publicKey) throw new Error('Wallet not connected');
 
       const connection = getConnection();
       const client = getClient();
 
-      // Single transaction: create mint + initialize launch + fund vault
-      // Mobile wallets prompt once per signAndSendTransaction call,
-      // so 1 tx with 5 instructions = 1 wallet prompt (best UX).
       const tx = await buildInitializeLaunchTx(
         client.program,
         connection,
@@ -235,10 +330,14 @@ export function useVestige() {
         pMin,
         rBest,
         rMin,
-        graduationTarget
+        graduationTarget,
+        name,
+        symbol,
+        uri,
       );
 
       const signature = await signAndSendTransaction(tx, [mintKeypair]);
+      invalidateLaunchCache();
       return signature;
     },
     [publicKey, getConnection, getClient, signAndSendTransaction]
@@ -252,6 +351,7 @@ export function useVestige() {
     getBalance,
     // Write
     buy,
+    sell,
     graduate,
     claimBonus,
     creatorClaimFees,

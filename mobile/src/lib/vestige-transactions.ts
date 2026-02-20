@@ -12,12 +12,17 @@ import {
   createInitializeMintInstruction,
   getAssociatedTokenAddressSync,
   createAssociatedTokenAccountInstruction,
+  createAssociatedTokenAccountIdempotentInstruction,
   createMintToInstruction,
 } from '@solana/spl-token';
 import {
   VestigeClient,
   PROTOCOL_TREASURY,
 } from './vestige-client';
+
+export const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
+  'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
+);
 
 /**
  * Transaction builders return unsigned Transaction objects.
@@ -51,18 +56,15 @@ export async function buildBuyTx(
 
   const tx = new Transaction();
 
-  // Check if user's token ATA exists; if not, create it in the same transaction
-  const existing = await connection.getAccountInfo(userTokenAccount);
-  if (!existing) {
-    tx.add(
-      createAssociatedTokenAccountInstruction(
-        user,
-        userTokenAccount,
-        user,
-        tokenMint
-      )
-    );
-  }
+  // Use idempotent instruction — no-op if ATA already exists, no RPC call needed
+  tx.add(
+    createAssociatedTokenAccountIdempotentInstruction(
+      user,
+      userTokenAccount,
+      user,
+      tokenMint
+    )
+  );
 
   const buyIx = await program.methods
     .buy(solAmount)
@@ -151,17 +153,17 @@ export async function buildAdvanceMilestoneTx(
   program: any,
   connection: Connection,
   launchPda: PublicKey,
-  authority: PublicKey
+  creator: PublicKey
 ): Promise<Transaction> {
   const tx = await program.methods
     .advanceMilestone()
     .accounts({
       launch: launchPda,
-      authority,
+      creator,
     })
     .transaction();
 
-  return setRecentBlockhash(connection, tx, authority);
+  return setRecentBlockhash(connection, tx, creator);
 }
 
 /**
@@ -194,12 +196,25 @@ export async function buildInitializeLaunchTx(
   pMin: BN,
   rBest: BN,
   rMin: BN,
-  graduationTarget: BN
+  graduationTarget: BN,
+  name: string,
+  symbol: string,
+  uri: string,
 ): Promise<Transaction> {
   const tokenMint = mintKeypair.publicKey;
   const [launchPda] = VestigeClient.deriveLaunchPda(creator, tokenMint);
   const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
   const [creatorFeeVaultPda] = VestigeClient.deriveCreatorFeeVaultPda(launchPda);
+
+  // Derive metadata PDA: ["metadata", metadata_program_id, mint]
+  const [metadataPda] = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from('metadata'),
+      TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+      tokenMint.toBuffer(),
+    ],
+    TOKEN_METADATA_PROGRAM_ID,
+  );
 
   const tx = new Transaction();
 
@@ -220,7 +235,7 @@ export async function buildInitializeLaunchTx(
     createInitializeMintInstruction(tokenMint, 9, creator, null)
   );
 
-  // 3. initializeLaunch (creates Launch PDA, vault PDA, creator fee vault PDA)
+  // 3. initializeLaunch (creates Launch PDA, vault PDA, creator fee vault PDA + metadata CPI)
   const initLaunchIx = await program.methods
     .initializeLaunch(
       tokenSupply,
@@ -231,13 +246,18 @@ export async function buildInitializeLaunchTx(
       pMin,
       rBest,
       rMin,
-      graduationTarget
+      graduationTarget,
+      name,
+      symbol,
+      uri,
     )
     .accounts({
       launch: launchPda,
       vault: vaultPda,
       creatorFeeVault: creatorFeeVaultPda,
       tokenMint,
+      metadata: metadataPda,
+      tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
       creator,
       systemProgram: SystemProgram.programId,
     })
@@ -259,4 +279,36 @@ export async function buildInitializeLaunchTx(
   // Don't set blockhash here — the wallet provider sets a fresh one
   // inside the transact() callback to avoid stale blockhash issues.
   return tx;
+}
+
+export async function buildSellTx(
+  program: any,
+  connection: Connection,
+  launchPda: PublicKey,
+  tokenAmount: BN,
+  user: PublicKey,
+  tokenVault: PublicKey,
+  userTokenAccount: PublicKey,
+): Promise<Transaction> {
+  const [positionPda] = VestigeClient.derivePositionPda(launchPda, user);
+  const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
+  const [creatorFeeVaultPda] = VestigeClient.deriveCreatorFeeVaultPda(launchPda);
+
+  const sellIx = await program.methods
+    .sell(tokenAmount)
+    .accounts({
+      launch: launchPda,
+      userPosition: positionPda,
+      vault: vaultPda,
+      creatorFeeVault: creatorFeeVaultPda,
+      protocolTreasury: PROTOCOL_TREASURY,
+      tokenVault,
+      userTokenAccount,
+      user,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    })
+    .instruction();
+
+  const tx = new Transaction().add(sellIx);
+  return setRecentBlockhash(connection, tx, user);
 }

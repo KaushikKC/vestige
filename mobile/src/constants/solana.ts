@@ -11,15 +11,22 @@ export const PROGRAM_ID = new PublicKey(
  * Pass as the `fetch` option to `new Connection(url, { fetch: fetchWithRetry })`.
  */
 export const fetchWithRetry: typeof fetch = async (input, init) => {
-  const MAX_RETRIES = 4;
-  let delay = 500; // start at 500ms
+  const MAX_RETRIES = 3;
+  let delay = 400; // start at 400ms
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const res = await fetch(input, init);
-    if (res.status !== 429 || attempt === MAX_RETRIES) {
-      return res;
+    try {
+      const res = await fetch(input, init);
+      if (res.status !== 429 || attempt === MAX_RETRIES) {
+        return res;
+      }
+    } catch (err) {
+      // Network errors (e.g. DNS, timeout) — retry those too
+      if (attempt === MAX_RETRIES) throw err;
     }
-    await new Promise((r) => setTimeout(r, delay));
+    // Add jitter (±20%) to avoid thundering herd
+    const jitter = delay * (0.8 + Math.random() * 0.4);
+    await new Promise((r) => setTimeout(r, jitter));
     delay *= 2;
   }
 
