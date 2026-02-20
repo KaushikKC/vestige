@@ -20,7 +20,7 @@ import {
 } from "@solana/spl-token";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useVestige } from "@/lib/use-vestige";
-import { VestigeClient } from "@/lib/vestige-client";
+import { VestigeClient, TOKEN_METADATA_PROGRAM_ID } from "@/lib/vestige-client";
 import { Loader2, ExternalLink, Copy } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -38,6 +38,9 @@ export default function CreateLaunchForm({
   const [launchPdaCreated, setLaunchPdaCreated] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
+    name: "",
+    symbol: "",
+    uri: "",
     tokenSupply: "1000000",
     bonusPool: "500000",
     pMax: "1",
@@ -56,7 +59,8 @@ export default function CreateLaunchForm({
   const applyTestMode = (enabled: boolean) => {
     setTestMode(enabled);
     if (enabled) {
-      setFormData({
+      setFormData((prev) => ({
+        ...prev,
         tokenSupply: "1000",
         bonusPool: "500",
         pMax: "1",
@@ -64,9 +68,10 @@ export default function CreateLaunchForm({
         rMin: "1",
         graduationTarget: "0.5",
         durationMinutes: "3",
-      });
+      }));
     } else {
-      setFormData({
+      setFormData((prev) => ({
+        ...prev,
         tokenSupply: "1000000",
         bonusPool: "500000",
         pMax: "1",
@@ -74,7 +79,7 @@ export default function CreateLaunchForm({
         rMin: "1",
         graduationTarget: "10",
         durationMinutes: "1440",
-      });
+      }));
     }
   };
 
@@ -123,14 +128,28 @@ export default function CreateLaunchForm({
       const [creatorFeeVaultPda] =
         VestigeClient.deriveCreatorFeeVaultPda(launchPda);
 
+      // Derive metadata PDA
+      const [metadataPda] = PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("metadata"),
+          TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+          tokenMint.toBuffer(),
+        ],
+        TOKEN_METADATA_PROGRAM_ID,
+      );
+
       // Single transaction: 1 user action = 1 wallet prompt
       // 5 instructions packed into one tx (~800 bytes, well under 1232 limit):
       //   1. createAccount (mint)
       //   2. initializeMint
-      //   3. initializeLaunch (Anchor — creates Launch PDA + vault PDAs)
+      //   3. initializeLaunch (Anchor — creates Launch PDA + vault PDAs + metadata CPI)
       //   4. createAssociatedTokenAccount (launch vault ATA)
       //   5. mintTo (supply + bonus directly to vault)
       const lamports = await getMinimumBalanceForRentExemptMint(connection);
+
+      const tokenName = formData.name || "Vestige Token";
+      const tokenSymbol = formData.symbol || "VSTG";
+      const tokenUri = formData.uri || "";
 
       const initLaunchIx = await program.methods
         .initializeLaunch(
@@ -143,12 +162,17 @@ export default function CreateLaunchForm({
           rBest,
           rMin,
           graduationTarget,
+          tokenName,
+          tokenSymbol,
+          tokenUri,
         )
         .accounts({
           launch: launchPda,
           vault: vaultPda,
           creatorFeeVault: creatorFeeVaultPda,
           tokenMint,
+          metadata: metadataPda,
+          tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
           creator: publicKey,
           systemProgram: SystemProgram.programId,
         })
@@ -300,6 +324,9 @@ export default function CreateLaunchForm({
             setLaunchPdaCreated(null);
             setTestMode(false);
             setFormData({
+              name: "",
+              symbol: "",
+              uri: "",
               tokenSupply: "1000000",
               bonusPool: "500000",
               pMax: "1",
@@ -339,6 +366,57 @@ export default function CreateLaunchForm({
       </div>
 
       <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-bold text-[#6B7280] mb-2">
+              Token Name
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
+              className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
+              placeholder="My Token"
+              maxLength={32}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-[#6B7280] mb-2">
+              Token Symbol
+            </label>
+            <input
+              type="text"
+              value={formData.symbol}
+              onChange={(e) =>
+                setFormData({ ...formData, symbol: e.target.value })
+              }
+              className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
+              placeholder="TKN"
+              maxLength={10}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-bold text-[#6B7280] mb-2">
+            Metadata URI (optional)
+          </label>
+          <input
+            type="text"
+            value={formData.uri}
+            onChange={(e) =>
+              setFormData({ ...formData, uri: e.target.value })
+            }
+            className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
+            placeholder="https://arweave.net/..."
+          />
+          <p className="text-xs text-[#6B7280] mt-1">
+            JSON metadata URI for token image and description
+          </p>
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-bold text-[#6B7280] mb-2">

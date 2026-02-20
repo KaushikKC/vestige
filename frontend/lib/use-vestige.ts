@@ -113,6 +113,41 @@ export function useVestige() {
     [client, wallet.publicKey]
   );
 
+  const sell = useCallback(
+    async (
+      launchPda: PublicKey,
+      tokenAmount: number,
+      tokenVault: PublicKey,
+      userTokenAccount: PublicKey
+    ): Promise<string | null> => {
+      if (!client || !wallet.publicKey) {
+        setError("Wallet not connected");
+        return null;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const amount = new (require("@coral-xyz/anchor").BN)(tokenAmount);
+        const tx = await client.sell(
+          launchPda,
+          amount,
+          wallet.publicKey,
+          tokenVault,
+          userTokenAccount
+        );
+        await refreshBalance();
+        return tx;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Unknown error");
+        console.error("Sell error:", e);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [client, wallet.publicKey, refreshBalance]
+  );
+
   const buy = useCallback(
     async (
       launchPda: PublicKey,
@@ -257,6 +292,7 @@ export function useVestige() {
     fetchLaunches,
     fetchLaunch,
     fetchUserPosition,
+    sell,
     buy,
     graduate,
     claimBonus,
