@@ -7,6 +7,7 @@ import Toast from "react-native-toast-message";
 import { PrivyProvider } from "@privy-io/expo";
 import { WalletProvider } from "./src/lib/use-wallet";
 import RootNavigator from "./src/navigation/RootNavigator";
+import AppSplash from "./src/components/AppSplash";
 
 const PRIVY_APP_ID = process.env.EXPO_PUBLIC_PRIVY_APP_ID ?? "";
 const PRIVY_CLIENT_ID = process.env.EXPO_PUBLIC_PRIVY_CLIENT_ID ?? "";
@@ -15,11 +16,13 @@ export default function App() {
   return (
     <PrivyProvider appId={PRIVY_APP_ID} clientId={PRIVY_CLIENT_ID}>
       <WalletProvider>
-        <NavigationContainer>
-          <StatusBar style="dark" />
-          <RootNavigator />
-          <Toast />
-        </NavigationContainer>
+        <AppSplash>
+          <NavigationContainer>
+            <StatusBar style="dark" />
+            <RootNavigator />
+            <Toast />
+          </NavigationContainer>
+        </AppSplash>
       </WalletProvider>
     </PrivyProvider>
   );
