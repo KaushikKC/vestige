@@ -6,7 +6,7 @@ import {
   LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
 import IDL from './vestige.json';
-import { RPC_ENDPOINT, PROGRAM_ID, fetchWithRetry } from '../constants/solana';
+import { RPC_ENDPOINT, PROGRAM_ID, CONNECTION_CONFIG } from '../constants/solana';
 
 // Seeds
 export const LAUNCH_SEED = Buffer.from('launch');
@@ -116,10 +116,7 @@ export class VestigeClient {
   public connection: Connection;
 
   constructor(connection?: Connection) {
-    const conn = connection || new Connection(RPC_ENDPOINT, {
-      commitment: 'confirmed',
-      fetch: fetchWithRetry,
-    });
+    const conn = connection || new Connection(RPC_ENDPOINT, CONNECTION_CONFIG);
     const wallet = new ReadOnlyWallet();
     this.provider = new AnchorProvider(conn, wallet, {
       commitment: 'confirmed',
@@ -329,6 +326,67 @@ export class VestigeClient {
     }
   }
 
+  // Metaplex Token Metadata Program
+  static METADATA_PROGRAM_ID = new PublicKey(
+    'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
+  );
+
+  /**
+   * Fetch the token image URL from on-chain Metaplex metadata.
+   * Derives the metadata PDA, reads the account, extracts the URI,
+   * then fetches the JSON to get the 'image' field.
+   */
+  static async fetchTokenImage(
+    connection: Connection,
+    tokenMint: PublicKey
+  ): Promise<string | null> {
+    try {
+      const [metadataPda] = PublicKey.findProgramAddressSync(
+        [
+          Buffer.from('metadata'),
+          VestigeClient.METADATA_PROGRAM_ID.toBuffer(),
+          tokenMint.toBuffer(),
+        ],
+        VestigeClient.METADATA_PROGRAM_ID
+      );
+
+      const accountInfo = await connection.getAccountInfo(metadataPda);
+      if (!accountInfo?.data) return null;
+
+      // Metaplex metadata layout: skip first 1 + 32 + 32 = 65 bytes (key, update_authority, mint)
+      // Then: name (4 + string), symbol (4 + string), uri (4 + string)
+      const data = accountInfo.data;
+      let offset = 65;
+
+      // Skip name: 4 byte length + content
+      const nameLen = data.readUInt32LE(offset);
+      offset += 4 + nameLen;
+
+      // Skip symbol: 4 byte length + content
+      const symbolLen = data.readUInt32LE(offset);
+      offset += 4 + symbolLen;
+
+      // Read uri: 4 byte length + content
+      const uriLen = data.readUInt32LE(offset);
+      offset += 4;
+      const uri = data.slice(offset, offset + uriLen).toString('utf8').replace(/\0/g, '').trim();
+
+      if (!uri) return null;
+
+      // Check if the URI itself is a direct image URL
+      if (/\.(png|jpg|jpeg|gif|webp|svg)(\?|$)/i.test(uri)) {
+        return uri;
+      }
+
+      // Otherwise fetch as JSON metadata
+      const res = await fetch(uri);
+      const json = await res.json();
+      return json?.image || null;
+    } catch {
+      return null;
+    }
+  }
+
   // ============== RPC Reads ==============
 
   private parseAccount(a: any): any {
@@ -367,6 +425,7 @@ export class VestigeClient {
     // Accounts from older program versions that don't match will throw during
     // deserialization and are safely skipped.
     const accounts = await this.program.account.launch.all();
+    console.log(`[Vestige] getProgramAccounts returned ${accounts.length} raw accounts`);
     const results: LaunchData[] = [];
     for (const a of accounts) {
       try {
@@ -375,10 +434,11 @@ export class VestigeClient {
           ...a.account,
           ...this.parseAccount(a.account),
         });
-      } catch {
-        // Skip accounts that fail to parse (old schema)
+      } catch (err: any) {
+        console.warn(`[Vestige] Failed to parse launch ${a.publicKey.toBase58()}:`, err?.message);
       }
     }
+    console.log(`[Vestige] Parsed ${results.length}/${accounts.length} launches successfully`);
     return results;
   }
 

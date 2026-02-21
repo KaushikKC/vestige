@@ -3,6 +3,7 @@ import React, {
   useContext,
   useMemo,
   useCallback,
+  useRef,
   ReactNode,
 } from 'react';
 import { Keypair, PublicKey, Connection, Transaction } from '@solana/web3.js';
@@ -13,7 +14,7 @@ import {
   isConnected,
 } from '@privy-io/expo';
 import Toast from 'react-native-toast-message';
-import { RPC_ENDPOINT, fetchWithRetry } from '../constants/solana';
+import { RPC_ENDPOINT, CONNECTION_CONFIG } from '../constants/solana';
 
 interface WalletContextType {
   publicKey: PublicKey | null;
@@ -37,6 +38,15 @@ export function PrivyWalletProvider({ children }: { children: ReactNode }) {
   const { user, logout } = usePrivy();
   const { login } = useLoginWithOAuth();
   const solanaWallet = useEmbeddedSolanaWallet();
+
+  // Reuse a single Connection instance to reduce overhead
+  const connectionRef = useRef<Connection | null>(null);
+  const getConnection = useCallback(() => {
+    if (!connectionRef.current) {
+      connectionRef.current = new Connection(RPC_ENDPOINT, CONNECTION_CONFIG);
+    }
+    return connectionRef.current;
+  }, []);
 
   const walletConnected = isConnected(solanaWallet);
   const wallet = walletConnected ? solanaWallet.wallets[0] : null;
@@ -84,10 +94,7 @@ export function PrivyWalletProvider({ children }: { children: ReactNode }) {
     async (tx: Transaction, signers?: Keypair[]): Promise<string> => {
       if (!wallet) throw new Error('Wallet not connected');
       const provider = await wallet.getProvider();
-      const connection = new Connection(RPC_ENDPOINT, {
-        commitment: 'confirmed',
-        fetch: fetchWithRetry,
-      });
+      const connection = getConnection();
 
       if (signers && signers.length > 0) {
         const { blockhash } = await connection.getLatestBlockhash('confirmed');
@@ -106,7 +113,7 @@ export function PrivyWalletProvider({ children }: { children: ReactNode }) {
 
       return signature;
     },
-    [wallet, publicKey]
+    [wallet, publicKey, getConnection]
   );
 
   const value = useMemo(

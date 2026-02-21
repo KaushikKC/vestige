@@ -4,6 +4,7 @@ import React, {
   useState,
   useCallback,
   useMemo,
+  useRef,
   ReactNode,
   useEffect,
 } from 'react';
@@ -14,7 +15,7 @@ import {
 } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
-import { RPC_ENDPOINT, fetchWithRetry } from '../constants/solana';
+import { RPC_ENDPOINT, CONNECTION_CONFIG } from '../constants/solana';
 import { toByteArray } from 'base64-js';
 
 const AUTH_TOKEN_KEY = 'mwa_auth_token';
@@ -47,6 +48,15 @@ const WalletContext = createContext<WalletContextType>({
 export function MWAWalletProvider({ children }: { children: ReactNode }) {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
+
+  // Reuse a single Connection instance to reduce overhead
+  const connectionRef = useRef<Connection | null>(null);
+  const getConnection = useCallback(() => {
+    if (!connectionRef.current) {
+      connectionRef.current = new Connection(RPC_ENDPOINT, CONNECTION_CONFIG);
+    }
+    return connectionRef.current;
+  }, []);
 
   // Restore cached session on mount
   useEffect(() => {
@@ -158,10 +168,7 @@ export function MWAWalletProvider({ children }: { children: ReactNode }) {
         throw new Error('Wallet not connected');
       }
 
-      const connection = new Connection(RPC_ENDPOINT, {
-        commitment: 'confirmed',
-        fetch: fetchWithRetry,
-      });
+      const connection = getConnection();
 
       // Use signTransactions + manual send for reliability.
       // Everything happens inside transact() so blockhash stays fresh.

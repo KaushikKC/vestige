@@ -1,9 +1,10 @@
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import {
   getAssociatedTokenAddressSync,
 } from '@solana/spl-token';
 import { BN } from '@coral-xyz/anchor';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useWallet } from './use-wallet';
 import {
   VestigeClient,
@@ -19,26 +20,16 @@ import {
   buildAdvanceMilestoneTx,
   buildInitializeLaunchTx,
 } from './vestige-transactions';
-import { RPC_ENDPOINT, fetchWithRetry } from '../constants/solana';
+import { RPC_ENDPOINT, CONNECTION_CONFIG } from '../constants/solana';
 
-// ============== Shared cache (module-level, shared across all hook instances) ==============
+// ============== Shared singleton (module-level) ==============
 
-const CACHE_TTL = 15_000; // 15 seconds
-
-let _launchCache: LaunchData[] = [];
-let _launchCacheTime = 0;
-let _launchInflight: Promise<LaunchData[]> | null = null;
-
-// Shared singleton connection + client
 let _sharedConnection: Connection | null = null;
 let _sharedClient: VestigeClient | null = null;
 
 function getSharedConnection(): Connection {
   if (!_sharedConnection) {
-    _sharedConnection = new Connection(RPC_ENDPOINT, {
-      commitment: 'confirmed',
-      fetch: fetchWithRetry,
-    });
+    _sharedConnection = new Connection(RPC_ENDPOINT, CONNECTION_CONFIG);
   }
   return _sharedConnection;
 }
@@ -50,11 +41,53 @@ function getSharedClient(): VestigeClient {
   return _sharedClient;
 }
 
+// ============== Launch PDA persistence ==============
+// Stores known launch PDAs in AsyncStorage so we don't need getProgramAccounts
+// to display launches. Individual getAccountInfo calls are much cheaper.
+
+const STORAGE_KEY = 'vestige_known_launch_pdas';
+
+async function loadKnownPdas(): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveKnownPdas(pdas: string[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(pdas));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+async function addKnownPda(pda: string): Promise<void> {
+  const existing = await loadKnownPdas();
+  if (!existing.includes(pda)) {
+    existing.push(pda);
+    await saveKnownPdas(existing);
+  }
+}
+
+// ============== Cache ==============
+
+const CACHE_TTL = 30_000; // 30 seconds
+
+let _launchCache: LaunchData[] = [];
+let _launchCacheTime = 0;
+let _launchInflight: Promise<LaunchData[]> | null = null;
+
 /**
- * Cached + deduplicated getAllLaunches.
- * - Returns cached data if less than CACHE_TTL old.
- * - If a fetch is already in flight, returns the same promise (dedup).
- * - force=true bypasses the cache (used after creating a launch).
+ * Fetches launches using a two-tier strategy:
+ *
+ * 1. FAST PATH (always): Fetch known PDAs from AsyncStorage, then fetch each
+ *    individually via getAccountInfo (cheap, ~1 RPC call per account, batched).
+ *
+ * 2. SLOW PATH (background, when forced): Also run getProgramAccounts to
+ *    discover new launches from other users. Merge results and save new PDAs.
  */
 async function cachedGetAllLaunches(force = false): Promise<LaunchData[]> {
   const now = Date.now();
@@ -69,12 +102,63 @@ async function cachedGetAllLaunches(force = false): Promise<LaunchData[]> {
     return _launchInflight;
   }
 
-  _launchInflight = getSharedClient()
-    .getAllLaunches()
-    .then((data) => {
-      _launchCache = data;
+  _launchInflight = (async () => {
+    const client = getSharedClient();
+    const knownPdas = await loadKnownPdas();
+    console.log(`[Vestige] Known PDAs in storage: ${knownPdas.length}`);
+
+    // FAST PATH: fetch known launches individually (cheap getAccountInfo calls)
+    const knownLaunches: LaunchData[] = [];
+    if (knownPdas.length > 0) {
+      // Fetch in parallel batches of 5
+      const BATCH = 5;
+      for (let i = 0; i < knownPdas.length; i += BATCH) {
+        const batch = knownPdas.slice(i, i + BATCH);
+        const results = await Promise.allSettled(
+          batch.map((pda) => client.getLaunch(new PublicKey(pda)))
+        );
+        for (const r of results) {
+          if (r.status === 'fulfilled' && r.value) {
+            knownLaunches.push(r.value);
+          }
+        }
+      }
+      console.log(`[Vestige] Fetched ${knownLaunches.length}/${knownPdas.length} known launches`);
+    }
+
+    // If we have known launches, update cache immediately so screens can display
+    if (knownLaunches.length > 0) {
+      _launchCache = knownLaunches;
       _launchCacheTime = Date.now();
-      return data;
+    }
+
+    // SLOW PATH: try getProgramAccounts to discover new launches
+    // Only do this if forced (pull-to-refresh) or we have no known PDAs
+    if (force || knownPdas.length === 0) {
+      try {
+        const allLaunches = await client.getAllLaunches();
+        console.log(`[Vestige] getProgramAccounts found ${allLaunches.length} total launches`);
+
+        // Merge: use getProgramAccounts results as the authoritative list
+        if (allLaunches.length > 0) {
+          _launchCache = allLaunches;
+          _launchCacheTime = Date.now();
+
+          // Save all discovered PDAs for future fast-path fetches
+          const allPdaStrs = allLaunches.map((l) => l.publicKey.toBase58());
+          await saveKnownPdas(allPdaStrs);
+        }
+      } catch (err: any) {
+        console.warn(`[Vestige] getProgramAccounts failed: ${err?.message}`);
+        // Fall through — we already have knownLaunches from fast path
+      }
+    }
+
+    return _launchCache;
+  })()
+    .catch((err) => {
+      console.warn(`[Vestige] Launch fetch failed entirely: ${err?.message}`);
+      return _launchCache; // return whatever stale data we have
     })
     .finally(() => {
       _launchInflight = null;
@@ -337,7 +421,15 @@ export function useVestige() {
       );
 
       const signature = await signAndSendTransaction(tx, [mintKeypair]);
+
+      // Immediately persist the new launch PDA so it shows up in Discovery
+      const [launchPda] = VestigeClient.deriveLaunchPda(
+        publicKey,
+        mintKeypair.publicKey
+      );
+      await addKnownPda(launchPda.toBase58());
       invalidateLaunchCache();
+
       return signature;
     },
     [publicKey, getConnection, getClient, signAndSendTransaction]
