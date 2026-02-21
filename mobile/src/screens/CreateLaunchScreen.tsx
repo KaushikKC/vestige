@@ -207,7 +207,7 @@ export default function CreateLaunchScreen({ navigation }: any) {
         label="Metadata URI (optional)"
         value={tokenUri}
         onChangeText={setTokenUri}
-        hint="JSON metadata URL for token image/description"
+        hint="Direct image URL (PNG/JPG) or JSON metadata with 'image' field"
       />
       <FormField
         label="Token Supply"

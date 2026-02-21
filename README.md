@@ -112,6 +112,8 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). Use **Creator → Create Launch** to create a mint + launch and get the Launch PDA, then open the launch page to buy, graduate, and claim.
 
+**Devnet: fund protocol treasury once.** The protocol fee (0.5%) is sent to the treasury account. On devnet that account must exist and be rent-exempt before the first buy. Send ~0.001 SOL to `GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb3Jy9N2Ce` (e.g. from your wallet or `solana transfer GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb3Jy9N2Ce 0.001 --allow-unfunded-recipient --url devnet`).
+
 **Mobile**
 
 ```bash

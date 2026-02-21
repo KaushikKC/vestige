@@ -6,8 +6,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Image,
 } from 'react-native';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, Connection } from '@solana/web3.js';
 import * as Clipboard from 'expo-clipboard';
 import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,11 +22,13 @@ import {
 } from '../lib/vestige-client';
 import { useVestige } from '../lib/use-vestige';
 import { useWallet } from '../lib/use-wallet';
-import StatBox from '../components/StatBox';
 import ProgressBar from '../components/ProgressBar';
 import BuyPanel from '../components/BuyPanel';
 import PositionCard from '../components/PositionCard';
 import SkeletonLoader from '../components/SkeletonLoader';
+import PriceCurveChart from '../components/PriceCurveChart';
+import CompactStatRow from '../components/CompactStatRow';
+import { CONNECTION_CONFIG, RPC_ENDPOINT } from '../constants/solana';
 
 type Props = {
   route: { params: { launchPda: string } };
@@ -34,25 +37,27 @@ type Props = {
 function LoadingSkeleton() {
   return (
     <View style={styles.content}>
-      {/* Mint pill skeleton */}
-      <View style={{ alignItems: 'center', marginBottom: SPACING.lg }}>
-        <SkeletonLoader width={200} height={28} borderRadius={RADIUS.full} />
+      {/* Compact header skeleton */}
+      <View style={styles.compactHeader}>
+        <SkeletonLoader width={40} height={40} borderRadius={20} />
+        <View style={{ flex: 1, marginLeft: SPACING.sm }}>
+          <SkeletonLoader width={120} height={16} />
+          <SkeletonLoader width={80} height={12} style={{ marginTop: 4 }} />
+        </View>
       </View>
+      {/* Price hero skeleton */}
+      <View style={{ marginBottom: SPACING.md }}>
+        <SkeletonLoader width={180} height={28} />
+        <SkeletonLoader width={100} height={14} style={{ marginTop: 4 }} />
+      </View>
+      {/* Chart placeholder */}
+      <SkeletonLoader width="100%" height={320} borderRadius={0} />
       {/* Stats row skeleton */}
-      <View style={styles.statsRow}>
-        <SkeletonLoader width="48%" height={72} borderRadius={RADIUS.md} />
-        <SkeletonLoader width="48%" height={72} borderRadius={RADIUS.md} />
-      </View>
-      <View style={styles.statsRow}>
-        <SkeletonLoader width="48%" height={72} borderRadius={RADIUS.md} />
-        <SkeletonLoader width="48%" height={72} borderRadius={RADIUS.md} />
-      </View>
-      {/* Progress bar skeleton */}
-      <View style={styles.section}>
-        <SkeletonLoader width="100%" height={80} borderRadius={RADIUS.md} />
+      <View style={{ marginTop: SPACING.md }}>
+        <SkeletonLoader width="100%" height={56} borderRadius={RADIUS.md} />
       </View>
       {/* Buy panel skeleton */}
-      <View style={styles.section}>
+      <View style={{ marginTop: SPACING.lg }}>
         <SkeletonLoader width="100%" height={200} borderRadius={RADIUS.lg} />
       </View>
     </View>
@@ -61,7 +66,6 @@ function LoadingSkeleton() {
 
 export default function LaunchDetailScreen({ route }: Props) {
   const { launchPda: launchPdaStr } = route.params;
-  // Memoize so it doesn't create a new PublicKey object on every render
   const launchPda = useMemo(() => new PublicKey(launchPdaStr), [launchPdaStr]);
 
   const {
@@ -83,8 +87,8 @@ export default function LaunchDetailScreen({ route }: Props) {
   const [curvePrice, setCurvePrice] = useState(0);
   const [riskWeight, setRiskWeight] = useState(0);
   const [timeLeft, setTimeLeft] = useState('');
+  const [tokenImage, setTokenImage] = useState<string | null>(null);
 
-  // Stable ref for publicKey string to avoid re-creating fetchData on every render
   const publicKeyStr = publicKey?.toBase58() ?? null;
 
   const fetchData = useCallback(async () => {
@@ -97,7 +101,6 @@ export default function LaunchDetailScreen({ route }: Props) {
       if (publicKeyStr && launchData) {
         const userPk = new PublicKey(publicKeyStr);
         const pos = await getUserPosition(launchPda, userPk);
-        // Only update position if we got a result — don't set null on transient failures
         if (pos !== undefined) {
           setPosition(pos);
         }
@@ -125,6 +128,12 @@ export default function LaunchDetailScreen({ route }: Props) {
     return () => clearInterval(interval);
   }, [launch]);
 
+  useEffect(() => {
+    if (!launch) return;
+    const conn = new Connection(RPC_ENDPOINT, CONNECTION_CONFIG);
+    VestigeClient.fetchTokenImage(conn, launch.tokenMint).then(setTokenImage);
+  }, [launch?.tokenMint.toBase58()]);
+
   const handleBuy = async (solAmount: number) => {
     if (!launch) return;
 
@@ -149,7 +158,6 @@ export default function LaunchDetailScreen({ route }: Props) {
     try {
       await buy(launchPda, launch, solAmount);
       Toast.show({ type: 'success', text1: 'Purchase successful!' });
-      // Brief delay before refetch so the RPC has time to reflect the new state
       setTimeout(fetchData, 2000);
     } catch (err: any) {
       Toast.show({
@@ -250,7 +258,7 @@ export default function LaunchDetailScreen({ route }: Props) {
   if (!launch) {
     return (
       <View style={styles.center}>
-        <Ionicons name="close-circle-outline" size={48} color={COLORS.error} style={styles.errorIcon} />
+        <Ionicons name="close-circle-outline" size={48} color={COLORS.error} style={{ marginBottom: SPACING.md }} />
         <Text style={styles.errorText}>Launch not found</Text>
         <Text style={styles.errorSubtext}>{launchPdaStr}</Text>
       </View>
@@ -259,6 +267,7 @@ export default function LaunchDetailScreen({ route }: Props) {
 
   const progress = VestigeClient.getProgress(launch);
   const priceSol = VestigeClient.lamportsToSol(curvePrice);
+  const pMaxSol = VestigeClient.lamportsToSol(launch.pMax.toNumber());
   const isCreator =
     connected && publicKey && launch.creator.equals(publicKey);
   const canClaimBonus =
@@ -275,30 +284,71 @@ export default function LaunchDetailScreen({ route }: Props) {
   const waitingForCreatorBuy =
     !launch.hasInitialBuy && connected && !isCreator;
 
+  // Discount from pMax
+  const discountPct = pMaxSol > 0 ? ((priceSol - pMaxSol) / pMaxSol) * 100 : 0;
+  const discountColor = discountPct >= 0 ? COLORS.green : COLORS.red;
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
     >
-      {/* Token Mint Pill */}
-      <TouchableOpacity style={styles.mintPill} onPress={copyMintAddress} activeOpacity={0.7}>
-        <Text style={styles.mintAddress}>
-          {launch.tokenMint.toBase58().slice(0, 8)}...{launch.tokenMint.toBase58().slice(-8)}
+      {/* 1. Compact Token Header */}
+      <View style={styles.compactHeader}>
+        {tokenImage ? (
+          <Image source={{ uri: tokenImage }} style={styles.headerImage} />
+        ) : (
+          <View style={styles.headerImagePlaceholder}>
+            <Ionicons name="cube-outline" size={20} color={COLORS.textMuted} />
+          </View>
+        )}
+        <View style={styles.headerNameCol}>
+          <Text style={styles.headerName} numberOfLines={1}>
+            {launch.name || 'Unnamed Token'}
+          </Text>
+          {launch.symbol ? (
+            <Text style={styles.headerSymbol}>${launch.symbol}</Text>
+          ) : null}
+        </View>
+        <TouchableOpacity onPress={copyMintAddress} activeOpacity={0.7} style={styles.mintChip}>
+          <Text style={styles.mintChipText}>
+            {launch.tokenMint.toBase58().slice(0, 4)}...{launch.tokenMint.toBase58().slice(-4)}
+          </Text>
+          <Ionicons name="copy-outline" size={11} color={COLORS.textMuted} />
+        </TouchableOpacity>
+      </View>
+
+      {/* 2. Price Hero */}
+      <View style={styles.priceHero}>
+        <Text style={styles.heroPrice}>{priceSol.toFixed(6)} SOL</Text>
+        <Text style={[styles.heroDiscount, { color: discountColor }]}>
+          {discountPct >= 0 ? '+' : ''}{discountPct.toFixed(1)}% from start
         </Text>
-        <Text style={styles.mintCopyHint}>Tap to copy</Text>
-      </TouchableOpacity>
-
-      {/* Stats Rows */}
-      <View style={styles.statsRow}>
-        <StatBox label="Price" value={`${priceSol.toFixed(6)}`} />
-        <StatBox label="Risk" value={`${riskWeight.toFixed(2)}x`} />
-      </View>
-      <View style={styles.statsRow}>
-        <StatBox label="Time Left" value={timeLeft} />
-        <StatBox label="Participants" value={`${launch.totalParticipants}`} />
       </View>
 
-      {/* Progress */}
+      {/* 3. Trading Chart (full-width, edge-to-edge) */}
+      <View style={styles.chartWrap}>
+        <PriceCurveChart
+          pMax={launch.pMax.toNumber()}
+          pMin={launch.pMin.toNumber()}
+          startTime={launch.startTime}
+          endTime={launch.endTime}
+        />
+      </View>
+
+      {/* 4. Compact Stats Row */}
+      <View style={styles.section}>
+        <CompactStatRow
+          stats={[
+            { label: 'PRICE', value: `${priceSol.toFixed(6)}` },
+            { label: 'RISK', value: `${riskWeight.toFixed(2)}x` },
+            { label: 'USERS', value: `${launch.totalParticipants}` },
+            { label: 'RAISED', value: `${VestigeClient.lamportsToSol(launch.totalSolCollected).toFixed(2)}` },
+          ]}
+        />
+      </View>
+
+      {/* 5. Progress */}
       <View style={styles.section}>
         <Text style={styles.sectionHeader}>Progress</Text>
         <ProgressBar
@@ -311,6 +361,33 @@ export default function LaunchDetailScreen({ route }: Props) {
           ).toFixed(4)}
         />
       </View>
+
+      {/* 6. Buy Panel */}
+      {!launch.isGraduated && (
+        <View style={styles.section}>
+          {waitingForCreatorBuy ? (
+            <View style={styles.waitingBox}>
+              <Text style={styles.waitingTitle}>Waiting for Creator</Text>
+              <Text style={styles.waitingSubtext}>
+                The creator must make an initial buy (min 0.01 SOL) to activate
+                this launch before others can participate.
+              </Text>
+            </View>
+          ) : (
+            <BuyPanel
+              launch={launch}
+              onBuy={handleBuy}
+              disabled={!connected}
+              isCreator={!!isCreator}
+            />
+          )}
+          {!connected && !waitingForCreatorBuy && (
+            <Text style={styles.connectHint}>
+              Connect wallet to buy tokens
+            </Text>
+          )}
+        </View>
+      )}
 
       {/* Milestone Dots */}
       {launch.isGraduated && isCreator && (
@@ -360,33 +437,6 @@ export default function LaunchDetailScreen({ route }: Props) {
             ).toFixed(4)}{' '}
             SOL locked in vault for future Raydium LP
           </Text>
-        </View>
-      )}
-
-      {/* Buy Panel / Waiting for Creator */}
-      {!launch.isGraduated && (
-        <View style={styles.section}>
-          {waitingForCreatorBuy ? (
-            <View style={styles.waitingBox}>
-              <Text style={styles.waitingTitle}>Waiting for Creator</Text>
-              <Text style={styles.waitingSubtext}>
-                The creator must make an initial buy (min 0.01 SOL) to activate
-                this launch before others can participate.
-              </Text>
-            </View>
-          ) : (
-            <BuyPanel
-              launch={launch}
-              onBuy={handleBuy}
-              disabled={!connected}
-              isCreator={!!isCreator}
-            />
-          )}
-          {!connected && !waitingForCreatorBuy && (
-            <Text style={styles.connectHint}>
-              Connect wallet to buy tokens
-            </Text>
-          )}
         </View>
       )}
 
@@ -529,32 +579,75 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.background,
   },
-  // Mint pill
-  mintPill: {
-    alignSelf: 'center',
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: RADIUS.full,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    marginBottom: SPACING.lg,
-    alignItems: 'center',
-  },
-  mintAddress: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.xs,
-    fontFamily: 'monospace',
-  },
-  mintCopyHint: {
-    color: COLORS.textMuted,
-    fontSize: 10,
-    marginTop: 2,
-  },
-  // Stats
-  statsRow: {
+  // Compact header
+  compactHeader: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    alignItems: 'center',
     marginBottom: SPACING.sm,
   },
+  headerImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.surfaceLight,
+  },
+  headerImagePlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerNameCol: {
+    flex: 1,
+    marginLeft: SPACING.sm,
+  },
+  headerName: {
+    color: COLORS.text,
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+  },
+  headerSymbol: {
+    color: COLORS.textMuted,
+    fontSize: FONT_SIZE.xs,
+    marginTop: 1,
+  },
+  mintChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: COLORS.surfaceLight,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: RADIUS.full,
+  },
+  mintChipText: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+    fontFamily: 'monospace',
+  },
+  // Price hero
+  priceHero: {
+    marginBottom: SPACING.md,
+  },
+  heroPrice: {
+    fontSize: 28,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+    color: COLORS.text,
+  },
+  heroDiscount: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  // Chart
+  chartWrap: {
+    marginHorizontal: -SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  // Sections
   section: {
     marginTop: SPACING.lg,
   },
@@ -747,17 +840,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: SPACING.sm,
   },
-  graduatedCheckmark: {
-    fontSize: 20,
-  },
   graduatedLabel: {
     color: COLORS.success,
     fontSize: FONT_SIZE.md,
     fontWeight: '700',
-  },
-  errorIcon: {
-    fontSize: 48,
-    marginBottom: SPACING.md,
   },
   errorText: {
     ...TYPOGRAPHY.h3,
