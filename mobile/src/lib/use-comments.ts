@@ -20,7 +20,9 @@ export function useComments(launchPda: string) {
       .order('created_at', { ascending: false })
       .limit(50);
 
-    if (!error && data) {
+    if (error) {
+      console.warn('[Comments] fetch error:', error.message);
+    } else if (data) {
       setComments(data);
     }
     setLoading(false);
@@ -72,7 +74,9 @@ export function useComments(launchPda: string) {
         .select('id, wallet_address, content, created_at')
         .single();
 
-      if (!error && data) {
+      if (error) {
+        console.warn('[Comments] post error:', error.message);
+      } else if (data) {
         setComments((prev) => {
           if (prev.some((c) => c.id === data.id)) return prev;
           return [data, ...prev];

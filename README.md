@@ -118,9 +118,39 @@ Open [http://localhost:3000](http://localhost:3000). Use **Creator → Create La
 
 ```bash
 cd mobile
+cp .env.example .env   # set EXPO_PUBLIC_* (Privy, Solana RPC, Supabase)
 npm install
 npx expo start
 ```
+
+**Supabase (mobile comments)** — The app uses Supabase for per-launch comments and realtime updates.
+
+1. Create a project at [app.supabase.com](https://app.supabase.com).
+2. In **Project Settings → API**, copy **Project URL** and **anon public** key.
+3. In `mobile/.env`, set:
+   - `EXPO_PUBLIC_SUPABASE_URL=<your Project URL>`
+   - `EXPO_PUBLIC_SUPABASE_ANON_KEY=<your anon key>`
+4. In the Supabase **SQL Editor**, run:
+
+```sql
+create table if not exists public.comments (
+  id uuid primary key default gen_random_uuid(),
+  launch_pda text not null,
+  wallet_address text not null,
+  content text not null,
+  created_at timestamptz default now()
+);
+
+alter table public.comments enable row level security;
+
+create policy "Allow read comments"
+  on public.comments for select using (true);
+
+create policy "Allow insert comments"
+  on public.comments for insert with check (true);
+```
+
+5. In **Database → Replication**, enable replication for the `comments` table so realtime works.
 
 ---
 

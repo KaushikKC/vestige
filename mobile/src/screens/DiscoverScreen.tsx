@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -8,33 +8,40 @@ import {
   StyleSheet,
   RefreshControl,
   ScrollView,
-} from 'react-native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useFocusEffect } from '@react-navigation/native';
-import { PublicKey } from '@solana/web3.js';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
-import { LaunchData } from '../lib/vestige-client';
-import { useVestige } from '../lib/use-vestige';
-import LaunchCard from '../components/LaunchCard';
-import KingOfTheHill from '../components/KingOfTheHill';
-import WalletButton from '../components/WalletButton';
-import SkeletonLoader from '../components/SkeletonLoader';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { DiscoverStackParamList } from '../navigation/RootNavigator';
+} from "react-native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useFocusEffect } from "@react-navigation/native";
+import { PublicKey } from "@solana/web3.js";
+import { Ionicons } from "@expo/vector-icons";
+import {
+  COLORS,
+  SPACING,
+  RADIUS,
+  FONT_SIZE,
+  SHADOWS,
+  TYPOGRAPHY,
+} from "../constants/theme";
+import { LaunchData } from "../lib/vestige-client";
+import { useVestige } from "../lib/use-vestige";
+import LaunchCard from "../components/LaunchCard";
+import KingOfTheHill from "../components/KingOfTheHill";
+import WalletButton from "../components/WalletButton";
+import SkeletonLoader from "../components/SkeletonLoader";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { DiscoverStackParamList } from "../navigation/RootNavigator";
 
 type Props = {
-  navigation: NativeStackNavigationProp<DiscoverStackParamList, 'DiscoverList'>;
+  navigation: NativeStackNavigationProp<DiscoverStackParamList, "DiscoverList">;
 };
 
-type SortMode = 'all' | 'active' | 'graduated' | 'mostRaised' | 'newest';
+type SortMode = "all" | "active" | "graduated" | "mostRaised" | "newest";
 
 const FILTER_CHIPS: { key: SortMode; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'active', label: 'Active' },
-  { key: 'graduated', label: 'Graduated' },
-  { key: 'mostRaised', label: 'Most Raised' },
-  { key: 'newest', label: 'Newest' },
+  { key: "all", label: "All" },
+  { key: "active", label: "Active" },
+  { key: "graduated", label: "Graduated" },
+  { key: "mostRaised", label: "Most Raised" },
+  { key: "newest", label: "Newest" },
 ];
 
 function isValidPublicKey(str: string): boolean {
@@ -81,25 +88,28 @@ export default function DiscoverScreen({ navigation }: Props) {
   const [launches, setLaunches] = useState<LaunchData[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [query, setQuery] = useState('');
-  const [sortMode, setSortMode] = useState<SortMode>('all');
+  const [query, setQuery] = useState("");
+  const [sortMode, setSortMode] = useState<SortMode>("all");
 
-  const fetchLaunches = useCallback(async (force = false) => {
-    try {
-      const data = await getAllLaunches(force);
-      setLaunches(data);
-    } catch (err) {
-      console.warn('Failed to fetch launches:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [getAllLaunches]);
+  const fetchLaunches = useCallback(
+    async (force = false) => {
+      try {
+        const data = await getAllLaunches(force);
+        setLaunches(data);
+      } catch (err) {
+        console.warn("Failed to fetch launches:", err);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [getAllLaunches],
+  );
 
   useFocusEffect(
     useCallback(() => {
       fetchLaunches();
-    }, [fetchLaunches])
+    }, [fetchLaunches]),
   );
 
   const onRefresh = useCallback(() => {
@@ -108,16 +118,16 @@ export default function DiscoverScreen({ navigation }: Props) {
   }, [fetchLaunches]);
 
   const goToLaunch = (pda: string) => {
-    navigation.navigate('LaunchDetail', { launchPda: pda });
+    navigation.navigate("LaunchDetail", { launchPda: pda });
   };
 
   const kingLaunch = useMemo(() => {
-    const active = launches.filter(
-      (l) => !l.isGraduated && l.totalSolCollected.toNumber() > 0
-    );
+    const active = launches.filter((l) => !l.isGraduated);
     if (!active.length) return null;
     return active.reduce((best, l) =>
-      l.totalSolCollected.toNumber() > best.totalSolCollected.toNumber() ? l : best
+      l.totalSolCollected.toNumber() > best.totalSolCollected.toNumber()
+        ? l
+        : best,
     );
   }, [launches]);
 
@@ -134,34 +144,32 @@ export default function DiscoverScreen({ navigation }: Props) {
         (l) =>
           l.name.toLowerCase().includes(q) ||
           l.symbol.toLowerCase().includes(q) ||
-          l.tokenMint.toBase58().toLowerCase().includes(q)
+          l.tokenMint.toBase58().toLowerCase().includes(q),
       );
     }
 
     // Filter
     switch (sortMode) {
-      case 'active':
+      case "active":
         list = list.filter((l) => !l.isGraduated);
         break;
-      case 'graduated':
+      case "graduated":
         list = list.filter((l) => l.isGraduated);
         break;
-      case 'mostRaised':
+      case "mostRaised":
         list = [...list].sort(
           (a, b) =>
-            b.totalSolCollected.toNumber() - a.totalSolCollected.toNumber()
+            b.totalSolCollected.toNumber() - a.totalSolCollected.toNumber(),
         );
         break;
-      case 'newest':
+      case "newest":
         list = [...list].sort((a, b) => b.startTime - a.startTime);
         break;
     }
 
     // Exclude king from main list to avoid duplication
     if (kingLaunch) {
-      list = list.filter(
-        (l) => !l.publicKey.equals(kingLaunch.publicKey)
-      );
+      list = list.filter((l) => !l.publicKey.equals(kingLaunch.publicKey));
     }
 
     return list;
@@ -177,7 +185,12 @@ export default function DiscoverScreen({ navigation }: Props) {
 
       {/* Search bar */}
       <View style={styles.searchWrap}>
-        <Ionicons name="search" size={16} color={COLORS.textMuted} style={styles.searchIcon} />
+        <Ionicons
+          name="search"
+          size={16}
+          color={COLORS.textMuted}
+          style={styles.searchIcon}
+        />
         <TextInput
           style={styles.searchInput}
           placeholder="Search by name or symbol..."
@@ -188,7 +201,10 @@ export default function DiscoverScreen({ navigation }: Props) {
           autoCorrect={false}
         />
         {query.length > 0 && (
-          <TouchableOpacity onPress={() => setQuery('')} style={styles.clearBtn}>
+          <TouchableOpacity
+            onPress={() => setQuery("")}
+            style={styles.clearBtn}
+          >
             <Ionicons name="close-circle" size={16} color={COLORS.textMuted} />
           </TouchableOpacity>
         )}
@@ -200,11 +216,17 @@ export default function DiscoverScreen({ navigation }: Props) {
           style={styles.pdaLink}
           onPress={() => {
             goToLaunch(trimmedQuery);
-            setQuery('');
+            setQuery("");
           }}
         >
-          <Ionicons name="arrow-forward-circle-outline" size={14} color={COLORS.primary} />
-          <Text style={styles.pdaLinkText}>Go to PDA: {trimmedQuery.slice(0, 8)}...</Text>
+          <Ionicons
+            name="arrow-forward-circle-outline"
+            size={14}
+            color={COLORS.primary}
+          />
+          <Text style={styles.pdaLinkText}>
+            Go to PDA: {trimmedQuery.slice(0, 8)}...
+          </Text>
         </TouchableOpacity>
       )}
 
@@ -217,10 +239,7 @@ export default function DiscoverScreen({ navigation }: Props) {
         {FILTER_CHIPS.map((chip) => (
           <TouchableOpacity
             key={chip.key}
-            style={[
-              styles.chip,
-              sortMode === chip.key && styles.chipActive,
-            ]}
+            style={[styles.chip, sortMode === chip.key && styles.chipActive]}
             onPress={() => setSortMode(chip.key)}
           >
             <Text
@@ -269,17 +288,22 @@ export default function DiscoverScreen({ navigation }: Props) {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Ionicons name="rocket-outline" size={48} color={COLORS.textMuted} style={{ marginBottom: SPACING.md }} />
+              <Ionicons
+                name="rocket-outline"
+                size={48}
+                color={COLORS.textMuted}
+                style={{ marginBottom: SPACING.md }}
+              />
               <Text style={styles.emptyTitle}>No launches found</Text>
               <Text style={styles.emptySubtext}>
                 {trimmedQuery
-                  ? 'Try a different search term'
-                  : 'Pull to refresh or create a new launch'}
+                  ? "Try a different search term"
+                  : "Pull to refresh or create a new launch"}
               </Text>
               {!trimmedQuery && (
                 <TouchableOpacity
                   style={styles.emptyCta}
-                  onPress={() => navigation.getParent()?.navigate('Create')}
+                  onPress={() => navigation.getParent()?.navigate("Create")}
                 >
                   <Text style={styles.emptyCtaText}>Create a Launch</Text>
                 </TouchableOpacity>
@@ -302,17 +326,17 @@ const skeletonStyles = StyleSheet.create({
     ...SHADOWS.md,
   },
   topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
 });
 
@@ -322,9 +346,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   hero: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.sm,
     paddingBottom: SPACING.sm,
@@ -334,8 +358,8 @@ const styles = StyleSheet.create({
   },
   // Search
   searchWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: COLORS.surface,
     marginHorizontal: SPACING.md,
     borderRadius: RADIUS.md,
@@ -356,8 +380,8 @@ const styles = StyleSheet.create({
   },
   // PDA link
   pdaLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs + 2,
@@ -365,12 +389,13 @@ const styles = StyleSheet.create({
   pdaLinkText: {
     color: COLORS.primary,
     fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   // Filter chips
   chipRow: {
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs + 2,
+    paddingTop: SPACING.xs + 2,
+    paddingBottom: SPACING.sm,
     gap: SPACING.xs + 2,
   },
   chip: {
@@ -380,6 +405,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
     borderWidth: 1,
     borderColor: COLORS.border,
+    height: 30,
   },
   chipActive: {
     backgroundColor: COLORS.primary,
@@ -388,10 +414,10 @@ const styles = StyleSheet.create({
   chipText: {
     color: COLORS.textSecondary,
     fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   chipTextActive: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
   // Lists
   skeletonList: {
@@ -403,7 +429,7 @@ const styles = StyleSheet.create({
   },
   // Empty state
   emptyState: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingTop: SPACING.xxl + 16,
   },
   emptyTitle: {
@@ -413,7 +439,7 @@ const styles = StyleSheet.create({
   emptySubtext: {
     color: COLORS.textMuted,
     fontSize: FONT_SIZE.sm,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: SPACING.lg,
   },
   emptyCta: {
@@ -423,8 +449,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xl,
   },
   emptyCtaText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 });
