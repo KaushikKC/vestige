@@ -23,12 +23,14 @@ import {
 import { useVestige } from '../lib/use-vestige';
 import { useWallet } from '../lib/use-wallet';
 import ProgressBar from '../components/ProgressBar';
-import BuyPanel from '../components/BuyPanel';
+import TradePanel from '../components/TradePanel';
 import PositionCard from '../components/PositionCard';
 import SkeletonLoader from '../components/SkeletonLoader';
 import PriceCurveChart from '../components/PriceCurveChart';
 import CompactStatRow from '../components/CompactStatRow';
 import CommentThread from '../components/CommentThread';
+import TradeFeed from '../components/TradeFeed';
+import HolderDistribution from '../components/HolderDistribution';
 import { CONNECTION_CONFIG, RPC_ENDPOINT } from '../constants/solana';
 
 type Props = {
@@ -73,6 +75,7 @@ export default function LaunchDetailScreen({ route }: Props) {
     getLaunch,
     getUserPosition,
     buy,
+    sell,
     graduate,
     claimBonus,
     creatorClaimFees,
@@ -89,6 +92,7 @@ export default function LaunchDetailScreen({ route }: Props) {
   const [riskWeight, setRiskWeight] = useState(0);
   const [timeLeft, setTimeLeft] = useState('');
   const [tokenImage, setTokenImage] = useState<string | null>(null);
+  const [infoTab, setInfoTab] = useState<'comments' | 'trades' | 'holders'>('comments');
 
   const publicKeyStr = publicKey?.toBase58() ?? null;
 
@@ -164,6 +168,21 @@ export default function LaunchDetailScreen({ route }: Props) {
       Toast.show({
         type: 'error',
         text1: 'Purchase failed',
+        text2: err?.message || 'Unknown error',
+      });
+    }
+  };
+
+  const handleSell = async (tokenAmount: number) => {
+    if (!launch) return;
+    try {
+      await sell(launchPda, launch, tokenAmount);
+      Toast.show({ type: 'success', text1: 'Sell successful!' });
+      setTimeout(fetchData, 2000);
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Sell failed',
         text2: err?.message || 'Unknown error',
       });
     }
@@ -363,12 +382,47 @@ export default function LaunchDetailScreen({ route }: Props) {
         />
       </View>
 
-      {/* 6. Comments */}
+      {/* 6. Tabbed Section: Comments / Trades / Holders */}
       <View style={styles.section}>
-        <CommentThread launchPda={launchPdaStr} />
+        <View style={styles.infoTabRow}>
+          {(['comments', 'trades', 'holders'] as const).map((t) => (
+            <TouchableOpacity
+              key={t}
+              style={[styles.infoTab, infoTab === t && styles.infoTabActive]}
+              onPress={() => setInfoTab(t)}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.infoTabText,
+                  infoTab === t && styles.infoTabTextActive,
+                ]}
+              >
+                {t.charAt(0).toUpperCase() + t.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {infoTab === 'comments' && (
+          <CommentThread launchPda={launchPdaStr} />
+        )}
+        {infoTab === 'trades' && (
+          <TradeFeed
+            launchPda={launchPdaStr}
+            tokenMint={launch.tokenMint.toBase58()}
+          />
+        )}
+        {infoTab === 'holders' && (
+          <HolderDistribution
+            launchPda={launchPdaStr}
+            tokenMint={launch.tokenMint.toBase58()}
+            totalSupply={launch.tokenSupply.toNumber()}
+          />
+        )}
       </View>
 
-      {/* 7. Buy Panel */}
+      {/* 7. Trade Panel (Buy + Sell) */}
       {!launch.isGraduated && (
         <View style={styles.section}>
           {waitingForCreatorBuy ? (
@@ -380,16 +434,18 @@ export default function LaunchDetailScreen({ route }: Props) {
               </Text>
             </View>
           ) : (
-            <BuyPanel
+            <TradePanel
               launch={launch}
+              position={position}
               onBuy={handleBuy}
+              onSell={handleSell}
               disabled={!connected}
               isCreator={!!isCreator}
             />
           )}
           {!connected && !waitingForCreatorBuy && (
             <Text style={styles.connectHint}>
-              Connect wallet to buy tokens
+              Connect wallet to trade tokens
             </Text>
           )}
         </View>
@@ -666,6 +722,31 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     textAlign: 'center',
     marginTop: SPACING.sm,
+  },
+  // Info tabs (Comments / Trades / Holders)
+  infoTabRow: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: RADIUS.md,
+    padding: 3,
+    marginBottom: SPACING.md,
+  },
+  infoTab: {
+    flex: 1,
+    paddingVertical: SPACING.sm,
+    alignItems: 'center',
+    borderRadius: RADIUS.md - 2,
+  },
+  infoTabActive: {
+    backgroundColor: COLORS.cardBg,
+  },
+  infoTabText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+  },
+  infoTabTextActive: {
+    color: COLORS.text,
   },
   // Milestones
   milestoneDots: {
