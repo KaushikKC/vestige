@@ -276,6 +276,12 @@ export class VestigeClient {
     return `${m}m`;
   }
 
+  static getMarketCapSol(launch: LaunchData): number {
+    const price = VestigeClient.getCurrentCurvePrice(launch);
+    const supply = launch.tokenSupply.toNumber();
+    return (price * supply) / (TOKEN_PRECISION * 1e9);
+  }
+
   static getProgress(launch: LaunchData): number {
     const target = launch.graduationTarget.toNumber();
     if (target <= 0) return 0;

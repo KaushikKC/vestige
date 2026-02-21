@@ -2593,6 +2593,68 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@supabase/auth-js@npm:2.97.0":
+  version: 2.97.0
+  resolution: "@supabase/auth-js@npm:2.97.0"
+  dependencies:
+    tslib: 2.8.1
+  checksum: bc537ed32b660fc847f00d52114db869717287b0285026a57cefe462e30d9601276a045be5b869f6edb430763f4e50c240116ef6c0a7efddb61195a781c9a49c
+  languageName: node
+  linkType: hard
+
+"@supabase/functions-js@npm:2.97.0":
+  version: 2.97.0
+  resolution: "@supabase/functions-js@npm:2.97.0"
+  dependencies:
+    tslib: 2.8.1
+  checksum: d8ea5325d8a57019b8eecb2629553f25cd5f03696423fd1e7357ada5d5c49dda04c4573d860afc025c55f6796ff54d008e5d6b94fec3e7d1056c9fa4e9c59d06
+  languageName: node
+  linkType: hard
+
+"@supabase/postgrest-js@npm:2.97.0":
+  version: 2.97.0
+  resolution: "@supabase/postgrest-js@npm:2.97.0"
+  dependencies:
+    tslib: 2.8.1
+  checksum: 86dec4ff472be87f1961135451fc22b2ca038d5b08beff0900416adcab1bb00059273af09e5d59cdb045f502994642902b81d0694c80f130ed36709b2dd0dd92
+  languageName: node
+  linkType: hard
+
+"@supabase/realtime-js@npm:2.97.0":
+  version: 2.97.0
+  resolution: "@supabase/realtime-js@npm:2.97.0"
+  dependencies:
+    "@types/phoenix": ^1.6.6
+    "@types/ws": ^8.18.1
+    tslib: 2.8.1
+    ws: ^8.18.2
+  checksum: d65fa061bf74d08128ed35520fda5fc4d7d9dae1aabe661be1d8287fae5c4745b004f2866d4925badd498a8f7a5299b8dcab9c325f8a40ba3086ac1ccafa9b7c
+  languageName: node
+  linkType: hard
+
+"@supabase/storage-js@npm:2.97.0":
+  version: 2.97.0
+  resolution: "@supabase/storage-js@npm:2.97.0"
+  dependencies:
+    iceberg-js: ^0.8.1
+    tslib: 2.8.1
+  checksum: 2ec2fc6251043d198ae734d52c33d20158d2a56ba4abbcf363abc58dbd5f7cb87e3e5bdd64fa82aa6dc03bac99ca2cba6eac7f8e72d7361585f5636f86280469
+  languageName: node
+  linkType: hard
+
+"@supabase/supabase-js@npm:^2.97.0":
+  version: 2.97.0
+  resolution: "@supabase/supabase-js@npm:2.97.0"
+  dependencies:
+    "@supabase/auth-js": 2.97.0
+    "@supabase/functions-js": 2.97.0
+    "@supabase/postgrest-js": 2.97.0
+    "@supabase/realtime-js": 2.97.0
+    "@supabase/storage-js": 2.97.0
+  checksum: ad68ebaef5de2a904655c8b15d55cfdb40719158db0425683ff76736d4e3886dd945705f1007d431b10d1e929ab2a72b066760a5f5911fcf8c7b16149c01bab4
+  languageName: node
+  linkType: hard
+
 "@swc/helpers@npm:^0.5.11":
   version: 0.5.18
   resolution: "@swc/helpers@npm:0.5.18"
@@ -2711,6 +2773,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/phoenix@npm:^1.6.6":
+  version: 1.6.7
+  resolution: "@types/phoenix@npm:1.6.7"
+  checksum: 768b6ceb1661eae1e276d7af851c91cfee228e21d9ccbdd110c76ccda01e94661fd7bfd6ea93c7acbb30c2bc516608ae960fd0db4bb7e7f8372f4f862efe0900
+  languageName: node
+  linkType: hard
+
 "@types/react@npm:~19.1.0":
   version: 19.1.17
   resolution: "@types/react@npm:19.1.17"
@@ -2743,7 +2812,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/ws@npm:^8.2.2":
+"@types/ws@npm:^8.18.1, @types/ws@npm:^8.2.2":
   version: 8.18.1
   resolution: "@types/ws@npm:8.18.1"
   dependencies:
@@ -4889,6 +4958,13 @@ __metadata:
   dependencies:
     ms: ^2.0.0
   checksum: 9c7a74a2827f9294c009266c82031030eae811ca87b0da3dceb8d6071b9bde22c9f3daef0469c3c533cc67a97d8a167cd9fc0389350e5f415f61a79b171ded16
+  languageName: node
+  linkType: hard
+
+"iceberg-js@npm:^0.8.1":
+  version: 0.8.1
+  resolution: "iceberg-js@npm:0.8.1"
+  checksum: 679e52f82a285b3e1da69bfb7c6c54af95067ca56293299b4ffcc196329a4f2eeb1502fe55c0b44cc80e9eb1bf34001b76ee9f0e13268a753d0cfe8d27072e56
   languageName: node
   linkType: hard
 
@@ -7560,7 +7636,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tslib@npm:^2.0.3, tslib@npm:^2.8.0":
+"tslib@npm:2.8.1, tslib@npm:^2.0.3, tslib@npm:^2.8.0":
   version: 2.8.1
   resolution: "tslib@npm:2.8.1"
   checksum: e4aba30e632b8c8902b47587fd13345e2827fa639e7c3121074d5ee0880723282411a8838f830b55100cbe4517672f84a2472667d355b81e8af165a55dc6203a
@@ -7791,6 +7867,7 @@ __metadata:
     "@solana-mobile/mobile-wallet-adapter-protocol-web3js": ^2.2.5
     "@solana/spl-token": ^0.3.9
     "@solana/web3.js": ^1.95.0
+    "@supabase/supabase-js": ^2.97.0
     "@types/bn.js": ^5.2.0
     "@types/react": ~19.1.0
     bn.js: ^5.2.2
@@ -7974,7 +8051,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ws@npm:^8.12.1, ws@npm:^8.5.0":
+"ws@npm:^8.12.1, ws@npm:^8.18.2, ws@npm:^8.5.0":
   version: 8.19.0
   resolution: "ws@npm:8.19.0"
   peerDependencies:

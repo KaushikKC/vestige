@@ -17,6 +17,7 @@ import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../cons
 import { LaunchData } from '../lib/vestige-client';
 import { useVestige } from '../lib/use-vestige';
 import LaunchCard from '../components/LaunchCard';
+import KingOfTheHill from '../components/KingOfTheHill';
 import WalletButton from '../components/WalletButton';
 import SkeletonLoader from '../components/SkeletonLoader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -110,6 +111,16 @@ export default function DiscoverScreen({ navigation }: Props) {
     navigation.navigate('LaunchDetail', { launchPda: pda });
   };
 
+  const kingLaunch = useMemo(() => {
+    const active = launches.filter(
+      (l) => !l.isGraduated && l.totalSolCollected.toNumber() > 0
+    );
+    if (!active.length) return null;
+    return active.reduce((best, l) =>
+      l.totalSolCollected.toNumber() > best.totalSolCollected.toNumber() ? l : best
+    );
+  }, [launches]);
+
   const trimmedQuery = query.trim();
   const showPdaLink = trimmedQuery.length > 0 && isValidPublicKey(trimmedQuery);
 
@@ -146,8 +157,15 @@ export default function DiscoverScreen({ navigation }: Props) {
         break;
     }
 
+    // Exclude king from main list to avoid duplication
+    if (kingLaunch) {
+      list = list.filter(
+        (l) => !l.publicKey.equals(kingLaunch.publicKey)
+      );
+    }
+
     return list;
-  }, [launches, trimmedQuery, sortMode]);
+  }, [launches, trimmedQuery, sortMode, kingLaunch]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -216,6 +234,14 @@ export default function DiscoverScreen({ navigation }: Props) {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {/* King of the Hill */}
+      {kingLaunch && !loading && (
+        <KingOfTheHill
+          launch={kingLaunch}
+          onPress={() => goToLaunch(kingLaunch.publicKey.toBase58())}
+        />
+      )}
 
       {loading ? (
         <View style={styles.skeletonList}>

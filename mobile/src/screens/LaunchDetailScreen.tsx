@@ -28,6 +28,7 @@ import PositionCard from '../components/PositionCard';
 import SkeletonLoader from '../components/SkeletonLoader';
 import PriceCurveChart from '../components/PriceCurveChart';
 import CompactStatRow from '../components/CompactStatRow';
+import CommentThread from '../components/CommentThread';
 import { CONNECTION_CONFIG, RPC_ENDPOINT } from '../constants/solana';
 
 type Props = {
@@ -340,7 +341,7 @@ export default function LaunchDetailScreen({ route }: Props) {
       <View style={styles.section}>
         <CompactStatRow
           stats={[
-            { label: 'PRICE', value: `${priceSol.toFixed(6)}` },
+            { label: 'MCAP', value: `${VestigeClient.getMarketCapSol(launch).toFixed(2)}` },
             { label: 'RISK', value: `${riskWeight.toFixed(2)}x` },
             { label: 'USERS', value: `${launch.totalParticipants}` },
             { label: 'RAISED', value: `${VestigeClient.lamportsToSol(launch.totalSolCollected).toFixed(2)}` },
@@ -362,7 +363,12 @@ export default function LaunchDetailScreen({ route }: Props) {
         />
       </View>
 
-      {/* 6. Buy Panel */}
+      {/* 6. Comments */}
+      <View style={styles.section}>
+        <CommentThread launchPda={launchPdaStr} />
+      </View>
+
+      {/* 7. Buy Panel */}
       {!launch.isGraduated && (
         <View style={styles.section}>
           {waitingForCreatorBuy ? (

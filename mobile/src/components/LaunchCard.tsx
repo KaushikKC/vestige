@@ -21,6 +21,7 @@ export default function LaunchCard({ launch, onPress }: LaunchCardProps) {
   const priceSol = VestigeClient.lamportsToSol(price);
   const pMaxSol = VestigeClient.lamportsToSol(launch.pMax.toNumber());
   const solRaised = VestigeClient.lamportsToSol(launch.totalSolCollected);
+  const mcap = VestigeClient.getMarketCapSol(launch);
 
   const name = launch.name || launch.tokenMint.toBase58().slice(0, 8) + '...';
   const symbol = launch.symbol || launch.tokenMint.toBase58().slice(0, 6);
@@ -72,6 +73,9 @@ export default function LaunchCard({ launch, onPress }: LaunchCardProps) {
           {'\u25CE'} {solRaised.toFixed(2)} SOL raised
         </Text>
       </View>
+
+      {/* Market cap */}
+      <Text style={styles.mcapText}>MCap: {mcap.toFixed(2)} SOL</Text>
 
       {/* Progress bar */}
       <View style={styles.progressTrack}>
@@ -163,6 +167,12 @@ const styles = StyleSheet.create({
   statText: {
     color: COLORS.textSecondary,
     fontSize: FONT_SIZE.xs,
+  },
+  mcapText: {
+    color: COLORS.textMuted,
+    fontSize: FONT_SIZE.xs,
+    textAlign: 'right',
+    marginBottom: SPACING.sm + 2,
   },
   progressTrack: {
     height: 4,

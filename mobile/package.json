@@ -23,6 +23,7 @@
     "@solana-mobile/mobile-wallet-adapter-protocol-web3js": "^2.2.5",
     "@solana/spl-token": "^0.3.9",
     "@solana/web3.js": "^1.95.0",
+    "@supabase/supabase-js": "^2.97.0",
     "bn.js": "^5.2.2",
     "buffer": "^6.0.3",
     "expo": "~54.0.33",
