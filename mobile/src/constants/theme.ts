@@ -20,6 +20,10 @@ export const COLORS = {
   tabBarBorder: '#E5E7EB',
   tabBarActive: '#1D04E1',
   tabBarInactive: '#9CA3AF',
+  green: '#00C853',
+  red: '#FF1744',
+  chartGrid: '#E8E8EC',
+  chartArea: '#F8F8FA',
 };
 
 export const SPACING = {
@@ -129,5 +133,17 @@ export const TYPOGRAPHY = {
     textTransform: 'uppercase' as const,
     letterSpacing: 0.8,
     color: COLORS.textSecondary,
+  },
+  price: {
+    fontSize: 20,
+    fontWeight: '800' as const,
+    fontFamily: 'monospace',
+    color: COLORS.text,
+  },
+  priceSmall: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+    fontFamily: 'monospace',
+    color: COLORS.text,
   },
 };

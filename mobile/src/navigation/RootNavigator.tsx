@@ -37,7 +37,7 @@ function DiscoverNavigator() {
       <DiscoverStack.Screen
         name="DiscoverList"
         component={DiscoverScreen}
-        options={{ title: 'Discover' }}
+        options={{ headerShown: false }}
       />
       <DiscoverStack.Screen
         name="LaunchDetail"
@@ -62,7 +62,7 @@ function PortfolioNavigator() {
       <PortfolioStack.Screen
         name="PortfolioList"
         component={PortfolioScreen}
-        options={{ title: 'Portfolio' }}
+        options={{ headerShown: false }}
       />
       <PortfolioStack.Screen
         name="LaunchDetail"
@@ -77,7 +77,7 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
   const iconMap: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionicons.glyphMap]> = {
     Discover: ['search-outline', 'search'],
     Create: ['add-circle-outline', 'add-circle'],
-    Portfolio: ['trending-up-outline', 'trending-up'],
+    Profile: ['person-outline', 'person'],
   };
   const [outline, filled] = iconMap[label] || ['help-outline', 'help'];
   return (
@@ -126,7 +126,7 @@ export default function RootNavigator() {
           title: 'Create Launch',
         }}
       />
-      <Tab.Screen name="Portfolio" component={PortfolioNavigator} />
+      <Tab.Screen name="Profile" component={PortfolioNavigator} />
     </Tab.Navigator>
   );
 }
