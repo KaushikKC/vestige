@@ -21,8 +21,9 @@ import {
   SHADOWS,
   TYPOGRAPHY,
 } from "../constants/theme";
-import { LaunchData } from "../lib/vestige-client";
+import { LaunchData, VestigeClient } from "../lib/vestige-client";
 import { useVestige } from "../lib/use-vestige";
+import { useFavorites } from "../lib/use-favorites";
 import LaunchCard from "../components/LaunchCard";
 import KingOfTheHill from "../components/KingOfTheHill";
 import WalletButton from "../components/WalletButton";
@@ -34,12 +35,14 @@ type Props = {
   navigation: NativeStackNavigationProp<DiscoverStackParamList, "DiscoverList">;
 };
 
-type SortMode = "all" | "active" | "graduated" | "mostRaised" | "newest";
+type SortMode = "all" | "active" | "graduated" | "mostRaised" | "newest" | "graduating" | "favorites";
 
 const FILTER_CHIPS: { key: SortMode; label: string }[] = [
   { key: "all", label: "All" },
   { key: "active", label: "Active" },
+  { key: "graduating", label: "Graduating" },
   { key: "graduated", label: "Graduated" },
+  { key: "favorites", label: "\u2605 Watchlist" },
   { key: "mostRaised", label: "Most Raised" },
   { key: "newest", label: "Newest" },
 ];
@@ -85,6 +88,7 @@ function SkeletonCard() {
 export default function DiscoverScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { getAllLaunches } = useVestige();
+  const { isFavorite, toggle: toggleFavorite } = useFavorites();
   const [launches, setLaunches] = useState<LaunchData[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -131,6 +135,14 @@ export default function DiscoverScreen({ navigation }: Props) {
     );
   }, [launches]);
 
+  const aboutToGraduate = useMemo(
+    () =>
+      launches.filter(
+        (l) => !l.isGraduated && VestigeClient.getProgress(l) > 80,
+      ),
+    [launches],
+  );
+
   const trimmedQuery = query.trim();
   const showPdaLink = trimmedQuery.length > 0 && isValidPublicKey(trimmedQuery);
 
@@ -165,6 +177,14 @@ export default function DiscoverScreen({ navigation }: Props) {
       case "newest":
         list = [...list].sort((a, b) => b.startTime - a.startTime);
         break;
+      case "graduating":
+        list = list.filter(
+          (l) => !l.isGraduated && VestigeClient.getProgress(l) > 80,
+        );
+        break;
+      case "favorites":
+        list = list.filter((l) => isFavorite(l.publicKey.toBase58()));
+        break;
     }
 
     // Exclude king from main list to avoid duplication
@@ -173,7 +193,7 @@ export default function DiscoverScreen({ navigation }: Props) {
     }
 
     return list;
-  }, [launches, trimmedQuery, sortMode, kingLaunch]);
+  }, [launches, trimmedQuery, sortMode, kingLaunch, isFavorite]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -262,6 +282,66 @@ export default function DiscoverScreen({ navigation }: Props) {
         />
       )}
 
+      {/* About to Graduate */}
+      {aboutToGraduate.length > 0 && !loading && (
+        <View style={styles.graduatingSection}>
+          <Text style={styles.graduatingSectionTitle}>About to Graduate</Text>
+          <FlatList
+            horizontal
+            data={aboutToGraduate}
+            keyExtractor={(item) => item.publicKey.toBase58()}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.graduatingList}
+            renderItem={({ item }) => {
+              const progress = VestigeClient.getProgress(item);
+              const target = item.graduationTarget.toNumber();
+              const collected = item.totalSolCollected.toNumber();
+              const remainingSol = VestigeClient.lamportsToSol(
+                Math.max(0, target - collected),
+              );
+              const barColor =
+                progress > 95 ? COLORS.red : COLORS.warning;
+              const name =
+                item.name ||
+                item.tokenMint.toBase58().slice(0, 8) + "...";
+              return (
+                <TouchableOpacity
+                  style={styles.graduatingCard}
+                  activeOpacity={0.7}
+                  onPress={() =>
+                    goToLaunch(item.publicKey.toBase58())
+                  }
+                >
+                  <Text
+                    style={styles.graduatingName}
+                    numberOfLines={1}
+                  >
+                    {name}
+                  </Text>
+                  <Text style={styles.graduatingSymbol}>
+                    ${item.symbol}
+                  </Text>
+                  <View style={styles.graduatingBarTrack}>
+                    <View
+                      style={[
+                        styles.graduatingBarFill,
+                        {
+                          width: `${Math.min(100, progress)}%`,
+                          backgroundColor: barColor,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.graduatingRemaining}>
+                    {remainingSol.toFixed(2)} SOL to go
+                  </Text>
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
+      )}
+
       {loading ? (
         <View style={styles.skeletonList}>
           <SkeletonCard />
@@ -276,6 +356,10 @@ export default function DiscoverScreen({ navigation }: Props) {
             <LaunchCard
               launch={item}
               onPress={() => goToLaunch(item.publicKey.toBase58())}
+              isFavorite={isFavorite(item.publicKey.toBase58())}
+              onToggleFavorite={() =>
+                toggleFavorite(item.publicKey.toBase58())
+              }
             />
           )}
           contentContainerStyle={styles.list}
@@ -418,6 +502,53 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: "#FFFFFF",
+  },
+  // About to Graduate
+  graduatingSection: {
+    marginBottom: SPACING.sm,
+  },
+  graduatingSectionTitle: {
+    ...TYPOGRAPHY.h3,
+    fontSize: FONT_SIZE.md,
+    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  graduatingList: {
+    paddingHorizontal: SPACING.md,
+    gap: SPACING.sm,
+  },
+  graduatingCard: {
+    width: 160,
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.md,
+    padding: SPACING.sm + 2,
+    ...SHADOWS.sm,
+  },
+  graduatingName: {
+    color: COLORS.text,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: "700",
+  },
+  graduatingSymbol: {
+    color: COLORS.textMuted,
+    fontSize: FONT_SIZE.xs - 1,
+    marginBottom: SPACING.xs + 2,
+  },
+  graduatingBarTrack: {
+    height: 6,
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: 3,
+    overflow: "hidden",
+    marginBottom: SPACING.xs,
+  },
+  graduatingBarFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  graduatingRemaining: {
+    color: COLORS.textSecondary,
+    fontSize: FONT_SIZE.xs - 1,
+    fontWeight: "600",
   },
   // Lists
   skeletonList: {

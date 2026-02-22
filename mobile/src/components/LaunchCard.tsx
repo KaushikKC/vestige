@@ -1,11 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import { LaunchData, VestigeClient } from '../lib/vestige-client';
 
 interface LaunchCardProps {
   launch: LaunchData;
   onPress: () => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
 }
 
 function hashStringToColor(str: string): string {
@@ -14,7 +17,7 @@ function hashStringToColor(str: string): string {
   return `hsl(${Math.abs(hash) % 360}, 60%, 45%)`;
 }
 
-export default function LaunchCard({ launch, onPress }: LaunchCardProps) {
+export default function LaunchCard({ launch, onPress, isFavorite, onToggleFavorite }: LaunchCardProps) {
   const progress = VestigeClient.getProgress(launch);
   const timeLeft = VestigeClient.getTimeRemaining(launch.endTime);
   const price = VestigeClient.getCurrentCurvePrice(launch);
@@ -51,6 +54,19 @@ export default function LaunchCard({ launch, onPress }: LaunchCardProps) {
           </View>
         ) : (
           <Text style={styles.timeText}>{timeLeft}</Text>
+        )}
+        {onToggleFavorite && (
+          <TouchableOpacity
+            onPress={(e) => { e.stopPropagation(); onToggleFavorite(); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.starBtn}
+          >
+            <Ionicons
+              name={isFavorite ? 'star' : 'star-outline'}
+              size={18}
+              color={isFavorite ? COLORS.warning : COLORS.textMuted}
+            />
+          </TouchableOpacity>
         )}
       </View>
 
@@ -129,6 +145,10 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: FONT_SIZE.xs,
     fontWeight: '600',
+  },
+  starBtn: {
+    marginLeft: SPACING.sm,
+    padding: 2,
   },
   graduatedBadge: {
     backgroundColor: COLORS.success + '20',
