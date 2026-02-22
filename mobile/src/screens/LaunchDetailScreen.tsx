@@ -27,11 +27,13 @@ import TradePanel from '../components/TradePanel';
 import PositionCard from '../components/PositionCard';
 import SkeletonLoader from '../components/SkeletonLoader';
 import PriceCurveChart from '../components/PriceCurveChart';
+import CandlestickChart from '../components/CandlestickChart';
 import CompactStatRow from '../components/CompactStatRow';
 import CommentThread from '../components/CommentThread';
 import TradeFeed from '../components/TradeFeed';
 import HolderDistribution from '../components/HolderDistribution';
 import { CONNECTION_CONFIG, RPC_ENDPOINT } from '../constants/solana';
+import { useTradeCandles, Interval } from '../lib/use-trade-candles';
 
 type Props = {
   route: { params: { launchPda: string } };
@@ -93,6 +95,8 @@ export default function LaunchDetailScreen({ route }: Props) {
   const [timeLeft, setTimeLeft] = useState('');
   const [tokenImage, setTokenImage] = useState<string | null>(null);
   const [infoTab, setInfoTab] = useState<'comments' | 'trades' | 'holders'>('comments');
+  const [chartMode, setChartMode] = useState<'curve' | 'candles'>('curve');
+  const { candles, loading: candlesLoading, interval: candleInterval, setInterval: setCandleInterval } = useTradeCandles(launchPdaStr);
 
   const publicKeyStr = publicKey?.toBase58() ?? null;
 
@@ -346,14 +350,50 @@ export default function LaunchDetailScreen({ route }: Props) {
         </Text>
       </View>
 
-      {/* 3. Trading Chart (full-width, edge-to-edge) */}
+      {/* 3. Chart Toggle + Trading Chart */}
+      <View style={styles.chartToggleRow}>
+        <View style={styles.chartToggleGroup}>
+          {(['curve', 'candles'] as const).map((mode) => (
+            <TouchableOpacity
+              key={mode}
+              style={[styles.chartToggleBtn, chartMode === mode && styles.chartToggleBtnActive]}
+              onPress={() => setChartMode(mode)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.chartToggleText, chartMode === mode && styles.chartToggleTextActive]}>
+                {mode === 'curve' ? 'Curve' : 'Candles'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {chartMode === 'candles' && (
+          <View style={styles.intervalGroup}>
+            {(['1m', '5m', '15m'] as Interval[]).map((iv) => (
+              <TouchableOpacity
+                key={iv}
+                style={[styles.intervalBtn, candleInterval === iv && styles.intervalBtnActive]}
+                onPress={() => setCandleInterval(iv)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.intervalText, candleInterval === iv && styles.intervalTextActive]}>
+                  {iv}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
       <View style={styles.chartWrap}>
-        <PriceCurveChart
-          pMax={launch.pMax.toNumber()}
-          pMin={launch.pMin.toNumber()}
-          startTime={launch.startTime}
-          endTime={launch.endTime}
-        />
+        {chartMode === 'curve' ? (
+          <PriceCurveChart
+            pMax={launch.pMax.toNumber()}
+            pMin={launch.pMin.toNumber()}
+            startTime={launch.startTime}
+            endTime={launch.endTime}
+          />
+        ) : (
+          <CandlestickChart candles={candles} loading={candlesLoading} />
+        )}
       </View>
 
       {/* 4. Compact Stats Row */}
@@ -703,6 +743,56 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     fontWeight: '600',
     marginTop: 2,
+  },
+  // Chart toggle
+  chartToggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  chartToggleGroup: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: RADIUS.md,
+    padding: 3,
+  },
+  chartToggleBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.md - 2,
+  },
+  chartToggleBtnActive: {
+    backgroundColor: COLORS.cardBg,
+  },
+  chartToggleText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+  },
+  chartToggleTextActive: {
+    color: COLORS.text,
+  },
+  intervalGroup: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  intervalBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.surfaceLight,
+  },
+  intervalBtnActive: {
+    backgroundColor: COLORS.primary,
+  },
+  intervalText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+  },
+  intervalTextActive: {
+    color: '#FFFFFF',
   },
   // Chart
   chartWrap: {

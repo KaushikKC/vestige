@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     padding: SPACING.md,
     marginHorizontal: SPACING.md,
-    marginBottom: SPACING.sm + 2,
+    marginBottom: SPACING.xs,
     borderWidth: 1.5,
     borderColor: GOLD + '40',
     ...SHADOWS.md,

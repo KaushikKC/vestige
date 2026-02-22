@@ -254,6 +254,7 @@ export default function DiscoverScreen({ navigation }: Props) {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.chipScrollView}
         contentContainerStyle={styles.chipRow}
       >
         {FILTER_CHIPS.map((chip) => (
@@ -276,10 +277,12 @@ export default function DiscoverScreen({ navigation }: Props) {
 
       {/* King of the Hill */}
       {kingLaunch && !loading && (
-        <KingOfTheHill
-          launch={kingLaunch}
-          onPress={() => goToLaunch(kingLaunch.publicKey.toBase58())}
-        />
+        <View style={styles.kingWrap}>
+          <KingOfTheHill
+            launch={kingLaunch}
+            onPress={() => goToLaunch(kingLaunch.publicKey.toBase58())}
+          />
+        </View>
       )}
 
       {/* About to Graduate */}
@@ -350,6 +353,7 @@ export default function DiscoverScreen({ navigation }: Props) {
         </View>
       ) : (
         <FlatList
+          style={styles.listContainer}
           data={filteredLaunches}
           keyExtractor={(item) => item.publicKey.toBase58()}
           renderItem={({ item }) => (
@@ -476,11 +480,18 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   // Filter chips
+  chipScrollView: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
   chipRow: {
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.xs + 2,
-    paddingBottom: SPACING.sm,
+    paddingBottom: SPACING.xs,
     gap: SPACING.xs + 2,
+  },
+  kingWrap: {
+    marginTop: SPACING.xs,
   },
   chip: {
     backgroundColor: COLORS.surface,
@@ -505,13 +516,13 @@ const styles = StyleSheet.create({
   },
   // About to Graduate
   graduatingSection: {
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.xs,
   },
   graduatingSectionTitle: {
     ...TYPOGRAPHY.h3,
     fontSize: FONT_SIZE.md,
     paddingHorizontal: SPACING.md,
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.xs,
   },
   graduatingList: {
     paddingHorizontal: SPACING.md,
@@ -553,6 +564,9 @@ const styles = StyleSheet.create({
   // Lists
   skeletonList: {
     paddingHorizontal: SPACING.md,
+  },
+  listContainer: {
+    flex: 1,
   },
   list: {
     paddingHorizontal: SPACING.md,
