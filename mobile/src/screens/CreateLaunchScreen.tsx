@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, memo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,11 @@ import {
   StyleSheet,
   ActivityIndicator,
   Switch,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { Keypair, PublicKey } from '@solana/web3.js';
+import { Keypair } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,10 +21,13 @@ import { useVestige } from '../lib/use-vestige';
 import { useWallet } from '../lib/use-wallet';
 import { VestigeClient } from '../lib/vestige-client';
 import WalletButton from '../components/WalletButton';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const LAMPORTS = 1_000_000_000;
 
 export default function CreateLaunchScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
   const { initializeLaunch } = useVestige();
   const { connected, publicKey } = useWallet();
 
@@ -30,7 +35,6 @@ export default function CreateLaunchScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [createdPda, setCreatedPda] = useState<string | null>(null);
 
-  // Form fields (values in SOL / human-readable units, matching web frontend)
   const [tokenName, setTokenName] = useState('');
   const [tokenSymbol, setTokenSymbol] = useState('');
   const [tokenUri, setTokenUri] = useState('');
@@ -102,19 +106,11 @@ export default function CreateLaunchScreen({ navigation }: any) {
         tokenUri || '',
       );
 
-      const [launchPda] = VestigeClient.deriveLaunchPda(
-        publicKey,
-        mintKeypair.publicKey
-      );
-
+      const [launchPda] = VestigeClient.deriveLaunchPda(publicKey, mintKeypair.publicKey);
       setCreatedPda(launchPda.toBase58());
-      Toast.show({ type: 'success', text1: 'Launch created! Make your initial buy to activate.' });
+      Toast.show({ type: 'success', text1: 'Launch created!' });
     } catch (err: any) {
-      Toast.show({
-        type: 'error',
-        text1: 'Create failed',
-        text2: err?.message || 'Unknown error',
-      });
+      Toast.show({ type: 'error', text1: 'Create failed', text2: err?.message });
     } finally {
       setLoading(false);
     }
@@ -130,35 +126,30 @@ export default function CreateLaunchScreen({ navigation }: any) {
   if (createdPda) {
     return (
       <View style={styles.successContainer}>
-        <Ionicons name="checkmark-circle" size={64} color={COLORS.success} style={styles.successCheckmark} />
-        <Text style={styles.successTitle}>Launch Created!</Text>
+        <LinearGradient colors={[COLORS.primary, COLORS.primaryDark]} style={styles.successIcon}>
+          <Ionicons name="checkmark" size={40} color="#FFF" />
+        </LinearGradient>
+        <Text style={styles.successTitle}>Artifact Launched</Text>
         <Text style={styles.initialBuyNote}>
-          Make your initial buy (min 0.01 SOL) to activate the launch.
+          Your token is ready for discovery. Make an initial buy to boost visibility.
         </Text>
-        <Text style={styles.successLabel}>Launch PDA:</Text>
-        <TouchableOpacity onPress={copyPda} style={styles.pdaWrap}>
-          <Text style={styles.pdaText}>{createdPda}</Text>
-          <Text style={styles.tapToCopy}>Tap to copy</Text>
+
+        <TouchableOpacity onPress={copyPda} style={styles.pdaCard}>
+          <Text style={styles.pdaLabel}>Launch Address</Text>
+          <Text style={styles.pdaText} numberOfLines={1}>{createdPda}</Text>
+          <Ionicons name="copy-outline" size={14} color={COLORS.textMuted} style={{ marginTop: 8 }} />
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.openButton}
           onPress={() => {
             setCreatedPda(null);
-            navigation.navigate('Discover', {
-              screen: 'LaunchDetail',
-              params: { launchPda: createdPda },
-            });
+            navigation.navigate('Discover');
           }}
         >
-          <Text style={styles.openButtonText}>Make Initial Buy</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.newButton}
-          onPress={() => setCreatedPda(null)}
-        >
-          <Text style={styles.newButtonText}>Create Another</Text>
+          <LinearGradient colors={[COLORS.primary, COLORS.primaryDark]} style={styles.gradient}>
+            <Text style={styles.openButtonText}>View in Discover</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
     );
@@ -167,331 +158,220 @@ export default function CreateLaunchScreen({ navigation }: any) {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + SPACING.md, paddingBottom: SPACING.xxl + 40 }]}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      showsVerticalScrollIndicator={false}
     >
-      <View style={styles.walletRow}>
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.headerSubtitle}>Create</Text>
+          <Text style={styles.headerTitle}>Launch Token</Text>
+        </View>
         <WalletButton />
       </View>
 
-      {/* Test Mode Toggle */}
-      <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Test Mode</Text>
-        <Switch
-          value={testMode}
-          onValueChange={applyTestMode}
-          trackColor={{ true: COLORS.accent, false: COLORS.surfaceLight }}
-          thumbColor={COLORS.surface}
-        />
+      <View style={styles.card}>
+        <View style={styles.toggleRow}>
+          <View>
+            <Text style={styles.inputLabel}>Beta Mode</Text>
+            <Text style={styles.inputHint}>Accelerated testing parameters</Text>
+          </View>
+          <Switch
+            value={testMode}
+            onValueChange={applyTestMode}
+            trackColor={{ true: COLORS.primary, false: COLORS.surfaceLight }}
+            thumbColor="#FFF"
+          />
+        </View>
       </View>
-      {testMode && (
-        <Text style={styles.testHint}>
-          3-min duration, 0.5 SOL graduation target
-        </Text>
-      )}
 
-      {/* Form Fields */}
-      <FormField
-        label="Token Name"
-        value={tokenName}
-        onChangeText={setTokenName}
-        hint="Displayed in wallets and explorers (max 32 chars)"
-      />
-      <FormField
-        label="Token Symbol"
-        value={tokenSymbol}
-        onChangeText={setTokenSymbol}
-        hint="Short ticker symbol (max 10 chars)"
-      />
-      <FormField
-        label="Metadata URI (optional)"
-        value={tokenUri}
-        onChangeText={setTokenUri}
-        hint="Direct image URL (PNG/JPG) or JSON metadata with 'image' field"
-      />
-      <FormField
-        label="Token Supply"
-        value={tokenSupply}
-        onChangeText={setTokenSupply}
-        keyboardType="numeric"
-      />
-      <FormField
-        label="Bonus Pool"
-        value={bonusPool}
-        onChangeText={setBonusPool}
-        keyboardType="numeric"
-      />
-      <FormField
-        label="Starting Price (SOL) — pMax"
-        value={pMax}
-        onChangeText={setPMax}
-        keyboardType="decimal-pad"
-        hint={`Price drops from ${pMax || '?'} SOL to ${pMax ? (parseFloat(pMax) / 10).toString() : '0'} SOL (10:1 ratio)`}
-      />
-      <FormField
-        label="Risk Weight Best (rBest)"
-        value={rBest}
-        onChangeText={setRBest}
-        keyboardType="numeric"
-      />
-      <FormField
-        label="Risk Weight Min (rMin)"
-        value={rMin}
-        onChangeText={setRMin}
-        keyboardType="numeric"
-      />
-      <FormField
-        label="Graduation Target (SOL)"
-        value={graduationTarget}
-        onChangeText={setGraduationTarget}
-        keyboardType="decimal-pad"
-      />
-      <FormField
-        label="Duration (minutes)"
-        value={durationMinutes}
-        onChangeText={setDurationMinutes}
-        keyboardType="numeric"
-      />
+      <View style={styles.formSection}>
+        <Text style={styles.sectionTitle}>Identity</Text>
+        <FormField label="Token Name" value={tokenName} onChangeText={setTokenName} placeholder="e.g. Hyperion" />
+        <FormField label="Ticker" value={tokenSymbol} onChangeText={setTokenSymbol} placeholder="e.g. HYP" />
+        <FormField label="Metadata URI" value={tokenUri} onChangeText={setTokenUri} placeholder="https://..." />
+      </View>
+
+      <View style={styles.formSection}>
+        <Text style={styles.sectionTitle}>Economics</Text>
+        <View style={styles.row}>
+          <View style={{ flex: 1 }}><FormField label="Supply" value={tokenSupply} onChangeText={setTokenSupply} keyboardType="numeric" /></View>
+          <View style={{ width: SPACING.md }} />
+          <View style={{ flex: 1 }}><FormField label="Bonus" value={bonusPool} onChangeText={setBonusPool} keyboardType="numeric" /></View>
+        </View>
+        <FormField
+          label="Initial Price (SOL)"
+          value={pMax}
+          onChangeText={setPMax}
+          keyboardType="decimal-pad"
+          hint={`Drops 10x over duration`}
+        />
+        <FormField label="Graduation Goal (SOL)" value={graduationTarget} onChangeText={setGraduationTarget} keyboardType="decimal-pad" />
+      </View>
 
       <TouchableOpacity
         style={[styles.createButton, (!connected || loading) && styles.createButtonDisabled]}
         onPress={handleCreate}
         disabled={!connected || loading}
       >
-        {loading ? (
-          <ActivityIndicator color="#1A1A2E" />
-        ) : (
-          <Text style={styles.createButtonText}>Create Launch</Text>
-        )}
+        <LinearGradient
+          colors={connected ? [COLORS.primary, COLORS.primaryDark] : [COLORS.surfaceLight, COLORS.surface]}
+          style={styles.gradient}
+        >
+          {loading ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.createButtonText}>{connected ? 'Forge Artifact' : 'Connect to Forge'}</Text>
+          )}
+        </LinearGradient>
       </TouchableOpacity>
 
-      {!connected && (
-        <Text style={styles.connectHint}>Connect wallet to create a launch</Text>
-      )}
-
-      <View style={styles.feeInfo}>
-        <View style={styles.feeAccent} />
-        <Text style={styles.feeInfoText}>
-          One transaction creates the token, initializes the launch, and funds
-          the vault. Every buy has a 1% fee: 0.5% protocol + 0.5% creator
-          (vested). Creator must make initial buy (min 0.01 SOL) to activate.
+      <View style={styles.infoCard}>
+        <Ionicons name="information-circle-outline" size={20} color={COLORS.primaryLight} />
+        <Text style={styles.infoText}>
+          Each launch requires a small rent deposit. 1% of all trades are allocated (0.5% Protocol, 0.5% Creator).
         </Text>
       </View>
     </ScrollView>
   );
 }
 
-function FormField({
+const FormField = memo(function FormField({
   label,
   value,
   onChangeText,
   keyboardType = 'default',
+  placeholder,
   hint,
 }: {
   label: string;
   value: string;
-  onChangeText: (text: string) => void;
+  onChangeText: (t: string) => void;
   keyboardType?: 'default' | 'numeric' | 'decimal-pad';
+  placeholder?: string;
   hint?: string;
 }) {
   const [focused, setFocused] = useState(false);
+  const [localValue, setLocalValue] = useState(value);
+
+  useEffect(() => {
+    if (!focused) setLocalValue(value);
+  }, [value, focused]);
+
+  const onFocus = useCallback(() => setFocused(true), []);
+  const onBlur = useCallback(() => {
+    setFocused(false);
+    if (localValue !== value) onChangeText(localValue);
+  }, [localValue, value, onChangeText]);
+
+  const displayValue = focused ? localValue : value;
+  const handleChangeText = useCallback(
+    (text: string) => {
+      if (focused) {
+        setLocalValue(text);
+      } else {
+        onChangeText(text);
+      }
+    },
+    [focused, onChangeText]
+  );
 
   return (
-    <View style={fieldStyles.container}>
-      <Text style={fieldStyles.label}>{label}</Text>
-      <View style={[fieldStyles.inputWrap, focused && fieldStyles.inputWrapFocused]}>
+    <View style={styles.fieldContainer}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      <View style={[styles.inputWrap, focused && styles.inputWrapFocused]}>
         <TextInput
-          style={fieldStyles.input}
-          value={value}
-          onChangeText={onChangeText}
+          style={styles.input}
+          value={displayValue}
+          onChangeText={handleChangeText}
           keyboardType={keyboardType}
+          placeholder={placeholder}
           placeholderTextColor={COLORS.textMuted}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          blurOnSubmit={false}
+          {...(Platform.OS === 'android' && { includeFontPadding: false })}
         />
       </View>
-      {hint && <Text style={fieldStyles.hint}>{hint}</Text>}
+      {hint ? <Text style={styles.hintText}>{hint}</Text> : null}
     </View>
   );
-}
-
-const fieldStyles = StyleSheet.create({
-  container: {
-    marginBottom: SPACING.md,
-  },
-  label: {
-    ...TYPOGRAPHY.label,
-    marginBottom: SPACING.xs + 2,
-  },
-  inputWrap: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-    ...SHADOWS.sm,
-  },
-  inputWrapFocused: {
-    borderColor: COLORS.primary,
-  },
-  input: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md - 2,
-    color: COLORS.text,
-    fontSize: FONT_SIZE.md,
-  },
-  hint: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.xs,
-    marginTop: SPACING.xs,
-  },
 });
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  content: {
-    padding: SPACING.md,
-    paddingBottom: SPACING.xxl,
-  },
-  walletRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginBottom: SPACING.lg,
-  },
-  toggleRow: {
+  container: { flex: 1, backgroundColor: COLORS.surface },
+  content: { paddingHorizontal: SPACING.lg },
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: COLORS.cardBg,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    marginBottom: SPACING.sm,
-    ...SHADOWS.sm,
-  },
-  toggleLabel: {
-    color: COLORS.text,
-    fontSize: FONT_SIZE.md,
-    fontWeight: '600',
-  },
-  testHint: {
-    color: COLORS.accentDark,
-    fontSize: FONT_SIZE.xs,
-    marginBottom: SPACING.md,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  createButton: {
-    backgroundColor: COLORS.accent,
-    borderRadius: RADIUS.lg,
-    paddingVertical: SPACING.md + 2,
-    alignItems: 'center',
-    marginTop: SPACING.md,
-    ...SHADOWS.md,
-  },
-  createButtonDisabled: {
-    opacity: 0.5,
-  },
-  createButtonText: {
-    color: '#1A1A2E',
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '800',
-  },
-  connectHint: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.sm,
-    textAlign: 'center',
-    marginTop: SPACING.md,
-  },
-  // Success state
-  successContainer: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING.lg,
-  },
-  successCheckmark: {
-    fontSize: 64,
     marginBottom: SPACING.md,
   },
-  successTitle: {
-    ...TYPOGRAPHY.h1,
-    color: COLORS.success,
-    marginBottom: SPACING.sm,
-  },
-  initialBuyNote: {
-    color: COLORS.accentDark,
-    fontSize: FONT_SIZE.sm,
-    textAlign: 'center',
-    marginBottom: SPACING.lg,
-    fontWeight: '600',
-  },
-  successLabel: {
-    ...TYPOGRAPHY.label,
-    marginBottom: SPACING.sm,
-  },
-  pdaWrap: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    alignItems: 'center',
-    ...SHADOWS.sm,
-  },
-  pdaText: {
-    color: COLORS.text,
-    fontSize: FONT_SIZE.sm,
-    fontFamily: 'monospace',
-    textAlign: 'center',
-  },
-  tapToCopy: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.xs,
-    marginTop: SPACING.xs,
-  },
-  openButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.lg,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.xl,
-    marginTop: SPACING.lg,
-    ...SHADOWS.md,
-  },
-  openButtonText: {
-    color: '#FFFFFF',
-    fontSize: FONT_SIZE.md,
-    fontWeight: '700',
-  },
-  newButton: {
-    borderRadius: RADIUS.lg,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.xl,
-    marginTop: SPACING.md,
+  headerSubtitle: { ...TYPOGRAPHY.label, color: COLORS.primaryLight, letterSpacing: 1, textTransform: 'uppercase' },
+  headerTitle: { ...TYPOGRAPHY.h1, fontSize: 28 },
+  card: {
     backgroundColor: COLORS.surfaceLight,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: SPACING.sm,
   },
-  newButtonText: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.md,
-    fontWeight: '600',
-  },
-  feeInfo: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.cardBg,
+  toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  formSection: { marginBottom: SPACING.sm },
+  sectionTitle: { ...TYPOGRAPHY.label, color: COLORS.textMuted, marginBottom: 4, fontSize: 13 },
+  fieldContainer: { marginBottom: SPACING.sm },
+  inputLabel: { ...TYPOGRAPHY.bodyBold, fontSize: 14, color: COLORS.text, marginBottom: 4 },
+  inputHint: { ...TYPOGRAPHY.caption, color: COLORS.textMuted },
+  inputWrap: {
+    backgroundColor: COLORS.surfaceLight,
     borderRadius: RADIUS.md,
-    marginTop: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  inputWrapFocused: { borderColor: COLORS.primary, ...SHADOWS.glow },
+  input: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 10,
+    color: COLORS.text,
+    fontSize: 16,
+  },
+  hintText: { ...TYPOGRAPHY.caption, color: COLORS.primaryLight, marginTop: 2 },
+  row: { flexDirection: 'row' },
+  createButton: {
+    height: 60,
+    borderRadius: RADIUS.lg,
     overflow: 'hidden',
-    ...SHADOWS.sm,
+    marginTop: 0,
+    ...SHADOWS.card,
   },
-  feeAccent: {
-    width: 4,
-    backgroundColor: COLORS.primary,
+  createButtonDisabled: { opacity: 0.6 },
+  gradient: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  createButtonText: { ...TYPOGRAPHY.bodyBold, color: '#FFF', fontSize: 18 },
+  infoCard: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(29, 4, 225, 0.06)',
+    padding: SPACING.sm,
+    borderRadius: RADIUS.md,
+    marginTop: 4,
+    marginBottom: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+    gap: 10,
   },
-  feeInfoText: {
-    flex: 1,
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.xs,
-    padding: SPACING.md,
-    lineHeight: 18,
-  },
+  infoText: { flex: 1, ...TYPOGRAPHY.caption, color: COLORS.textSecondary, lineHeight: 18 },
+  successContainer: { flex: 1, backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center', padding: SPACING.xxl },
+  successIcon: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.xl },
+  successTitle: { ...TYPOGRAPHY.h1, color: COLORS.text },
+  initialBuyNote: { ...TYPOGRAPHY.body, textAlign: 'center', color: COLORS.textSecondary, marginTop: SPACING.md, marginBottom: SPACING.xxl },
+  pdaCard: { backgroundColor: COLORS.surface, padding: SPACING.xl, borderRadius: RADIUS.xl, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
+  pdaLabel: { ...TYPOGRAPHY.label, color: COLORS.textMuted, marginBottom: 8 },
+  pdaText: { ...TYPOGRAPHY.bodyBold, color: COLORS.primaryLight, fontSize: 12 },
+  openButton: { width: '100%', height: 56, borderRadius: RADIUS.lg, overflow: 'hidden', marginTop: SPACING.xxl },
+  openButtonText: { ...TYPOGRAPHY.bodyBold, color: '#FFF' },
 });
+

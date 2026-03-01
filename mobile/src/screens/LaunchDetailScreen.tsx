@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Image,
+  StatusBar,
 } from 'react-native';
 import { PublicKey, Connection } from '@solana/web3.js';
 import * as Clipboard from 'expo-clipboard';
@@ -34,6 +35,10 @@ import TradeFeed from '../components/TradeFeed';
 import HolderDistribution from '../components/HolderDistribution';
 import { CONNECTION_CONFIG, RPC_ENDPOINT } from '../constants/solana';
 import { useTradeCandles, Interval } from '../lib/use-trade-candles';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import BackgroundEffect from '../components/BackgroundEffect';
+
 
 type Props = {
   route: { params: { launchPda: string } };
@@ -310,370 +315,376 @@ export default function LaunchDetailScreen({ route }: Props) {
 
   // Discount from pMax
   const discountPct = pMaxSol > 0 ? ((priceSol - pMaxSol) / pMaxSol) * 100 : 0;
-  const discountColor = discountPct >= 0 ? COLORS.green : COLORS.red;
+  const discountColor = discountPct >= 0 ? COLORS.success : COLORS.error;
+
+  const insets = useSafeAreaInsets();
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-    >
-      {/* 1. Compact Token Header */}
-      <View style={styles.compactHeader}>
-        {tokenImage ? (
-          <Image source={{ uri: tokenImage }} style={styles.headerImage} />
-        ) : (
-          <View style={styles.headerImagePlaceholder}>
-            <Ionicons name="cube-outline" size={20} color={COLORS.textMuted} />
+    <View style={styles.container}>
+      <BackgroundEffect />
+      <StatusBar barStyle="dark-content" />
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + SPACING.sm }]}
+      >
+        {/* 1. Compact Token Header */}
+        <View style={styles.compactHeader}>
+          {tokenImage ? (
+            <Image source={{ uri: tokenImage }} style={styles.headerImage} />
+          ) : (
+            <View style={styles.headerImagePlaceholder}>
+              <Ionicons name="cube-outline" size={20} color={COLORS.textMuted} />
+            </View>
+          )}
+          <View style={styles.headerNameCol}>
+            <Text style={styles.headerName} numberOfLines={1}>
+              {launch.name || 'Unnamed Token'}
+            </Text>
+            {launch.symbol ? (
+              <Text style={styles.headerSymbol}>${launch.symbol}</Text>
+            ) : null}
           </View>
-        )}
-        <View style={styles.headerNameCol}>
-          <Text style={styles.headerName} numberOfLines={1}>
-            {launch.name || 'Unnamed Token'}
-          </Text>
-          {launch.symbol ? (
-            <Text style={styles.headerSymbol}>${launch.symbol}</Text>
-          ) : null}
+          <TouchableOpacity onPress={copyMintAddress} activeOpacity={0.7} style={styles.mintChip}>
+            <Text style={styles.mintChipText}>
+              {launch.tokenMint.toBase58().slice(0, 4)}...{launch.tokenMint.toBase58().slice(-4)}
+            </Text>
+            <Ionicons name="copy-outline" size={11} color={COLORS.textMuted} />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={copyMintAddress} activeOpacity={0.7} style={styles.mintChip}>
-          <Text style={styles.mintChipText}>
-            {launch.tokenMint.toBase58().slice(0, 4)}...{launch.tokenMint.toBase58().slice(-4)}
+
+        {/* 2. Price Hero */}
+        <View style={styles.priceHero}>
+          <Text style={styles.heroPrice}>{priceSol.toFixed(6)} SOL</Text>
+          <Text style={[styles.heroDiscount, { color: discountColor }]}>
+            {discountPct >= 0 ? '+' : ''}{discountPct.toFixed(1)}% from start
           </Text>
-          <Ionicons name="copy-outline" size={11} color={COLORS.textMuted} />
-        </TouchableOpacity>
-      </View>
-
-      {/* 2. Price Hero */}
-      <View style={styles.priceHero}>
-        <Text style={styles.heroPrice}>{priceSol.toFixed(6)} SOL</Text>
-        <Text style={[styles.heroDiscount, { color: discountColor }]}>
-          {discountPct >= 0 ? '+' : ''}{discountPct.toFixed(1)}% from start
-        </Text>
-      </View>
-
-      {/* 3. Chart Toggle + Trading Chart */}
-      <View style={styles.chartToggleRow}>
-        <View style={styles.chartToggleGroup}>
-          {(['curve', 'candles'] as const).map((mode) => (
-            <TouchableOpacity
-              key={mode}
-              style={[styles.chartToggleBtn, chartMode === mode && styles.chartToggleBtnActive]}
-              onPress={() => setChartMode(mode)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.chartToggleText, chartMode === mode && styles.chartToggleTextActive]}>
-                {mode === 'curve' ? 'Curve' : 'Candles'}
-              </Text>
-            </TouchableOpacity>
-          ))}
         </View>
-        {chartMode === 'candles' && (
-          <View style={styles.intervalGroup}>
-            {(['1m', '5m', '15m'] as Interval[]).map((iv) => (
+
+        {/* 3. Chart Toggle + Trading Chart */}
+        <View style={styles.chartToggleRow}>
+          <View style={styles.chartToggleGroup}>
+            {(['curve', 'candles'] as const).map((mode) => (
               <TouchableOpacity
-                key={iv}
-                style={[styles.intervalBtn, candleInterval === iv && styles.intervalBtnActive]}
-                onPress={() => setCandleInterval(iv)}
+                key={mode}
+                style={[styles.chartToggleBtn, chartMode === mode && styles.chartToggleBtnActive]}
+                onPress={() => setChartMode(mode)}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.intervalText, candleInterval === iv && styles.intervalTextActive]}>
-                  {iv}
+                <Text style={[styles.chartToggleText, chartMode === mode && styles.chartToggleTextActive]}>
+                  {mode === 'curve' ? 'Curve' : 'Candles'}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
-        )}
-      </View>
-      <View style={styles.chartWrap}>
-        {chartMode === 'curve' ? (
-          <PriceCurveChart
-            pMax={launch.pMax.toNumber()}
-            pMin={launch.pMin.toNumber()}
-            startTime={launch.startTime}
-            endTime={launch.endTime}
-          />
-        ) : (
-          <CandlestickChart candles={candles} loading={candlesLoading} />
-        )}
-      </View>
-
-      {/* 4. Compact Stats Row */}
-      <View style={styles.section}>
-        <CompactStatRow
-          stats={[
-            { label: 'MCAP', value: `${VestigeClient.getMarketCapSol(launch).toFixed(2)}` },
-            { label: 'RISK', value: `${riskWeight.toFixed(2)}x` },
-            { label: 'USERS', value: `${launch.totalParticipants}` },
-            { label: 'RAISED', value: `${VestigeClient.lamportsToSol(launch.totalSolCollected).toFixed(2)}` },
-          ]}
-        />
-      </View>
-
-      {/* 5. Progress */}
-      <View style={styles.section}>
-        <Text style={styles.sectionHeader}>Progress</Text>
-        <ProgressBar
-          progress={progress}
-          collected={VestigeClient.lamportsToSol(
-            launch.totalSolCollected
-          ).toFixed(4)}
-          target={VestigeClient.lamportsToSol(
-            launch.graduationTarget
-          ).toFixed(4)}
-        />
-      </View>
-
-      {/* 6. Tabbed Section: Comments / Trades / Holders */}
-      <View style={styles.section}>
-        <View style={styles.infoTabRow}>
-          {(['comments', 'trades', 'holders'] as const).map((t) => (
-            <TouchableOpacity
-              key={t}
-              style={[styles.infoTab, infoTab === t && styles.infoTabActive]}
-              onPress={() => setInfoTab(t)}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[
-                  styles.infoTabText,
-                  infoTab === t && styles.infoTabTextActive,
-                ]}
-              >
-                {t.charAt(0).toUpperCase() + t.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {infoTab === 'comments' && (
-          <CommentThread launchPda={launchPdaStr} />
-        )}
-        {infoTab === 'trades' && (
-          <TradeFeed
-            launchPda={launchPdaStr}
-            tokenMint={launch.tokenMint.toBase58()}
-          />
-        )}
-        {infoTab === 'holders' && (
-          <HolderDistribution
-            launchPda={launchPdaStr}
-            tokenMint={launch.tokenMint.toBase58()}
-            totalSupply={launch.tokenSupply.toNumber()}
-          />
-        )}
-      </View>
-
-      {/* 7. Trade Panel (Buy + Sell) */}
-      {!launch.isGraduated && (
-        <View style={styles.section}>
-          {waitingForCreatorBuy ? (
-            <View style={styles.waitingBox}>
-              <Text style={styles.waitingTitle}>Waiting for Creator</Text>
-              <Text style={styles.waitingSubtext}>
-                The creator must make an initial buy (min 0.01 SOL) to activate
-                this launch before others can participate.
-              </Text>
+          {chartMode === 'candles' && (
+            <View style={styles.intervalGroup}>
+              {(['1m', '5m', '15m'] as Interval[]).map((iv) => (
+                <TouchableOpacity
+                  key={iv}
+                  style={[styles.intervalBtn, candleInterval === iv && styles.intervalBtnActive]}
+                  onPress={() => setCandleInterval(iv)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.intervalText, candleInterval === iv && styles.intervalTextActive]}>
+                    {iv}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
-          ) : (
-            <TradePanel
-              launch={launch}
-              position={position}
-              onBuy={handleBuy}
-              onSell={handleSell}
-              disabled={!connected}
-              isCreator={!!isCreator}
-            />
-          )}
-          {!connected && !waitingForCreatorBuy && (
-            <Text style={styles.connectHint}>
-              Connect wallet to trade tokens
-            </Text>
           )}
         </View>
-      )}
+        <View style={styles.chartWrap}>
+          {chartMode === 'curve' ? (
+            <PriceCurveChart
+              pMax={launch.pMax.toNumber()}
+              pMin={launch.pMin.toNumber()}
+              startTime={launch.startTime}
+              endTime={launch.endTime}
+            />
+          ) : (
+            <CandlestickChart candles={candles} loading={candlesLoading} />
+          )}
+        </View>
 
-      {/* Milestone Dots */}
-      {launch.isGraduated && isCreator && (
+        {/* 4. Compact Stats Row */}
         <View style={styles.section}>
-          <Text style={styles.sectionHeader}>Milestones</Text>
-          <View style={styles.milestoneDots}>
-            {[0, 1, 2, 3].map((i) => (
-              <View
-                key={i}
-                style={[
-                  styles.milestoneDot,
-                  i < milestoneLevel && styles.milestoneDotFilled,
-                ]}
-              />
+          <CompactStatRow
+            stats={[
+              { label: 'MCAP', value: `${VestigeClient.getMarketCapSol(launch).toFixed(2)}` },
+              { label: 'RISK', value: `${riskWeight.toFixed(2)}x` },
+              { label: 'USERS', value: `${launch.totalParticipants}` },
+              { label: 'RAISED', value: `${VestigeClient.lamportsToSol(launch.totalSolCollected).toFixed(2)}` },
+            ]}
+          />
+        </View>
+
+        {/* 5. Progress */}
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>Progress</Text>
+          <ProgressBar
+            progress={progress}
+            collected={VestigeClient.lamportsToSol(
+              launch.totalSolCollected
+            ).toFixed(4)}
+            target={VestigeClient.lamportsToSol(
+              launch.graduationTarget
+            ).toFixed(4)}
+          />
+        </View>
+
+        {/* 6. Tabbed Section: Comments / Trades / Holders */}
+        <View style={styles.section}>
+          <View style={styles.infoTabRow}>
+            {(['comments', 'trades', 'holders'] as const).map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.infoTab, infoTab === t && styles.infoTabActive]}
+                onPress={() => setInfoTab(t)}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.infoTabText,
+                    infoTab === t && styles.infoTabTextActive,
+                  ]}
+                >
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                </Text>
+              </TouchableOpacity>
             ))}
           </View>
-          <Text style={styles.milestoneLabel}>
-            {VestigeClient.getMilestoneDescription(milestoneLevel)}
-          </Text>
-        </View>
-      )}
 
-      {/* Graduate button */}
-      {!launch.isGraduated && connected && (
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.graduateButton}
-            onPress={handleGraduate}
-            disabled={actionLoading}
-          >
-            {actionLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
+          {infoTab === 'comments' && (
+            <CommentThread launchPda={launchPdaStr} />
+          )}
+          {infoTab === 'trades' && (
+            <TradeFeed
+              launchPda={launchPdaStr}
+              tokenMint={launch.tokenMint.toBase58()}
+            />
+          )}
+          {infoTab === 'holders' && (
+            <HolderDistribution
+              launchPda={launchPdaStr}
+              tokenMint={launch.tokenMint.toBase58()}
+              totalSupply={launch.tokenSupply.toNumber()}
+            />
+          )}
+        </View>
+
+        {/* 7. Trade Panel (Buy + Sell) */}
+        {!launch.isGraduated && (
+          <View style={styles.section}>
+            {waitingForCreatorBuy ? (
+              <View style={styles.waitingBox}>
+                <Text style={styles.waitingTitle}>Waiting for Creator</Text>
+                <Text style={styles.waitingSubtext}>
+                  The creator must make an initial buy (min 0.01 SOL) to activate
+                  this launch before others can participate.
+                </Text>
+              </View>
             ) : (
-              <Text style={styles.graduateButtonText}>Graduate Launch</Text>
+              <TradePanel
+                launch={launch}
+                position={position}
+                onBuy={handleBuy}
+                onSell={handleSell}
+                disabled={!connected}
+                isCreator={!!isCreator}
+              />
             )}
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* SOL Locked for Liquidity */}
-      {launch.isGraduated && (
-        <View style={styles.lockedBox}>
-          <Text style={styles.lockedTitle}>SOL Locked for Liquidity</Text>
-          <Text style={styles.lockedSubtext}>
-            {VestigeClient.lamportsToSol(
-              launch.totalSolCollected
-            ).toFixed(4)}{' '}
-            SOL locked in vault for future Raydium LP
-          </Text>
-        </View>
-      )}
-
-      {/* Creator Vested Fees Section */}
-      {launch.isGraduated && isCreator && (
-        <View style={styles.vestedSection}>
-          <Text style={styles.vestedTitle}>Creator Vested Fees</Text>
-          <View style={styles.vestedGrid}>
-            <View style={styles.vestedItem}>
-              <Text style={styles.vestedLabel}>Total Accumulated</Text>
-              <Text style={styles.vestedValue}>
-                {VestigeClient.lamportsToSol(totalCreatorFees).toFixed(6)} SOL
+            {!connected && !waitingForCreatorBuy && (
+              <Text style={styles.connectHint}>
+                Connect wallet to trade tokens
               </Text>
-            </View>
-            <View style={styles.vestedItem}>
-              <Text style={styles.vestedLabel}>Already Claimed</Text>
-              <Text style={styles.vestedValue}>
-                {VestigeClient.lamportsToSol(creatorFeesClaimed).toFixed(6)} SOL
-              </Text>
-            </View>
-            <View style={styles.vestedItem}>
-              <Text style={styles.vestedLabel}>Claimable Now</Text>
-              <Text style={styles.claimableValue}>
-                {VestigeClient.lamportsToSol(claimableCreatorFees).toFixed(6)}{' '}
-                SOL
-              </Text>
-            </View>
+            )}
           </View>
+        )}
 
-          <View style={styles.vestedActions}>
+        {/* Milestone Dots */}
+        {launch.isGraduated && isCreator && (
+          <View style={styles.section}>
+            <Text style={styles.sectionHeader}>Milestones</Text>
+            <View style={styles.milestoneDots}>
+              {[0, 1, 2, 3].map((i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.milestoneDot,
+                    i < milestoneLevel && styles.milestoneDotFilled,
+                  ]}
+                />
+              ))}
+            </View>
+            <Text style={styles.milestoneLabel}>
+              {VestigeClient.getMilestoneDescription(milestoneLevel)}
+            </Text>
+          </View>
+        )}
+
+        {/* Graduate button */}
+        {!launch.isGraduated && connected && (
+          <View style={styles.section}>
             <TouchableOpacity
-              style={[
-                styles.claimFeesButton,
-                claimableCreatorFees <= 0 && styles.disabledButton,
-              ]}
-              onPress={handleCreatorClaimFees}
-              disabled={actionLoading || claimableCreatorFees <= 0}
+              style={styles.graduateButton}
+              onPress={handleGraduate}
+              disabled={actionLoading}
             >
               {actionLoading ? (
-                <ActivityIndicator color={COLORS.text} />
+                <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.claimFeesButtonText}>
-                  Claim Vested Fees
+                <Text style={styles.graduateButtonText}>Graduate Launch</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* SOL Locked for Liquidity */}
+        {launch.isGraduated && (
+          <View style={styles.lockedBox}>
+            <Text style={styles.lockedTitle}>SOL Locked for Liquidity</Text>
+            <Text style={styles.lockedSubtext}>
+              {VestigeClient.lamportsToSol(
+                launch.totalSolCollected
+              ).toFixed(4)}{' '}
+              SOL locked in vault for future Raydium LP
+            </Text>
+          </View>
+        )}
+
+        {/* Creator Vested Fees Section */}
+        {launch.isGraduated && isCreator && (
+          <View style={styles.vestedSection}>
+            <Text style={styles.vestedTitle}>Creator Vested Fees</Text>
+            <View style={styles.vestedGrid}>
+              <View style={styles.vestedItem}>
+                <Text style={styles.vestedLabel}>Total Accumulated</Text>
+                <Text style={styles.vestedValue}>
+                  {VestigeClient.lamportsToSol(totalCreatorFees).toFixed(6)} SOL
+                </Text>
+              </View>
+              <View style={styles.vestedItem}>
+                <Text style={styles.vestedLabel}>Already Claimed</Text>
+                <Text style={styles.vestedValue}>
+                  {VestigeClient.lamportsToSol(creatorFeesClaimed).toFixed(6)} SOL
+                </Text>
+              </View>
+              <View style={styles.vestedItem}>
+                <Text style={styles.vestedLabel}>Claimable Now</Text>
+                <Text style={styles.claimableValue}>
+                  {VestigeClient.lamportsToSol(claimableCreatorFees).toFixed(6)}{' '}
+                  SOL
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.vestedActions}>
+              <TouchableOpacity
+                style={[
+                  styles.claimFeesButton,
+                  claimableCreatorFees <= 0 && styles.disabledButton,
+                ]}
+                onPress={handleCreatorClaimFees}
+                disabled={actionLoading || claimableCreatorFees <= 0}
+              >
+                {actionLoading ? (
+                  <ActivityIndicator color={COLORS.text} />
+                ) : (
+                  <Text style={styles.claimFeesButtonText}>
+                    Claim Vested Fees
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              {milestoneLevel < 4 && (
+                <TouchableOpacity
+                  style={styles.advanceButton}
+                  onPress={handleAdvanceMilestone}
+                  disabled={actionLoading}
+                >
+                  <Text style={styles.advanceButtonText}>Advance</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* User Position */}
+        {position && (
+          <View style={styles.section}>
+            <Text style={styles.sectionHeader}>Your Position</Text>
+            <PositionCard position={position} />
+          </View>
+        )}
+
+        {/* Claim Bonus */}
+        {canClaimBonus && (
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.claimBonusButton}
+              onPress={handleClaimBonus}
+              disabled={actionLoading}
+            >
+              {actionLoading ? (
+                <ActivityIndicator color="#1A1A2E" />
+              ) : (
+                <Text style={styles.claimBonusButtonText}>
+                  Claim Bonus Tokens
                 </Text>
               )}
             </TouchableOpacity>
-
-            {milestoneLevel < 4 && (
-              <TouchableOpacity
-                style={styles.advanceButton}
-                onPress={handleAdvanceMilestone}
-                disabled={actionLoading}
-              >
-                <Text style={styles.advanceButtonText}>Advance</Text>
-              </TouchableOpacity>
-            )}
           </View>
-        </View>
-      )}
+        )}
 
-      {/* User Position */}
-      {position && (
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>Your Position</Text>
-          <PositionCard position={position} />
-        </View>
-      )}
-
-      {/* Claim Bonus */}
-      {canClaimBonus && (
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.claimBonusButton}
-            onPress={handleClaimBonus}
-            disabled={actionLoading}
-          >
-            {actionLoading ? (
-              <ActivityIndicator color="#1A1A2E" />
-            ) : (
-              <Text style={styles.claimBonusButtonText}>
-                Claim Bonus Tokens
+        {/* Launch Info */}
+        {launch && (
+          <View style={styles.section}>
+            <Text style={styles.sectionHeader}>Launch Details</Text>
+            <View style={styles.infoBox}>
+              <Text style={styles.infoText}>
+                Price Range:{' '}
+                {(launch.pMax.toNumber() / 1e9).toFixed(4)} SOL {'->'}{' '}
+                {(launch.pMin.toNumber() / 1e9).toFixed(4)} SOL
               </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
+              <Text style={styles.infoText}>
+                Weight Range: {launch.rBest}x {'->'} {launch.rMin}x
+              </Text>
+              <Text style={styles.infoText}>
+                Token Supply:{' '}
+                {(launch.tokenSupply.toNumber() / TOKEN_PRECISION).toLocaleString()}
+              </Text>
+              <Text style={styles.infoText}>
+                Fee: 0.5% protocol + 0.5% creator = 1% total
+              </Text>
+              <Text style={styles.infoText}>
+                Initial Buy: {launch.hasInitialBuy ? 'Completed' : 'Pending'}
+              </Text>
+            </View>
+          </View>
+        )}
 
-      {/* Launch Info */}
-      {launch && (
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>Launch Details</Text>
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>
-              Price Range:{' '}
-              {(launch.pMax.toNumber() / 1e9).toFixed(4)} SOL {'->'}{' '}
-              {(launch.pMin.toNumber() / 1e9).toFixed(4)} SOL
-            </Text>
-            <Text style={styles.infoText}>
-              Weight Range: {launch.rBest}x {'->'} {launch.rMin}x
-            </Text>
-            <Text style={styles.infoText}>
-              Token Supply:{' '}
-              {(launch.tokenSupply.toNumber() / TOKEN_PRECISION).toLocaleString()}
-            </Text>
-            <Text style={styles.infoText}>
-              Fee: 0.5% protocol + 0.5% creator = 1% total
-            </Text>
-            <Text style={styles.infoText}>
-              Initial Buy: {launch.hasInitialBuy ? 'Completed' : 'Pending'}
+        {/* Graduated Badge */}
+        {launch.isGraduated && (
+          <View style={styles.graduatedBox}>
+            <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+            <Text style={styles.graduatedLabel}>
+              This launch has graduated
             </Text>
           </View>
-        </View>
-      )}
-
-      {/* Graduated Badge */}
-      {launch.isGraduated && (
-        <View style={styles.graduatedBox}>
-          <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
-          <Text style={styles.graduatedLabel}>
-            This launch has graduated
-          </Text>
-        </View>
-      )}
-    </ScrollView>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: 'transparent',
   },
   content: {
-    padding: SPACING.md,
-    paddingBottom: SPACING.xxl,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: 40,
   },
   center: {
     flex: 1,
@@ -685,342 +696,313 @@ const styles = StyleSheet.create({
   compactHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
   },
   headerImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.md,
     backgroundColor: COLORS.surfaceLight,
   },
   headerImagePlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.md,
     backgroundColor: COLORS.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerNameCol: {
     flex: 1,
-    marginLeft: SPACING.sm,
+    marginLeft: SPACING.md,
   },
   headerName: {
-    color: COLORS.text,
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
+    ...TYPOGRAPHY.h2,
+    fontSize: 20,
   },
   headerSymbol: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.xs,
-    marginTop: 1,
+    ...TYPOGRAPHY.caption,
+    color: COLORS.primaryLight,
+    fontWeight: '800',
   },
   mintChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 6,
     backgroundColor: COLORS.surfaceLight,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   mintChipText: {
-    color: COLORS.textMuted,
+    color: COLORS.textSecondary,
     fontSize: 11,
-    fontFamily: 'monospace',
+    fontWeight: '600',
   },
   // Price hero
   priceHero: {
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 12,
   },
   heroPrice: {
-    fontSize: 28,
-    fontWeight: '800',
-    fontFamily: 'monospace',
-    color: COLORS.text,
+    ...TYPOGRAPHY.h1,
+    fontSize: 34,
   },
   heroDiscount: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '600',
-    marginTop: 2,
+    ...TYPOGRAPHY.bodyBold,
+    fontSize: 14,
   },
   // Chart toggle
   chartToggleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
   },
   chartToggleGroup: {
     flexDirection: 'row',
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: RADIUS.md,
-    padding: 3,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.full,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   chartToggleBtn: {
     paddingVertical: 6,
-    paddingHorizontal: SPACING.md,
-    borderRadius: RADIUS.md - 2,
+    paddingHorizontal: 16,
+    borderRadius: RADIUS.full,
   },
   chartToggleBtnActive: {
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: COLORS.surfaceLight,
   },
   chartToggleText: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
+    ...TYPOGRAPHY.caption,
     color: COLORS.textMuted,
+    fontWeight: '700',
   },
   chartToggleTextActive: {
     color: COLORS.text,
   },
   intervalGroup: {
     flexDirection: 'row',
-    gap: 4,
+    gap: 6,
   },
   intervalBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: SPACING.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.surfaceLight,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   intervalBtnActive: {
     backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   intervalText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.textMuted,
   },
   intervalTextActive: {
     color: '#FFFFFF',
   },
-  // Chart
   chartWrap: {
-    marginHorizontal: -SPACING.md,
-    marginBottom: SPACING.sm,
+    marginHorizontal: -SPACING.lg,
+    marginBottom: SPACING.lg,
+    height: 320,
   },
-  // Sections
+  // Stats
   section: {
-    marginTop: SPACING.lg,
+    marginBottom: SPACING.xl,
   },
   sectionHeader: {
     ...TYPOGRAPHY.label,
-    marginBottom: SPACING.sm,
-  },
-  connectHint: {
     color: COLORS.textMuted,
-    fontSize: FONT_SIZE.sm,
-    textAlign: 'center',
-    marginTop: SPACING.sm,
+    marginBottom: SPACING.md,
+    fontSize: 13,
   },
-  // Info tabs (Comments / Trades / Holders)
+  // Tabs
   infoTabRow: {
     flexDirection: 'row',
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: RADIUS.md,
-    padding: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
     marginBottom: SPACING.md,
   },
   infoTab: {
-    flex: 1,
-    paddingVertical: SPACING.sm,
-    alignItems: 'center',
-    borderRadius: RADIUS.md - 2,
+    marginRight: SPACING.xl,
+    paddingBottom: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
   infoTabActive: {
-    backgroundColor: COLORS.cardBg,
+    borderBottomColor: COLORS.primary,
   },
   infoTabText: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '600',
+    ...TYPOGRAPHY.bodyBold,
     color: COLORS.textMuted,
+    fontSize: 14,
   },
   infoTabTextActive: {
     color: COLORS.text,
   },
-  // Milestones
-  milestoneDots: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.sm,
-  },
-  milestoneDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: COLORS.surfaceLight,
-  },
-  milestoneDotFilled: {
-    backgroundColor: COLORS.accent,
-  },
-  milestoneLabel: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.xs,
-  },
-  // Graduate button
-  graduateButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.lg,
-    paddingVertical: SPACING.md,
-    alignItems: 'center',
-    ...SHADOWS.md,
-  },
-  graduateButtonText: {
-    color: '#FFFFFF',
-    fontSize: FONT_SIZE.md,
-    fontWeight: '700',
-  },
-  // SOL Locked
-  lockedBox: {
-    backgroundColor: COLORS.primaryLight,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    marginTop: SPACING.lg,
-  },
-  lockedTitle: {
-    color: COLORS.primary,
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
-    marginBottom: SPACING.xs,
-  },
-  lockedSubtext: {
-    color: COLORS.primary,
-    fontSize: FONT_SIZE.xs,
-  },
-  // Waiting for creator
-  waitingBox: {
-    backgroundColor: COLORS.cardBg,
+  // List blocks
+  infoBox: {
+    backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    gap: 8,
+  },
+  infoText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
+    fontSize: 13,
+  },
+  waitingBox: {
+    backgroundColor: COLORS.surface,
+    padding: SPACING.xl,
+    borderRadius: RADIUS.xl,
     alignItems: 'center',
-    ...SHADOWS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   waitingTitle: {
-    color: COLORS.warning,
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
-    marginBottom: SPACING.sm,
+    ...TYPOGRAPHY.h3,
+    marginBottom: 8,
   },
   waitingSubtext: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.sm,
+    ...TYPOGRAPHY.body,
     textAlign: 'center',
+    color: COLORS.textSecondary,
   },
-  // Vested Fees
-  vestedSection: {
-    backgroundColor: COLORS.cardBg,
+  graduateButton: {
     borderRadius: RADIUS.lg,
-    padding: SPACING.md + 4,
-    marginTop: SPACING.lg,
-    ...SHADOWS.sm,
+    overflow: 'hidden',
+    height: 54,
+    ...SHADOWS.card,
+  },
+  graduateButtonText: {
+    ...TYPOGRAPHY.bodyBold,
+    color: '#FFF',
+  },
+  lockedBox: {
+    backgroundColor: 'rgba(29, 4, 225, 0.05)',
+    padding: SPACING.lg,
+    borderRadius: RADIUS.lg,
+    marginBottom: SPACING.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(29, 4, 225, 0.2)',
+  },
+  lockedTitle: {
+    ...TYPOGRAPHY.bodyBold,
+    color: COLORS.primaryLight,
+  },
+  lockedSubtext: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
+    marginTop: 4,
+  },
+  vestedSection: {
+    backgroundColor: COLORS.surface,
+    padding: SPACING.lg,
+    borderRadius: RADIUS.lg,
+    marginBottom: SPACING.xl,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   vestedTitle: {
-    color: COLORS.text,
-    fontSize: FONT_SIZE.md,
-    fontWeight: '700',
+    ...TYPOGRAPHY.h3,
     marginBottom: SPACING.md,
   },
   vestedGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
-    marginBottom: SPACING.md,
+    gap: 12,
   },
   vestedItem: {
-    width: '47%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   vestedLabel: {
+    ...TYPOGRAPHY.caption,
     color: COLORS.textMuted,
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 2,
   },
   vestedValue: {
+    ...TYPOGRAPHY.caption,
     color: COLORS.text,
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
     fontFamily: 'monospace',
   },
   claimableValue: {
-    color: COLORS.success,
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
+    ...TYPOGRAPHY.bodyBold,
+    color: COLORS.primaryLight,
     fontFamily: 'monospace',
   },
   vestedActions: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    marginTop: SPACING.lg,
+    gap: 12,
   },
   claimFeesButton: {
-    flex: 1,
-    backgroundColor: COLORS.surfaceLight,
+    flex: 2,
+    backgroundColor: COLORS.primary,
+    height: 44,
     borderRadius: RADIUS.md,
-    paddingVertical: SPACING.md,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   claimFeesButtonText: {
-    color: COLORS.text,
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
+    ...TYPOGRAPHY.bodyBold,
+    color: '#FFF',
+    fontSize: 13,
   },
   advanceButton: {
-    backgroundColor: COLORS.primary,
+    flex: 1,
+    backgroundColor: COLORS.surfaceLight,
+    height: 44,
     borderRadius: RADIUS.md,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
+    justifyContent: 'center',
     alignItems: 'center',
-    ...SHADOWS.sm,
   },
   advanceButtonText: {
-    color: '#FFFFFF',
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
+    ...TYPOGRAPHY.bodyBold,
+    color: COLORS.text,
+    fontSize: 13,
   },
   disabledButton: {
     opacity: 0.5,
   },
-  // Claim Bonus
-  claimBonusButton: {
-    backgroundColor: COLORS.accent,
-    borderRadius: RADIUS.lg,
-    paddingVertical: SPACING.md + 2,
-    alignItems: 'center',
-    ...SHADOWS.md,
-  },
-  claimBonusButtonText: {
-    color: '#1A1A2E',
-    fontSize: FONT_SIZE.md,
-    fontWeight: '800',
-  },
-  // Launch Info
-  infoBox: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    gap: SPACING.xs + 2,
-    ...SHADOWS.sm,
-  },
-  infoText: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.xs,
-  },
-  // Graduated Badge
   graduatedBox: {
-    backgroundColor: COLORS.success + '15',
-    borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    marginTop: SPACING.lg,
-    alignItems: 'center',
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACING.sm,
+    gap: 8,
+    marginTop: SPACING.lg,
   },
   graduatedLabel: {
+    ...TYPOGRAPHY.bodyBold,
     color: COLORS.success,
-    fontSize: FONT_SIZE.md,
-    fontWeight: '700',
+  },
+  milestoneDots: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  milestoneDot: {
+    width: 24,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: COLORS.border,
+  },
+  milestoneDotFilled: {
+    backgroundColor: COLORS.primary,
+  },
+  milestoneLabel: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textMuted,
   },
   errorText: {
     ...TYPOGRAPHY.h3,
@@ -1032,4 +1014,23 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     fontFamily: 'monospace',
   },
+  claimBonusButton: {
+    backgroundColor: COLORS.accent,
+    height: 54,
+    borderRadius: RADIUS.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...SHADOWS.glow,
+  },
+  claimBonusButtonText: {
+    ...TYPOGRAPHY.bodyBold,
+    color: '#000',
+  },
+  connectHint: {
+    textAlign: 'center',
+    color: COLORS.textMuted,
+    fontSize: 12,
+    marginTop: 12,
+  },
 });
+

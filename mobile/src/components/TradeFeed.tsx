@@ -136,14 +136,14 @@ export default function TradeFeed({ launchPda }: TradeFeedProps) {
     const isBuy = item.type === 'buy';
     return (
       <View style={styles.tradeItem}>
-        <Text style={[styles.tradeIcon, { color: isBuy ? COLORS.green : COLORS.red }]}>
+        <Text style={[styles.tradeIcon, { color: isBuy ? COLORS.success : COLORS.error }]}>
           {isBuy ? '\u25CF' : '\u25CF'}
         </Text>
         <Text style={styles.tradeWallet}>{truncateWallet(item.wallet)}</Text>
         <Text
           style={[
             styles.tradeAmount,
-            { color: isBuy ? COLORS.green : COLORS.red },
+            { color: isBuy ? COLORS.success : COLORS.error },
           ]}
         >
           {isBuy ? '+' : '-'}

@@ -7,7 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS } from '../constants/theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import {
   LaunchData,
   UserPositionData,
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.lg,
     padding: SPACING.md + 4,
-    ...SHADOWS.lg,
+    ...SHADOWS.card,
   },
   // Tab toggle
   tabRow: {
@@ -394,21 +394,26 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md - 2,
   },
   tabActiveBuy: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: 'rgba(0, 240, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: COLORS.accent,
   },
   tabActiveSell: {
-    backgroundColor: COLORS.red,
+    backgroundColor: 'rgba(255, 59, 59, 0.15)',
+    borderWidth: 1,
+    borderColor: COLORS.error,
   },
   tabText: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '800',
     color: COLORS.textMuted,
+    letterSpacing: 1,
   },
   tabTextActiveBuy: {
-    color: '#1A1A2E',
+    color: COLORS.accent,
   },
   tabTextActiveSell: {
-    color: '#FFFFFF',
+    color: COLORS.error,
   },
   // Input
   inputRow: {
@@ -537,25 +542,26 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     paddingVertical: SPACING.md + 2,
     alignItems: 'center',
+    ...SHADOWS.glow,
   },
   buyButtonText: {
-    color: '#1A1A2E',
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '800',
+    ...TYPOGRAPHY.bodyBold,
+    color: '#000',
+    fontSize: 18,
   },
   sellButton: {
-    backgroundColor: COLORS.red,
+    backgroundColor: COLORS.error,
     borderRadius: RADIUS.lg,
     paddingVertical: SPACING.md + 2,
     alignItems: 'center',
   },
   sellButtonText: {
+    ...TYPOGRAPHY.bodyBold,
     color: '#FFFFFF',
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '800',
+    fontSize: 18,
   },
   buttonDisabled: {
-    opacity: 0.5,
+    opacity: 0.3,
   },
   disclaimer: {
     color: COLORS.textMuted,

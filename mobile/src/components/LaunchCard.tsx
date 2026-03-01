@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import { LaunchData, VestigeClient } from '../lib/vestige-client';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface LaunchCardProps {
   launch: LaunchData;
@@ -11,204 +12,205 @@ interface LaunchCardProps {
   onToggleFavorite?: () => void;
 }
 
-function hashStringToColor(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  return `hsl(${Math.abs(hash) % 360}, 60%, 45%)`;
-}
-
 export default function LaunchCard({ launch, onPress, isFavorite, onToggleFavorite }: LaunchCardProps) {
   const progress = VestigeClient.getProgress(launch);
   const timeLeft = VestigeClient.getTimeRemaining(launch.endTime);
-  const price = VestigeClient.getCurrentCurvePrice(launch);
-  const priceSol = VestigeClient.lamportsToSol(price);
-  const pMaxSol = VestigeClient.lamportsToSol(launch.pMax.toNumber());
+  const priceSol = VestigeClient.lamportsToSol(VestigeClient.getCurrentCurvePrice(launch));
   const solRaised = VestigeClient.lamportsToSol(launch.totalSolCollected);
   const mcap = VestigeClient.getMarketCapSol(launch);
 
   const name = launch.name || launch.tokenMint.toBase58().slice(0, 8) + '...';
   const symbol = launch.symbol || launch.tokenMint.toBase58().slice(0, 6);
-  const avatarColor = hashStringToColor(launch.tokenMint.toBase58());
-
-  // Discount from pMax
-  const discountPct = pMaxSol > 0 ? ((priceSol - pMaxSol) / pMaxSol) * 100 : 0;
-  const discountLabel = discountPct >= 0
-    ? `+${discountPct.toFixed(0)}%`
-    : `${discountPct.toFixed(0)}%`;
-  const discountColor = discountPct >= 0 ? COLORS.green : COLORS.red;
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-      {/* Top row: avatar + name + time */}
-      <View style={styles.topRow}>
-        <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
-          <Text style={styles.avatarLetter}>{name.charAt(0).toUpperCase()}</Text>
-        </View>
-        <View style={styles.nameCol}>
-          <Text style={styles.tokenName} numberOfLines={1}>{name}</Text>
-          <Text style={styles.tokenSymbol}>${symbol}</Text>
-        </View>
-        {launch.isGraduated ? (
-          <View style={styles.graduatedBadge}>
-            <Text style={styles.graduatedText}>Graduated</Text>
-          </View>
-        ) : (
-          <Text style={styles.timeText}>{timeLeft}</Text>
-        )}
-        {onToggleFavorite && (
-          <TouchableOpacity
-            onPress={(e) => { e.stopPropagation(); onToggleFavorite(); }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={styles.starBtn}
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
+      <View style={styles.container}>
+        <View style={styles.avatarContainer}>
+          <LinearGradient
+            colors={[COLORS.primary, COLORS.accent]}
+            style={styles.avatar}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
           >
-            <Ionicons
-              name={isFavorite ? 'star' : 'star-outline'}
-              size={18}
-              color={isFavorite ? COLORS.warning : COLORS.textMuted}
-            />
-          </TouchableOpacity>
-        )}
-      </View>
+            <Text style={styles.avatarText}>{symbol.charAt(0).toUpperCase()}</Text>
+          </LinearGradient>
+        </View>
 
-      {/* Price row */}
-      <View style={styles.priceRow}>
-        <Text style={styles.priceValue}>{priceSol.toFixed(6)} SOL</Text>
-        <View style={[styles.discountBadge, { backgroundColor: discountColor + '18' }]}>
-          <Text style={[styles.discountText, { color: discountColor }]}>
-            {discountLabel} from start
-          </Text>
+        <View style={styles.mainInfo}>
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={styles.tokenName} numberOfLines={1}>{name}</Text>
+              <View style={styles.symbolRow}>
+                <Text style={styles.tokenSymbol}>${symbol}</Text>
+                {!launch.isGraduated && (
+                  <Text style={styles.timeTag}>• {timeLeft}</Text>
+                )}
+              </View>
+            </View>
+            <View style={styles.priceCol}>
+              <Text style={styles.priceLabel}>{priceSol.toFixed(6)} SOL</Text>
+              <Text style={styles.mcapLabel}>${mcap.toFixed(2)} MC</Text>
+            </View>
+          </View>
+
+          <View style={styles.progressRow}>
+            <View style={styles.progressHeader}>
+              <Text style={styles.progressLabel}>Bonding Curve Progress</Text>
+              <Text style={[styles.progressValue, { color: progress > 80 ? COLORS.accent : COLORS.primaryLight }]}>
+                {progress.toFixed(1)}%
+              </Text>
+            </View>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${Math.min(100, progress)}%` }]} />
+            </View>
+          </View>
+
+          <View style={styles.footerRow}>
+            <View style={styles.stat}>
+              <Ionicons name="people-outline" size={14} color={COLORS.textMuted} />
+              <Text style={styles.statValue}>{launch.totalParticipants}</Text>
+            </View>
+            <View style={styles.stat}>
+              <Ionicons name="diamond-outline" size={14} color={COLORS.textMuted} />
+              <Text style={styles.statValue}>{solRaised.toFixed(2)} SOL</Text>
+            </View>
+            {onToggleFavorite && (
+              <TouchableOpacity onPress={(e) => { e.stopPropagation(); onToggleFavorite(); }}>
+                <Ionicons
+                  name={isFavorite ? 'star' : 'star-outline'}
+                  size={18}
+                  color={isFavorite ? COLORS.warning : COLORS.textMuted}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
-
-      {/* Stats row */}
-      <View style={styles.statsRow}>
-        <Text style={styles.statText}>
-          {'\u{1F465}'} {launch.totalParticipants} participants
-        </Text>
-        <Text style={styles.statText}>
-          {'\u25CE'} {solRaised.toFixed(2)} SOL raised
-        </Text>
-      </View>
-
-      {/* Market cap */}
-      <Text style={styles.mcapText}>MCap: {mcap.toFixed(2)} SOL</Text>
-
-      {/* Progress bar */}
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${Math.min(100, progress)}%` }]} />
-      </View>
-      <Text style={styles.progressText}>{progress.toFixed(1)}%</Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
+    marginHorizontal: SPACING.lg,
     marginBottom: SPACING.md,
-    padding: SPACING.md,
-    ...SHADOWS.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...SHADOWS.card,
   },
-  topRow: {
+  container: {
+    padding: SPACING.md,
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.sm + 4,
+  },
+  avatarContainer: {
+    marginRight: SPACING.md,
   },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 52,
+    height: 52,
+    borderRadius: RADIUS.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING.sm + 2,
   },
-  avatarLetter: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
+  avatarText: {
+    color: '#FFF',
+    fontSize: 22,
+    fontWeight: '900',
   },
-  nameCol: {
+  mainInfo: {
     flex: 1,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: SPACING.sm,
+  },
   tokenName: {
+    ...TYPOGRAPHY.bodyBold,
     color: COLORS.text,
-    fontSize: FONT_SIZE.md,
-    fontWeight: '700',
+    fontSize: 17,
   },
-  tokenSymbol: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.xs,
-    marginTop: 1,
-  },
-  timeText: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
-  },
-  starBtn: {
-    marginLeft: SPACING.sm,
-    padding: 2,
-  },
-  graduatedBadge: {
-    backgroundColor: COLORS.success + '20',
-    paddingHorizontal: SPACING.sm + 2,
-    paddingVertical: 3,
-    borderRadius: RADIUS.full,
-  },
-  graduatedText: {
-    color: COLORS.success,
-    fontSize: FONT_SIZE.xs - 1,
-    fontWeight: '700',
-  },
-  priceRow: {
+  symbolRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.sm + 2,
+    marginTop: 2,
   },
-  priceValue: {
-    ...TYPOGRAPHY.price,
-  },
-  discountBadge: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 3,
-    borderRadius: RADIUS.full,
-  },
-  discountText: {
-    fontSize: FONT_SIZE.xs - 1,
+  tokenSymbol: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textMuted,
     fontWeight: '700',
   },
-  statsRow: {
+  timeTag: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textMuted,
+    marginLeft: 4,
+  },
+  priceCol: {
+    alignItems: 'flex-end',
+  },
+  priceLabel: {
+    ...TYPOGRAPHY.label,
+    color: COLORS.text,
+    fontSize: 15,
+  },
+  mcapLabel: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  progressRow: {
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.sm,
+  },
+  progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: SPACING.sm + 2,
+    marginBottom: 4,
   },
-  statText: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.xs,
-  },
-  mcapText: {
+  progressLabel: {
+    ...TYPOGRAPHY.caption,
     color: COLORS.textMuted,
-    fontSize: FONT_SIZE.xs,
-    textAlign: 'right',
-    marginBottom: SPACING.sm + 2,
+    fontSize: 10,
+    textTransform: 'uppercase',
+  },
+  progressValue: {
+    ...TYPOGRAPHY.caption,
+    fontWeight: '800',
   },
   progressTrack: {
-    height: 4,
+    height: 6,
     backgroundColor: COLORS.surfaceLight,
-    borderRadius: 2,
+    borderRadius: 3,
     overflow: 'hidden',
-    marginBottom: 3,
   },
   progressFill: {
     height: '100%',
     backgroundColor: COLORS.primary,
-    borderRadius: 2,
+    borderRadius: 3,
   },
-  progressText: {
-    color: COLORS.textMuted,
-    fontSize: 10,
-    textAlign: 'right',
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: SPACING.xs,
+    paddingTop: SPACING.xs,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  stat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statValue: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
   },
 });
+

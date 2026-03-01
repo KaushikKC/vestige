@@ -2,44 +2,57 @@ import { Platform } from 'react-native';
 
 export const COLORS = {
   primary: '#1D04E1',
-  primaryLight: '#E8E5FC',
-  accent: '#B8D430',
-  accentDark: '#8FA620',
-  background: '#F5F5F7',
-  surface: '#FFFFFF',
-  surfaceLight: '#EEEEF0',
+  primaryDark: '#12028A',
+  primaryLight: '#4D36FF',
+  primaryGlow: 'rgba(29, 4, 225, 0.2)',
+
+  accent: '#1D04E1', // Using primary blue for accent in light mode
+  accentGlow: 'rgba(29, 4, 225, 0.15)',
+
+  background: '#FFFFFF',
+  surface: '#F8F9FA',
+  surfaceLight: '#FFFFFF',
+  surfaceDark: '#EDF2F7',
+
   cardBg: '#FFFFFF',
-  border: '#D1D5DB',
-  text: '#1A1A2E',
-  textSecondary: '#4B5563',
-  textMuted: '#9CA3AF',
-  success: '#16A34A',
+  border: '#E2E8F0',
+  borderLight: '#F1F5F9',
+
+  text: '#1A202C',
+  textSecondary: '#4A5568',
+  textMuted: '#718096',
+
+  success: '#059669',
   error: '#DC2626',
   warning: '#D97706',
+
   tabBarBg: '#FFFFFF',
-  tabBarBorder: '#E5E7EB',
+  tabBarBorder: '#E2E8F0',
   tabBarActive: '#1D04E1',
-  tabBarInactive: '#9CA3AF',
-  green: '#00C853',
-  red: '#FF1744',
-  chartGrid: '#E8E8EC',
-  chartArea: '#F8F8FA',
+  tabBarInactive: '#94A3B8',
+
+  chartGreen: '#10B981',
+  chartRed: '#EF4444',
+  chartGrid: '#F1F5F9',
 };
 
 export const SPACING = {
+  xxs: 2,
   xs: 4,
   sm: 8,
   md: 16,
   lg: 24,
   xl: 32,
   xxl: 48,
+  xxxl: 64,
 };
 
 export const RADIUS = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
+  xs: 6,
+  sm: 10,
+  md: 14,
+  lg: 20,
+  xl: 28,
   full: 999,
 };
 
@@ -48,68 +61,22 @@ export const FONT_SIZE = {
   sm: 14,
   md: 16,
   lg: 18,
-  xl: 24,
+  xl: 22,
   xxl: 32,
-};
-
-export const SHADOWS = {
-  sm: Platform.select({
-    ios: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.08,
-      shadowRadius: 4,
-    },
-    android: {
-      elevation: 2,
-    },
-  }) as Record<string, any>,
-  md: Platform.select({
-    ios: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.12,
-      shadowRadius: 8,
-    },
-    android: {
-      elevation: 4,
-    },
-  }) as Record<string, any>,
-  lg: Platform.select({
-    ios: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.16,
-      shadowRadius: 12,
-    },
-    android: {
-      elevation: 8,
-    },
-  }) as Record<string, any>,
-  tabBar: Platform.select({
-    ios: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: -3 },
-      shadowOpacity: 0.1,
-      shadowRadius: 6,
-    },
-    android: {
-      elevation: 10,
-    },
-  }) as Record<string, any>,
+  huge: 48,
 };
 
 export const TYPOGRAPHY = {
   h1: {
     fontSize: FONT_SIZE.xxl,
     fontWeight: '800' as const,
-    letterSpacing: -0.5,
+    letterSpacing: -0.8,
     color: COLORS.text,
   },
   h2: {
     fontSize: FONT_SIZE.xl,
     fontWeight: '700' as const,
-    letterSpacing: -0.3,
+    letterSpacing: -0.5,
     color: COLORS.text,
   },
   h3: {
@@ -120,6 +87,12 @@ export const TYPOGRAPHY = {
   body: {
     fontSize: FONT_SIZE.md,
     fontWeight: '400' as const,
+    color: COLORS.textSecondary,
+    lineHeight: 22,
+  },
+  bodyBold: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600' as const,
     color: COLORS.text,
   },
   caption: {
@@ -128,22 +101,52 @@ export const TYPOGRAPHY = {
     color: COLORS.textMuted,
   },
   label: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '600' as const,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.8,
     color: COLORS.textSecondary,
   },
   price: {
     fontSize: 20,
     fontWeight: '800' as const,
-    fontFamily: 'monospace',
+    fontFamily: Platform.select({ ios: 'Courier New', android: 'monospace' }),
     color: COLORS.text,
   },
-  priceSmall: {
-    fontSize: 14,
-    fontWeight: '700' as const,
-    fontFamily: 'monospace',
-    color: COLORS.text,
+};
+
+export const SHADOWS = {
+  sm: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
+  md: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  lg: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  glow: {
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  card: {
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  }
 };

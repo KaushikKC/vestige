@@ -8,6 +8,7 @@ import {
   StyleSheet,
   RefreshControl,
   ScrollView,
+  StatusBar,
 } from "react-native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
@@ -28,8 +29,12 @@ import LaunchCard from "../components/LaunchCard";
 import KingOfTheHill from "../components/KingOfTheHill";
 import WalletButton from "../components/WalletButton";
 import SkeletonLoader from "../components/SkeletonLoader";
+import VestigeLogo from "../components/VestigeLogo";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DiscoverStackParamList } from "../navigation/RootNavigator";
+import { LinearGradient } from "expo-linear-gradient";
+import BackgroundEffect from "../components/BackgroundEffect";
+
 
 type Props = {
   navigation: NativeStackNavigationProp<DiscoverStackParamList, "DiscoverList">;
@@ -42,44 +47,24 @@ const FILTER_CHIPS: { key: SortMode; label: string }[] = [
   { key: "active", label: "Active" },
   { key: "graduating", label: "Graduating" },
   { key: "graduated", label: "Graduated" },
-  { key: "favorites", label: "\u2605 Watchlist" },
-  { key: "mostRaised", label: "Most Raised" },
-  { key: "newest", label: "Newest" },
+  { key: "favorites", label: "Watchlist" },
+  { key: "mostRaised", label: "Hot" },
+  { key: "newest", label: "New" },
 ];
-
-function isValidPublicKey(str: string): boolean {
-  if (str.length < 32 || str.length > 44) return false;
-  try {
-    new PublicKey(str);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 function SkeletonCard() {
   return (
     <View style={skeletonStyles.card}>
-      {/* Avatar + name row */}
       <View style={skeletonStyles.topRow}>
-        <SkeletonLoader width={36} height={36} borderRadius={18} />
-        <View style={{ flex: 1, marginLeft: SPACING.sm }}>
-          <SkeletonLoader width={100} height={14} />
-          <SkeletonLoader width={60} height={10} style={{ marginTop: 4 }} />
+        <SkeletonLoader width={48} height={48} borderRadius={RADIUS.md} />
+        <View style={{ flex: 1, marginLeft: SPACING.md }}>
+          <SkeletonLoader width={120} height={16} />
+          <SkeletonLoader width={80} height={12} style={{ marginTop: 6 }} />
         </View>
-        <SkeletonLoader width={40} height={14} />
       </View>
-      {/* Price row */}
-      <View style={skeletonStyles.priceRow}>
-        <SkeletonLoader width={140} height={22} />
-        <SkeletonLoader width={80} height={18} borderRadius={RADIUS.full} />
-      </View>
-      {/* Stats row */}
       <View style={skeletonStyles.statsRow}>
-        <SkeletonLoader width="45%" height={12} />
-        <SkeletonLoader width="40%" height={12} />
+        <SkeletonLoader width="60%" height={14} />
       </View>
-      {/* Progress bar */}
       <SkeletonLoader width="100%" height={4} borderRadius={2} />
     </View>
   );
@@ -148,8 +133,6 @@ export default function DiscoverScreen({ navigation }: Props) {
 
   const filteredLaunches = useMemo(() => {
     let list = launches;
-
-    // Text search
     if (trimmedQuery) {
       const q = trimmedQuery.toLowerCase();
       list = list.filter(
@@ -159,348 +142,228 @@ export default function DiscoverScreen({ navigation }: Props) {
           l.tokenMint.toBase58().toLowerCase().includes(q),
       );
     }
-
-    // Filter
     switch (sortMode) {
-      case "active":
-        list = list.filter((l) => !l.isGraduated);
-        break;
-      case "graduated":
-        list = list.filter((l) => l.isGraduated);
-        break;
-      case "mostRaised":
-        list = [...list].sort(
-          (a, b) =>
-            b.totalSolCollected.toNumber() - a.totalSolCollected.toNumber(),
-        );
-        break;
-      case "newest":
-        list = [...list].sort((a, b) => b.startTime - a.startTime);
-        break;
-      case "graduating":
-        list = list.filter(
-          (l) => !l.isGraduated && VestigeClient.getProgress(l) > 80,
-        );
-        break;
-      case "favorites":
-        list = list.filter((l) => isFavorite(l.publicKey.toBase58()));
-        break;
+      case "active": list = list.filter((l) => !l.isGraduated); break;
+      case "graduated": list = list.filter((l) => l.isGraduated); break;
+      case "mostRaised": list = [...list].sort((a, b) => b.totalSolCollected.toNumber() - a.totalSolCollected.toNumber()); break;
+      case "newest": list = [...list].sort((a, b) => b.startTime - a.startTime); break;
+      case "graduating": list = list.filter((l) => !l.isGraduated && VestigeClient.getProgress(l) > 80); break;
+      case "favorites": list = list.filter((l) => isFavorite(l.publicKey.toBase58())); break;
     }
-
-    // Exclude king from main list to avoid duplication
-    if (kingLaunch) {
-      list = list.filter((l) => !l.publicKey.equals(kingLaunch.publicKey));
-    }
-
+    if (kingLaunch) list = list.filter((l) => !l.publicKey.equals(kingLaunch.publicKey));
     return list;
   }, [launches, trimmedQuery, sortMode, kingLaunch, isFavorite]);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.hero}>
-        <Text style={styles.heroTitle}>Markets</Text>
-        <WalletButton />
+    <View style={styles.container}>
+      <BackgroundEffect />
+      <StatusBar barStyle="dark-content" />
+      <View style={[styles.header, { paddingTop: insets.top + SPACING.sm }]}>
+        <View style={styles.brandRow}>
+          <View style={styles.logoGroup}>
+            <VestigeLogo size={32} />
+            <Text style={styles.headerTitle}>VESTIGE</Text>
+          </View>
+          <WalletButton />
+        </View>
+
+        {/* Search */}
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={18} color={COLORS.textSecondary} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search coin..."
+              placeholderTextColor={COLORS.textMuted}
+              value={query}
+              onChangeText={setQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {query.length > 0 && (
+              <TouchableOpacity onPress={() => setQuery("")}>
+                <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
       </View>
 
-      {/* Search bar */}
-      <View style={styles.searchWrap}>
-        <Ionicons
-          name="search"
-          size={16}
-          color={COLORS.textMuted}
-          style={styles.searchIcon}
-        />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by name or symbol..."
-          placeholderTextColor={COLORS.textMuted}
-          value={query}
-          onChangeText={setQuery}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {query.length > 0 && (
-          <TouchableOpacity
-            onPress={() => setQuery("")}
-            style={styles.clearBtn}
-          >
-            <Ionicons name="close-circle" size={16} color={COLORS.textMuted} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* PDA link */}
-      {showPdaLink && (
-        <TouchableOpacity
-          style={styles.pdaLink}
-          onPress={() => {
-            goToLaunch(trimmedQuery);
-            setQuery("");
-          }}
-        >
-          <Ionicons
-            name="arrow-forward-circle-outline"
-            size={14}
-            color={COLORS.primary}
-          />
-          <Text style={styles.pdaLinkText}>
-            Go to PDA: {trimmedQuery.slice(0, 8)}...
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Filter chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.chipScrollView}
-        contentContainerStyle={styles.chipRow}
-      >
-        {FILTER_CHIPS.map((chip) => (
-          <TouchableOpacity
-            key={chip.key}
-            style={[styles.chip, sortMode === chip.key && styles.chipActive]}
-            onPress={() => setSortMode(chip.key)}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                sortMode === chip.key && styles.chipTextActive,
-              ]}
+      <FlatList
+        data={filteredLaunches}
+        keyExtractor={(item) => item.publicKey.toBase58()}
+        ListHeaderComponent={
+          <>
+            {/* Filter chips */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipRow}
             >
-              {chip.label}
+              {FILTER_CHIPS.map((chip) => (
+                <TouchableOpacity
+                  key={chip.key}
+                  style={[styles.chip, sortMode === chip.key && styles.chipActive]}
+                  onPress={() => setSortMode(chip.key)}
+                >
+                  <Text style={[styles.chipText, sortMode === chip.key && styles.chipTextActive]}>
+                    {chip.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* King of the Hill */}
+            {kingLaunch && !loading && (
+              <View style={styles.kingContainer}>
+                <KingOfTheHill
+                  launch={kingLaunch}
+                  onPress={() => goToLaunch(kingLaunch.publicKey.toBase58())}
+                />
+              </View>
+            )}
+
+            {/* Trending / Graduating */}
+            {aboutToGraduate.length > 0 && (
+              <View style={styles.trendingSection}>
+                <Text style={styles.sectionTitle}>Trending Searches</Text>
+                <FlatList
+                  horizontal
+                  data={aboutToGraduate}
+                  keyExtractor={(item) => item.publicKey.toBase58()}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.trendingList}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.trendingCard}
+                      onPress={() => goToLaunch(item.publicKey.toBase58())}
+                    >
+                      <View style={styles.trendingCardHeader}>
+                        <View style={styles.trendingAvatar} />
+                        <View>
+                          <Text style={styles.trendingName} numberOfLines={1}>{item.name}</Text>
+                          <Text style={styles.trendingSymbol}>${item.symbol}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.miniChart} />
+                      <Text style={styles.trendingPrice}>
+                        {VestigeClient.getProgress(item).toFixed(1)}% Full
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+            )}
+
+            <Text style={[styles.sectionTitle, { marginLeft: SPACING.lg, marginTop: SPACING.lg }]}>
+              Latest Launches
             </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* King of the Hill */}
-      {kingLaunch && !loading && (
-        <View style={styles.kingWrap}>
-          <KingOfTheHill
-            launch={kingLaunch}
-            onPress={() => goToLaunch(kingLaunch.publicKey.toBase58())}
+          </>
+        }
+        renderItem={({ item }) => (
+          <LaunchCard
+            launch={item}
+            onPress={() => goToLaunch(item.publicKey.toBase58())}
+            isFavorite={isFavorite(item.publicKey.toBase58())}
+            onToggleFavorite={() => toggleFavorite(item.publicKey.toBase58())}
           />
-        </View>
-      )}
-
-      {/* About to Graduate */}
-      {aboutToGraduate.length > 0 && !loading && (
-        <View style={styles.graduatingSection}>
-          <Text style={styles.graduatingSectionTitle}>About to Graduate</Text>
-          <FlatList
-            horizontal
-            data={aboutToGraduate}
-            keyExtractor={(item) => item.publicKey.toBase58()}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.graduatingList}
-            renderItem={({ item }) => {
-              const progress = VestigeClient.getProgress(item);
-              const target = item.graduationTarget.toNumber();
-              const collected = item.totalSolCollected.toNumber();
-              const remainingSol = VestigeClient.lamportsToSol(
-                Math.max(0, target - collected),
-              );
-              const barColor =
-                progress > 95 ? COLORS.red : COLORS.warning;
-              const name =
-                item.name ||
-                item.tokenMint.toBase58().slice(0, 8) + "...";
-              return (
-                <TouchableOpacity
-                  style={styles.graduatingCard}
-                  activeOpacity={0.7}
-                  onPress={() =>
-                    goToLaunch(item.publicKey.toBase58())
-                  }
-                >
-                  <Text
-                    style={styles.graduatingName}
-                    numberOfLines={1}
-                  >
-                    {name}
-                  </Text>
-                  <Text style={styles.graduatingSymbol}>
-                    ${item.symbol}
-                  </Text>
-                  <View style={styles.graduatingBarTrack}>
-                    <View
-                      style={[
-                        styles.graduatingBarFill,
-                        {
-                          width: `${Math.min(100, progress)}%`,
-                          backgroundColor: barColor,
-                        },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.graduatingRemaining}>
-                    {remainingSol.toFixed(2)} SOL to go
-                  </Text>
-                </TouchableOpacity>
-              );
-            }}
-          />
-        </View>
-      )}
-
-      {loading ? (
-        <View style={styles.skeletonList}>
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-        </View>
-      ) : (
-        <FlatList
-          style={styles.listContainer}
-          data={filteredLaunches}
-          keyExtractor={(item) => item.publicKey.toBase58()}
-          renderItem={({ item }) => (
-            <LaunchCard
-              launch={item}
-              onPress={() => goToLaunch(item.publicKey.toBase58())}
-              isFavorite={isFavorite(item.publicKey.toBase58())}
-              onToggleFavorite={() =>
-                toggleFavorite(item.publicKey.toBase58())
-              }
-            />
-          )}
-          contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={COLORS.primary}
-            />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons
-                name="rocket-outline"
-                size={48}
-                color={COLORS.textMuted}
-                style={{ marginBottom: SPACING.md }}
-              />
-              <Text style={styles.emptyTitle}>No launches found</Text>
-              <Text style={styles.emptySubtext}>
-                {trimmedQuery
-                  ? "Try a different search term"
-                  : "Pull to refresh or create a new launch"}
-              </Text>
-              {!trimmedQuery && (
-                <TouchableOpacity
-                  style={styles.emptyCta}
-                  onPress={() => navigation.getParent()?.navigate("Create")}
-                >
-                  <Text style={styles.emptyCtaText}>Create a Launch</Text>
-                </TouchableOpacity>
-              )}
+        )}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
+        }
+        ListEmptyComponent={
+          loading ? (
+            <View style={{ padding: SPACING.lg }}>
+              <SkeletonCard />
+              <SkeletonCard />
             </View>
-          }
-        />
-      )}
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>No launches found</Text>
+            </View>
+          )
+        }
+      />
     </View>
   );
 }
 
+function isValidPublicKey(str: string): boolean {
+  if (str.length < 32 || str.length > 44) return false;
+  try { new PublicKey(str); return true; } catch { return false; }
+}
+
 const skeletonStyles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
-    padding: SPACING.md,
+    padding: SPACING.lg,
     marginBottom: SPACING.md,
-    gap: SPACING.sm + 2,
-    ...SHADOWS.md,
+    gap: SPACING.md,
   },
-  topRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  priceRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  statsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
+  topRow: { flexDirection: "row", alignItems: "center" },
+  statsRow: { marginTop: SPACING.sm },
 });
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: 'transparent',
   },
-  hero: {
+  header: {
+    backgroundColor: 'transparent',
+    paddingBottom: SPACING.md,
+  },
+  brandRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.sm,
-    paddingBottom: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
   },
-  heroTitle: {
-    ...TYPOGRAPHY.h1,
+  logoGroup: {
+    flexDirection: "row",
+    alignItems: "center",
   },
-  // Search
-  searchWrap: {
+  headerTitle: {
+    ...TYPOGRAPHY.h2,
+    color: COLORS.text,
+    marginLeft: SPACING.sm,
+    fontSize: 20,
+    letterSpacing: 1,
+  },
+  searchContainer: {
+    paddingHorizontal: SPACING.lg,
+  },
+  searchBar: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: COLORS.surface,
-    marginHorizontal: SPACING.md,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.sm + 2,
-    ...SHADOWS.sm,
-  },
-  searchIcon: {
-    marginRight: SPACING.xs + 2,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    height: 48,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: SPACING.sm + 2,
+    paddingHorizontal: SPACING.sm,
     color: COLORS.text,
-    fontSize: FONT_SIZE.sm,
-  },
-  clearBtn: {
-    padding: 4,
-  },
-  // PDA link
-  pdaLink: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs + 2,
-  },
-  pdaLinkText: {
-    color: COLORS.primary,
-    fontSize: FONT_SIZE.xs,
-    fontWeight: "600",
-  },
-  // Filter chips
-  chipScrollView: {
-    flexGrow: 0,
-    flexShrink: 0,
+    fontSize: FONT_SIZE.md,
   },
   chipRow: {
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.xs + 2,
-    paddingBottom: SPACING.xs,
-    gap: SPACING.xs + 2,
-  },
-  kingWrap: {
-    marginTop: SPACING.xs,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    gap: SPACING.sm,
   },
   chip: {
     backgroundColor: COLORS.surface,
-    paddingHorizontal: SPACING.sm + 4,
-    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
     borderRadius: RADIUS.full,
     borderWidth: 1,
     borderColor: COLORS.border,
-    height: 30,
   },
   chipActive: {
     backgroundColor: COLORS.primary,
@@ -508,94 +371,78 @@ const styles = StyleSheet.create({
   },
   chipText: {
     color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.xs,
+    fontSize: FONT_SIZE.sm,
     fontWeight: "600",
   },
   chipTextActive: {
-    color: "#FFFFFF",
+    color: "#FFF",
   },
-  // About to Graduate
-  graduatingSection: {
-    marginBottom: SPACING.xs,
+  kingContainer: {
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.xl,
   },
-  graduatingSectionTitle: {
+  trendingSection: {
+    marginBottom: SPACING.xl,
+  },
+  sectionTitle: {
     ...TYPOGRAPHY.h3,
-    fontSize: FONT_SIZE.md,
-    paddingHorizontal: SPACING.md,
-    marginBottom: SPACING.xs,
-  },
-  graduatingList: {
-    paddingHorizontal: SPACING.md,
-    gap: SPACING.sm,
-  },
-  graduatingCard: {
-    width: 160,
-    backgroundColor: COLORS.cardBg,
-    borderRadius: RADIUS.md,
-    padding: SPACING.sm + 2,
-    ...SHADOWS.sm,
-  },
-  graduatingName: {
     color: COLORS.text,
-    fontSize: FONT_SIZE.sm,
-    fontWeight: "700",
+    marginBottom: SPACING.md,
+    paddingHorizontal: SPACING.lg,
   },
-  graduatingSymbol: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.xs - 1,
-    marginBottom: SPACING.xs + 2,
+  trendingList: {
+    paddingHorizontal: SPACING.lg,
+    gap: SPACING.md,
   },
-  graduatingBarTrack: {
-    height: 6,
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: 3,
-    overflow: "hidden",
-    marginBottom: SPACING.xs,
-  },
-  graduatingBarFill: {
-    height: "100%",
-    borderRadius: 3,
-  },
-  graduatingRemaining: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.xs - 1,
-    fontWeight: "600",
-  },
-  // Lists
-  skeletonList: {
-    paddingHorizontal: SPACING.md,
-  },
-  listContainer: {
-    flex: 1,
-  },
-  list: {
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xxl,
-  },
-  // Empty state
-  emptyState: {
-    alignItems: "center",
-    paddingTop: SPACING.xxl + 16,
-  },
-  emptyTitle: {
-    ...TYPOGRAPHY.h3,
-    marginBottom: SPACING.sm,
-  },
-  emptySubtext: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.sm,
-    textAlign: "center",
-    marginBottom: SPACING.lg,
-  },
-  emptyCta: {
-    backgroundColor: COLORS.primary,
+  trendingCard: {
+    backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
-    paddingVertical: SPACING.sm + 4,
-    paddingHorizontal: SPACING.xl,
+    padding: SPACING.md,
+    width: 200,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  emptyCtaText: {
-    color: "#FFFFFF",
-    fontSize: FONT_SIZE.sm,
-    fontWeight: "700",
+  trendingCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  trendingAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.surfaceLight,
+    marginRight: SPACING.sm,
+  },
+  trendingName: {
+    ...TYPOGRAPHY.bodyBold,
+    color: COLORS.text,
+    width: 110,
+  },
+  trendingSymbol: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textMuted,
+  },
+  miniChart: {
+    height: 40,
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: RADIUS.sm,
+    marginVertical: SPACING.sm,
+    opacity: 0.3,
+  },
+  trendingPrice: {
+    ...TYPOGRAPHY.label,
+    color: COLORS.primaryLight,
+  },
+  listContent: {
+    paddingBottom: 100,
+  },
+  emptyState: {
+    padding: 60,
+    alignItems: "center",
+  },
+  emptyText: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.textMuted,
   },
 });
+

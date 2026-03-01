@@ -77,7 +77,7 @@ export default function CandlestickChart({ candles, loading }: Props) {
     <View style={styles.container}>
       <Svg width={SCREEN_WIDTH} height={CHART_HEIGHT}>
         {/* Background */}
-        <Rect x={0} y={0} width={SCREEN_WIDTH} height={CHART_HEIGHT} fill={COLORS.chartArea} />
+        <Rect x={0} y={0} width={SCREEN_WIDTH} height={CHART_HEIGHT} fill={COLORS.surfaceDark} />
 
         {/* Horizontal grid + Y labels */}
         {gridLines.map((gl, i) => (
@@ -120,7 +120,7 @@ export default function CandlestickChart({ candles, loading }: Props) {
               y={PAD.top + PLOT_H - barH}
               width={candleWidth}
               height={barH}
-              fill={isGreen ? COLORS.green : COLORS.red}
+              fill={isGreen ? COLORS.chartGreen : COLORS.chartRed}
               opacity={0.15}
             />
           );
@@ -130,7 +130,7 @@ export default function CandlestickChart({ candles, loading }: Props) {
         {candles.map((c, i) => {
           const cx = PAD.left + i * candleGap + candleGap / 2;
           const isGreen = c.close >= c.open;
-          const color = isGreen ? COLORS.green : COLORS.red;
+          const color = isGreen ? COLORS.chartGreen : COLORS.chartRed;
           const bodyTop = mapY(Math.max(c.open, c.close));
           const bodyBottom = mapY(Math.min(c.open, c.close));
           const bodyH = Math.max(1, bodyBottom - bodyTop);
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   center: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.chartArea,
+    backgroundColor: COLORS.surfaceDark,
   },
   loadingText: {
     color: COLORS.textMuted,
