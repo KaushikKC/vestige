@@ -1,66 +1,87 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS } from '../constants/theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import { LaunchData, VestigeClient } from '../lib/vestige-client';
-
-const GOLD = '#FFA000';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface Props {
   launch: LaunchData;
   onPress: () => void;
 }
 
-function hashStringToColor(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  return `hsl(${Math.abs(hash) % 360}, 60%, 45%)`;
-}
-
 export default function KingOfTheHill({ launch, onPress }: Props) {
   const progress = VestigeClient.getProgress(launch);
-  const mcap = VestigeClient.getMarketCapSol(launch);
+  const timeLeft = VestigeClient.getTimeRemaining(launch.endTime);
+  const priceSol = VestigeClient.lamportsToSol(VestigeClient.getCurrentCurvePrice(launch));
   const solRaised = VestigeClient.lamportsToSol(launch.totalSolCollected);
+  const mcap = VestigeClient.getMarketCapSol(launch);
+
   const name = launch.name || launch.tokenMint.toBase58().slice(0, 8) + '...';
   const symbol = launch.symbol || launch.tokenMint.toBase58().slice(0, 6);
-  const avatarColor = hashStringToColor(launch.tokenMint.toBase58());
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-      {/* Crown header */}
-      <View style={styles.crownRow}>
-        <Ionicons name="trophy" size={16} color={GOLD} />
-        <Text style={styles.crownText}>KING OF THE HILL</Text>
-      </View>
-
-      {/* Token info */}
-      <View style={styles.tokenRow}>
-        <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
-          <Text style={styles.avatarLetter}>{name.charAt(0).toUpperCase()}</Text>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
+      <LinearGradient
+        colors={[COLORS.pastelIndigo, COLORS.surface]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.gradient}
+      >
+        <View style={styles.badge}>
+          <Ionicons name="trophy" size={14} color={COLORS.primary} />
+          <Text style={styles.badgeText}>#1 TOP LAUNCH</Text>
         </View>
-        <View style={styles.tokenInfo}>
-          <View style={styles.nameRow}>
-            <Text style={styles.tokenName} numberOfLines={1}>{name}</Text>
-            <Text style={styles.tokenSymbol}>${symbol}</Text>
+
+        <View style={styles.container}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{symbol.charAt(0).toUpperCase()}</Text>
           </View>
-          <Text style={styles.mcapText}>Market Cap: {mcap.toFixed(2)} SOL</Text>
+
+          <View style={styles.mainInfo}>
+            <View style={styles.headerRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.tokenName} numberOfLines={1}>{name}</Text>
+                <View style={styles.symbolRow}>
+                  <Text style={styles.tokenSymbol}>${symbol}</Text>
+                  {!launch.isGraduated && (
+                    <Text style={styles.timeTag}>• {timeLeft}</Text>
+                  )}
+                </View>
+              </View>
+              <View style={styles.priceCol}>
+                <Text style={styles.priceLabel}>{priceSol.toFixed(6)} SOL</Text>
+                <Text style={styles.mcapLabel}>${mcap.toFixed(2)} MC</Text>
+              </View>
+            </View>
+
+            <View style={styles.progressRow}>
+              <View style={styles.progressHeader}>
+                <Text style={styles.progressLabel}>Graduation Progress</Text>
+                <Text style={styles.progressValue}>
+                  {progress.toFixed(1)}%
+                </Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${Math.min(100, progress)}%` }]} />
+              </View>
+            </View>
+
+            <View style={styles.footerRow}>
+              <View style={styles.statsRow}>
+                <View style={styles.stat}>
+                  <Ionicons name="people" size={12} color={COLORS.textSecondary} />
+                  <Text style={styles.statValue}>{launch.totalParticipants}</Text>
+                </View>
+                <View style={styles.stat}>
+                  <Ionicons name="flame" size={12} color={COLORS.textSecondary} />
+                  <Text style={styles.statValue}>{solRaised.toFixed(2)} SOL Raised</Text>
+                </View>
+              </View>
+            </View>
+          </View>
         </View>
-      </View>
-
-      {/* Progress bar */}
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${Math.min(100, progress)}%` }]} />
-      </View>
-
-      {/* Bottom stats */}
-      <View style={styles.statsRow}>
-        <Text style={styles.statText}>
-          {launch.totalParticipants} participants
-        </Text>
-        <Text style={styles.statText}>
-          {solRaised.toFixed(2)} SOL raised
-        </Text>
-      </View>
+      </LinearGradient>
     </TouchableOpacity>
   );
 }
@@ -69,84 +90,153 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    marginHorizontal: SPACING.md,
-    marginBottom: SPACING.xs,
-    borderWidth: 1.5,
-    borderColor: GOLD + '40',
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.xl,
+    borderWidth: 2,
+    borderColor: COLORS.pastelIndigo,
     ...SHADOWS.md,
+    overflow: 'hidden',
   },
-  crownRow: {
+  gradient: {
+    padding: SPACING.lg,
+  },
+  badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.xs + 2,
-    marginBottom: SPACING.sm + 2,
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: RADIUS.full,
+    alignSelf: 'flex-start',
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderDark,
+    gap: 6,
   },
-  crownText: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '800',
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: COLORS.primary,
     letterSpacing: 1,
-    color: GOLD,
   },
-  tokenRow: {
+  container: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.sm + 2,
   },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 64,
+    height: 64,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surface,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING.sm + 2,
+    marginRight: SPACING.md,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
   },
-  avatarLetter: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
+  avatarText: {
+    color: COLORS.text,
+    fontSize: 24,
+    fontWeight: '900',
   },
-  tokenInfo: {
+  mainInfo: {
     flex: 1,
   },
-  nameRow: {
+  headerRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: SPACING.xs + 2,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: SPACING.md,
   },
   tokenName: {
+    ...TYPOGRAPHY.h3,
+    fontSize: 20,
     color: COLORS.text,
-    fontSize: FONT_SIZE.md,
-    fontWeight: '700',
+    letterSpacing: -0.5,
   },
-  tokenSymbol: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.xs,
-  },
-  mcapText: {
-    color: GOLD,
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
+  symbolRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 2,
   },
+  tokenSymbol: {
+    ...TYPOGRAPHY.label,
+    fontWeight: '800',
+    color: COLORS.textSecondary,
+    fontSize: 13,
+  },
+  timeTag: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textMuted,
+    marginLeft: 4,
+    fontWeight: '600',
+  },
+  priceCol: {
+    alignItems: 'flex-end',
+  },
+  priceLabel: {
+    ...TYPOGRAPHY.bodyBold,
+    fontSize: 15,
+    color: COLORS.text,
+  },
+  mcapLabel: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  progressRow: {
+    marginBottom: SPACING.md,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  progressLabel: {
+    ...TYPOGRAPHY.caption,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    fontWeight: '800',
+    color: COLORS.textMuted,
+  },
+  progressValue: {
+    ...TYPOGRAPHY.bodyBold,
+    fontSize: 14,
+    color: COLORS.primary,
+  },
   progressTrack: {
-    height: 6,
-    backgroundColor: GOLD + '20',
-    borderRadius: 3,
+    height: 10,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 5,
     overflow: 'hidden',
-    marginBottom: SPACING.sm,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: GOLD,
-    borderRadius: 3,
+    backgroundColor: COLORS.primary,
+    borderRadius: 5,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+    paddingTop: SPACING.md,
   },
   statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: SPACING.lg,
   },
-  statText: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.xs,
+  stat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  statValue: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.text,
+    fontWeight: '800',
+    fontSize: 13,
   },
 });

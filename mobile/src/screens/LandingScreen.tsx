@@ -16,12 +16,12 @@ export default function LandingScreen({ navigation }: any) {
             <StatusBar barStyle="dark-content" />
 
             {/* Background Decor */}
-            <View style={styles.bgGlow} />
+            {/* <View style={styles.bgGlow} /> */}
 
             <View style={styles.content}>
                 <View style={styles.header}>
-                    <VestigeLogo size={60} />
-                    <Text style={styles.logoText}>VESTIGE</Text>
+                    <VestigeLogo size={40} />
+                    <Text style={styles.logoText}>Vestige</Text>
                 </View>
 
                 <View style={styles.heroSection}>
@@ -30,13 +30,12 @@ export default function LandingScreen({ navigation }: any) {
                     </Text>
 
                     <View style={styles.features}>
-                        <View style={styles.featureItem}>
-                            <Ionicons name="flame" size={20} color={COLORS.error} style={{ marginRight: 6 }} />
+                        <View style={[styles.featureItem, { backgroundColor: COLORS.pastelLavender }]}>
+                            <Ionicons name="flame" size={24} color={COLORS.error} style={{ marginRight: 12 }} />
                             <Text style={styles.featureText}>Hottest launches</Text>
                         </View>
-                        <View style={styles.divider} />
-                        <View style={styles.featureItem}>
-                            <Ionicons name="flash" size={20} color={COLORS.warning} style={{ marginRight: 6 }} />
+                        <View style={[styles.featureItem, { backgroundColor: COLORS.pastelBlue }]}>
+                            <Ionicons name="flash" size={24} color={COLORS.warning} style={{ marginRight: 12 }} />
                             <Text style={styles.featureText}>Instant trading</Text>
                         </View>
                     </View>
@@ -48,14 +47,7 @@ export default function LandingScreen({ navigation }: any) {
                         onPress={() => navigation.navigate('Onboarding')}
                         activeOpacity={0.8}
                     >
-                        <LinearGradient
-                            colors={[COLORS.primary, COLORS.primaryDark]}
-                            style={styles.gradient}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                        >
-                            <Text style={styles.buttonText}>Get Started</Text>
-                        </LinearGradient>
+                        <Text style={styles.buttonText}>Get Started</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -92,83 +84,71 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
-        paddingHorizontal: SPACING.xl,
-        justifyContent: 'space-between',
+        paddingHorizontal: SPACING.lg,
         paddingTop: SPACING.xxxl,
         paddingBottom: SPACING.xxl,
     },
     header: {
         alignItems: 'center',
         flexDirection: 'row',
-        justifyContent: 'center',
+        marginBottom: SPACING.xl,
     },
     logoText: {
         ...TYPOGRAPHY.h2,
         color: COLORS.text,
         marginLeft: SPACING.sm,
-        letterSpacing: 2,
         fontWeight: '900',
+        letterSpacing: -1,
     },
     heroSection: {
-        alignItems: 'center',
+        flex: 1,
+        justifyContent: 'center',
     },
     heroTitle: {
         ...TYPOGRAPHY.h1,
-        fontSize: 42,
-        textAlign: 'center',
+        fontSize: 44,
         lineHeight: 52,
         color: COLORS.text,
     },
     highlightText: {
-        color: COLORS.primaryLight,
-        fontStyle: 'italic',
+        color: COLORS.textMuted,
     },
     features: {
-        flexDirection: 'row',
-        alignItems: 'center',
         marginTop: SPACING.xl,
-        backgroundColor: COLORS.surface,
-        paddingVertical: SPACING.sm,
-        paddingHorizontal: SPACING.lg,
-        borderRadius: RADIUS.full,
-        borderWidth: 1,
-        borderColor: COLORS.border,
+        gap: SPACING.md,
     },
     featureItem: {
         flexDirection: 'row',
         alignItems: 'center',
-    },
-    featureIcon: {
-        fontSize: 16,
-        marginRight: 4,
+        padding: SPACING.lg,
+        borderRadius: RADIUS.lg,
+        backgroundColor: COLORS.surface,
+        ...SHADOWS.card,
     },
     featureText: {
-        ...TYPOGRAPHY.caption,
-        color: COLORS.textSecondary,
-        fontWeight: '600',
+        ...TYPOGRAPHY.bodyBold,
+        fontSize: 18,
     },
     divider: {
-        width: 1,
-        height: 14,
-        backgroundColor: COLORS.border,
-        marginHorizontal: SPACING.md,
+        display: 'none',
     },
     footer: {
         width: '100%',
-        alignItems: 'center',
+        marginTop: SPACING.xxl,
     },
     primaryButton: {
         width: '100%',
-        height: 60,
-        borderRadius: RADIUS.lg,
+        height: 64,
+        borderRadius: RADIUS.full,
         overflow: 'hidden',
         marginBottom: SPACING.md,
-        ...SHADOWS.glow,
-    },
-    gradient: {
-        flex: 1,
+        backgroundColor: COLORS.primary,
         justifyContent: 'center',
         alignItems: 'center',
+        ...SHADOWS.md,
+    },
+    gradient: {
+        display: 'none',
     },
     buttonText: {
         ...TYPOGRAPHY.bodyBold,
@@ -176,21 +156,28 @@ const styles = StyleSheet.create({
         fontSize: 18,
     },
     secondaryButton: {
-        paddingVertical: SPACING.sm,
+        width: '100%',
+        height: 64,
+        borderRadius: RADIUS.full,
+        backgroundColor: COLORS.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
         marginBottom: SPACING.xl,
+        ...SHADOWS.card,
     },
     secondaryButtonText: {
-        ...TYPOGRAPHY.label,
-        color: COLORS.textSecondary,
+        ...TYPOGRAPHY.bodyBold,
+        color: COLORS.text,
     },
     termsText: {
         ...TYPOGRAPHY.caption,
         textAlign: 'center',
         color: COLORS.textMuted,
-        lineHeight: 18,
+        lineHeight: 20,
     },
     linkText: {
-        color: COLORS.textSecondary,
+        color: COLORS.text,
+        fontWeight: '600',
         textDecorationLine: 'underline',
     },
 });

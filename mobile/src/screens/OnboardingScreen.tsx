@@ -14,21 +14,24 @@ const SLIDES = [
         title: 'Introducing Callouts',
         description: 'Alert your followers of coins in real-time. Discover the best callers to follow!',
         icon: 'megaphone',
-        color: '#1D04E1',
+        color: COLORS.pastelLavender,
+        accent: '#9333EA',
     },
     {
         id: '2',
         title: 'Track Performance',
         description: 'Monitor your portfolio with professional charts and real-time data updates.',
         icon: 'stats-chart',
-        color: '#4D36FF',
+        color: COLORS.pastelBlue,
+        accent: '#2563EB',
     },
     {
         id: '3',
         title: 'Secure Artifacts',
         description: 'Your digital assets are protected with state-of-the-art security and encryption.',
         icon: 'shield-checkmark',
-        color: '#12028A',
+        color: COLORS.pastelGreen,
+        accent: '#16A34A',
     },
 ];
 
@@ -39,7 +42,9 @@ export default function OnboardingScreen({ navigation }: any) {
     const slidesRef = useRef(null);
 
     const viewableItemsChanged = useRef(({ viewableItems }: any) => {
-        setCurrentIndex(viewableItems[0].index);
+        if (viewableItems && viewableItems.length > 0) {
+            setCurrentIndex(viewableItems[0].index);
+        }
     }).current;
 
     const viewConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
@@ -55,9 +60,9 @@ export default function OnboardingScreen({ navigation }: any) {
     const Slide = ({ item }: { item: typeof SLIDES[0] }) => {
         return (
             <View style={styles.slide}>
-                <View style={styles.card}>
-                    <View style={[styles.iconContainer, { backgroundColor: item.color + '20' }]}>
-                        <Ionicons name={item.icon as any} size={80} color={item.color} />
+                <View style={[styles.card, { backgroundColor: item.color }]}>
+                    <View style={styles.iconContainer}>
+                        <Ionicons name={item.icon as any} size={100} color={item.accent} />
                     </View>
                     <Text style={styles.slideTitle}>{item.title}</Text>
                     <Text style={styles.slideDescription}>{item.description}</Text>
@@ -69,7 +74,7 @@ export default function OnboardingScreen({ navigation }: any) {
     return (
         <SafeAreaView style={styles.container}>
             <BackgroundEffect />
-            <View style={[styles.header, { marginTop: insets.top > 0 ? 40 : 50 }]}>
+            <View style={[styles.header, { marginTop: insets.top > 0 ? 20 : 40 }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
                     <Ionicons name="arrow-back" size={24} color={COLORS.text} />
                 </TouchableOpacity>
@@ -80,16 +85,16 @@ export default function OnboardingScreen({ navigation }: any) {
                             style={[
                                 styles.progressBar,
                                 {
-                                    backgroundColor: index <= currentIndex ? COLORS.primary : COLORS.border,
-                                    flex: 1,
-                                    marginHorizontal: 4,
+                                    backgroundColor: index <= currentIndex ? COLORS.text : COLORS.border,
+                                    flex: index === currentIndex ? 2 : 1,
+                                    opacity: index === currentIndex ? 1 : 0.5,
                                 }
                             ]}
                         />
                     ))}
                 </View>
                 <TouchableOpacity onPress={() => navigation.navigate('MainTabs')} style={styles.headerButton}>
-                    <Ionicons name="close" size={24} color={COLORS.text} />
+                    <Text style={styles.skipText}>Skip</Text>
                 </TouchableOpacity>
             </View>
 
@@ -115,14 +120,9 @@ export default function OnboardingScreen({ navigation }: any) {
                     onPress={handleNext}
                     activeOpacity={0.8}
                 >
-                    <LinearGradient
-                        colors={[COLORS.primary, COLORS.primaryDark]}
-                        style={styles.gradient}
-                    >
-                        <Text style={styles.buttonText}>
-                            {currentIndex === SLIDES.length - 1 ? 'Start Exploring' : 'Next'}
-                        </Text>
-                    </LinearGradient>
+                    <Text style={styles.buttonText}>
+                        {currentIndex === SLIDES.length - 1 ? 'Start Exploring' : 'Next'}
+                    </Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
@@ -132,53 +132,55 @@ export default function OnboardingScreen({ navigation }: any) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: 'transparent',
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: SPACING.lg,
         paddingBottom: SPACING.md,
-        justifyContent: 'space-between',
     },
     headerButton: {
         padding: 8,
     },
+    skipText: {
+        ...TYPOGRAPHY.label,
+        color: COLORS.text,
+    },
     progressContainer: {
         flex: 1,
         flexDirection: 'row',
-        marginHorizontal: SPACING.md,
+        marginHorizontal: SPACING.xl,
         height: 4,
     },
     progressBar: {
-        height: 4,
-        borderRadius: 2,
+        height: 6,
+        borderRadius: 3,
+        marginHorizontal: 3,
     },
     slide: {
         width,
         alignItems: 'center',
-        paddingHorizontal: SPACING.xl,
         justifyContent: 'center',
+        paddingHorizontal: SPACING.lg,
     },
     card: {
         width: '100%',
-        backgroundColor: COLORS.surface,
         borderRadius: RADIUS.xl,
         padding: SPACING.xl,
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        minHeight: 400,
+        height: 480,
         justifyContent: 'center',
-        ...SHADOWS.card,
+        ...SHADOWS.md,
     },
     iconContainer: {
-        width: 160,
-        height: 160,
-        borderRadius: 80,
+        width: 180,
+        height: 180,
+        borderRadius: 90,
+        backgroundColor: '#FFFFFF',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: SPACING.xl,
+        marginBottom: SPACING.xxl,
+        ...SHADOWS.sm,
     },
     slideTitle: {
         ...TYPOGRAPHY.h2,
@@ -188,24 +190,24 @@ const styles = StyleSheet.create({
     },
     slideDescription: {
         ...TYPOGRAPHY.body,
+        fontSize: 18,
+        lineHeight: 26,
         color: COLORS.textSecondary,
         textAlign: 'center',
         paddingHorizontal: SPACING.md,
     },
     footer: {
         padding: SPACING.xl,
+        paddingBottom: SPACING.xxl,
     },
     nextButton: {
         width: '100%',
-        height: 60,
-        borderRadius: RADIUS.lg,
-        overflow: 'hidden',
-        ...SHADOWS.glow,
-    },
-    gradient: {
-        flex: 1,
+        height: 64,
+        borderRadius: RADIUS.full,
+        backgroundColor: COLORS.primary,
         justifyContent: 'center',
         alignItems: 'center',
+        ...SHADOWS.md,
     },
     buttonText: {
         ...TYPOGRAPHY.bodyBold,

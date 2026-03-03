@@ -22,23 +22,21 @@ export default function LaunchCard({ launch, onPress, isFavorite, onToggleFavori
   const name = launch.name || launch.tokenMint.toBase58().slice(0, 8) + '...';
   const symbol = launch.symbol || launch.tokenMint.toBase58().slice(0, 6);
 
+  // Use symbol to determine a consistent pastel color
+  const pastelColors = [COLORS.pastelBlue, COLORS.pastelGreen, COLORS.pastelLavender, COLORS.pastelYellow];
+  const colorIndex = symbol.length % pastelColors.length;
+  const avatarBg = pastelColors[colorIndex];
+
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.container}>
-        <View style={styles.avatarContainer}>
-          <LinearGradient
-            colors={[COLORS.primary, COLORS.accent]}
-            style={styles.avatar}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Text style={styles.avatarText}>{symbol.charAt(0).toUpperCase()}</Text>
-          </LinearGradient>
+        <View style={[styles.avatar, { backgroundColor: avatarBg }]}>
+          <Text style={styles.avatarText}>{symbol.charAt(0).toUpperCase()}</Text>
         </View>
 
         <View style={styles.mainInfo}>
           <View style={styles.headerRow}>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={styles.tokenName} numberOfLines={1}>{name}</Text>
               <View style={styles.symbolRow}>
                 <Text style={styles.tokenSymbol}>${symbol}</Text>
@@ -55,8 +53,8 @@ export default function LaunchCard({ launch, onPress, isFavorite, onToggleFavori
 
           <View style={styles.progressRow}>
             <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>Bonding Curve Progress</Text>
-              <Text style={[styles.progressValue, { color: progress > 80 ? COLORS.accent : COLORS.primaryLight }]}>
+              <Text style={styles.progressLabel}>Progress</Text>
+              <Text style={styles.progressValue}>
                 {progress.toFixed(1)}%
               </Text>
             </View>
@@ -66,16 +64,18 @@ export default function LaunchCard({ launch, onPress, isFavorite, onToggleFavori
           </View>
 
           <View style={styles.footerRow}>
-            <View style={styles.stat}>
-              <Ionicons name="people-outline" size={14} color={COLORS.textMuted} />
-              <Text style={styles.statValue}>{launch.totalParticipants}</Text>
-            </View>
-            <View style={styles.stat}>
-              <Ionicons name="diamond-outline" size={14} color={COLORS.textMuted} />
-              <Text style={styles.statValue}>{solRaised.toFixed(2)} SOL</Text>
+            <View style={styles.statsRow}>
+              <View style={styles.stat}>
+                <Ionicons name="people" size={12} color={COLORS.textSecondary} />
+                <Text style={styles.statValue}>{launch.totalParticipants}</Text>
+              </View>
+              <View style={styles.stat}>
+                <Ionicons name="flame" size={12} color={COLORS.textSecondary} />
+                <Text style={styles.statValue}>{solRaised.toFixed(2)} SOL</Text>
+              </View>
             </View>
             {onToggleFavorite && (
-              <TouchableOpacity onPress={(e) => { e.stopPropagation(); onToggleFavorite(); }}>
+              <TouchableOpacity onPress={(e) => { e.stopPropagation(); onToggleFavorite(); }} style={styles.favButton}>
                 <Ionicons
                   name={isFavorite ? 'star' : 'star-outline'}
                   size={18}
@@ -92,32 +92,31 @@ export default function LaunchCard({ launch, onPress, isFavorite, onToggleFavori
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.lg,
     marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    marginBottom: SPACING.lg,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderDark,
     ...SHADOWS.card,
   },
   container: {
-    padding: SPACING.md,
+    padding: SPACING.lg,
     flexDirection: 'row',
   },
-  avatarContainer: {
-    marginRight: SPACING.md,
-  },
   avatar: {
-    width: 52,
-    height: 52,
+    width: 64,
+    height: 64,
     borderRadius: RADIUS.md,
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: SPACING.md,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
   },
   avatarText: {
-    color: '#FFF',
-    fontSize: 22,
+    color: COLORS.text,
+    fontSize: 24,
     fontWeight: '900',
   },
   mainInfo: {
@@ -127,12 +126,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
   },
   tokenName: {
-    ...TYPOGRAPHY.bodyBold,
+    ...TYPOGRAPHY.h3,
+    fontSize: 20,
     color: COLORS.text,
-    fontSize: 17,
+    letterSpacing: -0.5,
   },
   symbolRow: {
     flexDirection: 'row',
@@ -140,77 +140,90 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   tokenSymbol: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textMuted,
-    fontWeight: '700',
+    ...TYPOGRAPHY.label,
+    fontWeight: '800',
+    color: COLORS.textSecondary,
+    fontSize: 13,
   },
   timeTag: {
     ...TYPOGRAPHY.caption,
     color: COLORS.textMuted,
     marginLeft: 4,
+    fontWeight: '600',
   },
   priceCol: {
     alignItems: 'flex-end',
   },
   priceLabel: {
-    ...TYPOGRAPHY.label,
-    color: COLORS.text,
+    ...TYPOGRAPHY.bodyBold,
     fontSize: 15,
+    color: COLORS.text,
   },
   mcapLabel: {
     ...TYPOGRAPHY.caption,
     color: COLORS.textSecondary,
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
   },
   progressRow: {
-    marginTop: SPACING.xs,
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
   },
   progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   progressLabel: {
     ...TYPOGRAPHY.caption,
-    color: COLORS.textMuted,
-    fontSize: 10,
+    fontSize: 11,
     textTransform: 'uppercase',
+    letterSpacing: 1,
+    fontWeight: '800',
+    color: COLORS.textMuted,
   },
   progressValue: {
-    ...TYPOGRAPHY.caption,
-    fontWeight: '800',
+    ...TYPOGRAPHY.bodyBold,
+    fontSize: 14,
+    color: COLORS.primary,
   },
   progressTrack: {
-    height: 6,
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: 3,
+    height: 10,
+    backgroundColor: COLORS.background,
+    borderRadius: 5,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   progressFill: {
     height: '100%',
     backgroundColor: COLORS.primary,
-    borderRadius: 3,
+    borderRadius: 5,
   },
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: SPACING.xs,
-    paddingTop: SPACING.xs,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    borderTopColor: COLORS.borderLight,
+    paddingTop: SPACING.md,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: SPACING.lg,
   },
   stat: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   statValue: {
     ...TYPOGRAPHY.caption,
-    color: COLORS.textSecondary,
-    fontWeight: '600',
+    color: COLORS.text,
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  favButton: {
+    padding: 4,
   },
 });
 

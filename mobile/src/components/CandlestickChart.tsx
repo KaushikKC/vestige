@@ -77,7 +77,7 @@ export default function CandlestickChart({ candles, loading }: Props) {
     <View style={styles.container}>
       <Svg width={SCREEN_WIDTH} height={CHART_HEIGHT}>
         {/* Background */}
-        <Rect x={0} y={0} width={SCREEN_WIDTH} height={CHART_HEIGHT} fill={COLORS.surfaceDark} />
+        <Rect x={0} y={0} width={SCREEN_WIDTH} height={CHART_HEIGHT} fill={COLORS.chartArea} />
 
         {/* Horizontal grid + Y labels */}
         {gridLines.map((gl, i) => (
@@ -88,7 +88,7 @@ export default function CandlestickChart({ candles, loading }: Props) {
             />
             <SvgText
               x={PAD.left - 6} y={gl.y + 3}
-              fill={COLORS.textMuted} fontSize={8} fontFamily="monospace"
+              fill="rgba(255, 255, 255, 0.6)" fontSize={8} fontFamily="monospace"
               textAnchor="end"
             >
               {gl.label}
@@ -101,7 +101,7 @@ export default function CandlestickChart({ candles, loading }: Props) {
           <SvgText
             key={`t${i}`}
             x={tl.x} y={CHART_HEIGHT - 8}
-            fill={COLORS.textMuted} fontSize={9}
+            fill="rgba(255, 255, 255, 0.6)" fontSize={9}
             textAnchor="middle"
           >
             {tl.label}

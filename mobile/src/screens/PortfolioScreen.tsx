@@ -161,10 +161,8 @@ export default function PortfolioScreen({ navigation }: Props) {
           Securely manage your digital artifacts and track your performance in real-time.
         </Text>
         <TouchableOpacity style={styles.connectButton} onPress={connect} activeOpacity={0.8}>
-          <LinearGradient colors={['#1D04E1', '#12028A']} style={styles.gradient}>
-            <Ionicons name="wallet-outline" size={22} color="#FFF" style={{ marginRight: 10 }} />
-            <Text style={styles.connectButtonText}>Sign In with Wallet</Text>
-          </LinearGradient>
+          <Ionicons name="wallet-outline" size={22} color="#FFF" style={{ marginRight: 10 }} />
+          <Text style={styles.connectButtonText}>Sign In with Wallet</Text>
         </TouchableOpacity>
       </View>
     );
@@ -191,7 +189,7 @@ export default function PortfolioScreen({ navigation }: Props) {
             </View>
 
             {/* Wallet Card */}
-            <LinearGradient colors={[COLORS.surfaceLight, COLORS.surface]} style={styles.walletCard}>
+            <View style={styles.walletCard}>
               <View style={styles.walletHeader}>
                 <TouchableOpacity onPress={copyAddress} style={styles.addressPill}>
                   <View style={styles.activeDot} />
@@ -214,7 +212,7 @@ export default function PortfolioScreen({ navigation }: Props) {
                   <Text style={styles.statLabel}>Positions</Text>
                 </View>
               </View>
-            </LinearGradient>
+            </View>
 
             {loading ? (
               <View style={{ gap: SPACING.md }}>
@@ -267,29 +265,28 @@ const skeletonStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
-  content: { paddingHorizontal: SPACING.xl },
+  content: { paddingHorizontal: SPACING.lg },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'baseline',
     marginBottom: SPACING.xl,
   },
-  headerSubtitle: { ...TYPOGRAPHY.label, color: COLORS.primaryLight, letterSpacing: 1 },
+  headerSubtitle: { ...TYPOGRAPHY.label, color: COLORS.textMuted, letterSpacing: 0.5 },
   headerTitle: { ...TYPOGRAPHY.h1, fontSize: 32 },
   logoutBtn: { padding: SPACING.sm },
   walletCard: {
     borderRadius: RADIUS.xl,
     padding: SPACING.xl,
-    marginBottom: SPACING.xxl,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    ...SHADOWS.card,
+    marginBottom: SPACING.xl,
+    backgroundColor: COLORS.pastelBlue,
+    ...SHADOWS.md,
   },
   walletHeader: { flexDirection: 'row', marginBottom: SPACING.lg },
   addressPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(255,255,255,0.6)',
     paddingHorizontal: SPACING.md,
     paddingVertical: 6,
     borderRadius: RADIUS.full,
@@ -297,57 +294,59 @@ const styles = StyleSheet.create({
   },
   activeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.success },
   addressText: { color: COLORS.text, fontSize: 13, fontWeight: '700' },
-  balanceLabel: { ...TYPOGRAPHY.caption, color: COLORS.textMuted },
-  balanceAmount: { ...TYPOGRAPHY.h1, fontSize: 36, marginTop: 4 },
-  usdAmount: { ...TYPOGRAPHY.body, color: COLORS.textSecondary, marginTop: 2 },
+  balanceLabel: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary, fontWeight: '600' },
+  balanceAmount: { ...TYPOGRAPHY.h1, fontSize: 40, marginTop: 4 },
+  usdAmount: { ...TYPOGRAPHY.body, color: COLORS.textSecondary, marginTop: 2, fontWeight: '600' },
   statsRow: {
     flexDirection: 'row',
     marginTop: SPACING.xl,
-    paddingTop: SPACING.lg,
+    paddingTop: SPACING.xl,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    borderTopColor: 'rgba(0,0,0,0.05)',
   },
   statItem: { flex: 1, alignItems: 'center' },
   statValue: { ...TYPOGRAPHY.h3, color: COLORS.text },
-  statLabel: { ...TYPOGRAPHY.caption, color: COLORS.textMuted },
-  statDivider: { width: 1, height: '80%', backgroundColor: COLORS.border },
-  sectionHeader: { marginBottom: SPACING.md },
+  statLabel: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary, fontWeight: '600' },
+  statDivider: { width: 1, height: '80%', backgroundColor: 'rgba(0,0,0,0.05)' },
+  sectionHeader: { marginBottom: SPACING.md, marginTop: SPACING.md },
   sectionTitle: { ...TYPOGRAPHY.h3, fontSize: 18 },
   emptyCenter: {
     flex: 1,
+    padding: SPACING.xl,
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING.xxxl,
-    backgroundColor: 'transparent',
   },
   emptyTitle: {
-    ...TYPOGRAPHY.h2,
-    fontSize: 16,
-    letterSpacing: 2,
-    marginTop: SPACING.md,
-    color: '#000000',
-    fontWeight: '800',
-    textAlign: 'center',
+    ...TYPOGRAPHY.h1,
+    marginTop: SPACING.xl,
+    color: COLORS.text,
   },
   emptySubtext: {
     ...TYPOGRAPHY.body,
-    textAlign: 'center',
-    marginTop: SPACING.lg,
-    color: '#444444',
-    lineHeight: 24,
+    marginTop: SPACING.md,
+    color: COLORS.textSecondary,
+    fontSize: 18,
+    lineHeight: 26,
   },
   connectButton: {
     width: '100%',
-    height: 60,
-    marginTop: SPACING.xxxl,
-    borderRadius: RADIUS.lg,
-    overflow: 'hidden',
-    ...SHADOWS.glow,
+    height: 64,
+    marginTop: SPACING.xxl,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...SHADOWS.md,
   },
-  gradient: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   connectButtonText: { ...TYPOGRAPHY.bodyBold, color: '#FFF' },
-  emptyList: { alignItems: 'center', paddingTop: SPACING.xl, opacity: 0.5, paddingBottom: SPACING.xxxl},
+  emptyList: {
+    alignItems: 'center',
+    paddingTop: SPACING.xxl,
+    paddingBottom: SPACING.xxxl,
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.lg,
+    ...SHADOWS.card,
+  },
   emptyListTitle: { ...TYPOGRAPHY.h3, marginTop: SPACING.md },
-  emptyListDesc: { ...TYPOGRAPHY.body, textAlign: 'center', marginTop: 8 },
+  emptyListDesc: { ...TYPOGRAPHY.body, textAlign: 'center', marginTop: 8, paddingHorizontal: SPACING.xl },
 });
 

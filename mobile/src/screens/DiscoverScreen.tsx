@@ -150,7 +150,8 @@ export default function DiscoverScreen({ navigation }: Props) {
       case "graduating": list = list.filter((l) => !l.isGraduated && VestigeClient.getProgress(l) > 80); break;
       case "favorites": list = list.filter((l) => isFavorite(l.publicKey.toBase58())); break;
     }
-    if (kingLaunch) list = list.filter((l) => !l.publicKey.equals(kingLaunch.publicKey));
+    // When King of the Hill card is shown, exclude it from list; when card is commented out, include it
+    // if (kingLaunch) list = list.filter((l) => !l.publicKey.equals(kingLaunch.publicKey));
     return list;
   }, [launches, trimmedQuery, sortMode, kingLaunch, isFavorite]);
 
@@ -213,15 +214,15 @@ export default function DiscoverScreen({ navigation }: Props) {
               ))}
             </ScrollView>
 
-            {/* King of the Hill */}
-            {kingLaunch && !loading && (
+            {/* King of the Hill — commented out for now */}
+            {/* {kingLaunch && !loading && (
               <View style={styles.kingContainer}>
                 <KingOfTheHill
                   launch={kingLaunch}
                   onPress={() => goToLaunch(kingLaunch.publicKey.toBase58())}
                 />
               </View>
-            )}
+            )} */}
 
             {/* Trending / Graduating */}
             {aboutToGraduate.length > 0 && (
@@ -233,9 +234,13 @@ export default function DiscoverScreen({ navigation }: Props) {
                   keyExtractor={(item) => item.publicKey.toBase58()}
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.trendingList}
-                  renderItem={({ item }) => (
+                  renderItem={({ item, index }) => (
                     <TouchableOpacity
-                      style={styles.trendingCard}
+                      style={[
+                        styles.trendingCard,
+                        index % 3 === 1 && styles.trendingCardAlt,
+                        index % 3 === 2 && styles.trendingCardAlt2,
+                      ]}
                       onPress={() => goToLaunch(item.publicKey.toBase58())}
                     >
                       <View style={styles.trendingCardHeader}>
@@ -320,7 +325,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
   },
   logoGroup: {
     flexDirection: "row",
@@ -330,8 +335,9 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.h2,
     color: COLORS.text,
     marginLeft: SPACING.sm,
-    fontSize: 20,
-    letterSpacing: 1,
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: -0.5,
   },
   searchContainer: {
     paddingHorizontal: SPACING.lg,
@@ -339,46 +345,47 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.pastelBlue, // Slight tint
     borderRadius: RADIUS.full,
     paddingHorizontal: SPACING.md,
-    height: 48,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    height: 52,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderDark,
+    ...SHADOWS.sm,
   },
   searchInput: {
     flex: 1,
     paddingHorizontal: SPACING.sm,
     color: COLORS.text,
-    fontSize: FONT_SIZE.md,
+    fontSize: 16,
+    fontWeight: '500',
   },
   chipRow: {
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    paddingVertical: SPACING.lg,
     gap: SPACING.sm,
   },
   chip: {
     backgroundColor: COLORS.surface,
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
+    paddingVertical: 10,
     borderRadius: RADIUS.full,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderDark,
   },
   chipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.pastelLavender,
+    borderColor: COLORS.borderDark,
   },
   chipText: {
     color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.sm,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "800",
   },
   chipTextActive: {
-    color: "#FFF",
+    color: COLORS.primary,
   },
   kingContainer: {
-    marginHorizontal: SPACING.lg,
     marginBottom: SPACING.xl,
   },
   trendingSection: {
@@ -389,6 +396,8 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginBottom: SPACING.md,
     paddingHorizontal: SPACING.lg,
+    fontSize: 20,
+    fontWeight: '800',
   },
   trendingList: {
     paddingHorizontal: SPACING.lg,
@@ -397,44 +406,55 @@ const styles = StyleSheet.create({
   trendingCard: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    width: 200,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    padding: SPACING.lg,
+    width: 210,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderDark,
+    ...SHADOWS.card,
+  },
+  trendingCardAlt: {
+    backgroundColor: COLORS.pastelMint,
+  },
+  trendingCardAlt2: {
+    backgroundColor: COLORS.pastelRose,
   },
   trendingCardHeader: {
     flexDirection: "row",
     alignItems: "center",
   },
   trendingAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.surfaceLight,
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.pastelBlue,
     marginRight: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   trendingName: {
     ...TYPOGRAPHY.bodyBold,
     color: COLORS.text,
-    width: 110,
+    fontSize: 16,
   },
   trendingSymbol: {
     ...TYPOGRAPHY.caption,
-    color: COLORS.textMuted,
+    color: COLORS.textSecondary,
+    fontWeight: '700',
   },
   miniChart: {
-    height: 40,
-    backgroundColor: COLORS.surfaceLight,
+    height: 32,
+    backgroundColor: COLORS.background,
     borderRadius: RADIUS.sm,
-    marginVertical: SPACING.sm,
-    opacity: 0.3,
+    marginVertical: SPACING.md,
+    opacity: 0.5,
   },
   trendingPrice: {
     ...TYPOGRAPHY.label,
-    color: COLORS.primaryLight,
+    color: COLORS.text,
+    fontWeight: '800',
   },
   listContent: {
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   emptyState: {
     padding: 60,
