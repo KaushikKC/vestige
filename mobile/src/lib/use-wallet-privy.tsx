@@ -96,10 +96,12 @@ export function PrivyWalletProvider({ children }: { children: ReactNode }) {
       const provider = await wallet.getProvider();
       const connection = getConnection();
 
+      // Always fetch a fresh blockhash so we have lastValidBlockHeight for confirmation
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+      tx.recentBlockhash = blockhash;
+      tx.feePayer = tx.feePayer || publicKey!;
+
       if (signers && signers.length > 0) {
-        const { blockhash } = await connection.getLatestBlockhash('confirmed');
-        tx.recentBlockhash = tx.recentBlockhash || blockhash;
-        tx.feePayer = tx.feePayer || publicKey!;
         tx.partialSign(...signers);
       }
 
@@ -110,6 +112,18 @@ export function PrivyWalletProvider({ children }: { children: ReactNode }) {
           connection,
         },
       });
+
+      // Confirm on-chain — Privy's provider sends but doesn't guarantee confirmation
+      const confirmResult = await connection.confirmTransaction(
+        { signature, blockhash, lastValidBlockHeight },
+        'confirmed'
+      );
+
+      if (confirmResult.value.err) {
+        throw new Error(
+          `Transaction failed on-chain: ${JSON.stringify(confirmResult.value.err)}`
+        );
+      }
 
       return signature;
     },

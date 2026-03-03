@@ -85,8 +85,8 @@ export default function CreateLaunchScreen({ navigation }: any) {
 
       const now = Math.floor(Date.now() / 1000);
       const durationSec = parseInt(durationMinutes) * 60;
-      const startTime = new BN(now + 5);
-      const endTime = new BN(now + 5 + durationSec);
+      const startTime = new BN(now);
+      const endTime = new BN(now + durationSec);
 
       const mintKeypair = Keypair.generate();
       const identity = identityFormRef.current?.getValues() ?? { tokenName: '', tokenSymbol: '', tokenUri: '' };

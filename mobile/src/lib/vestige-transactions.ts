@@ -33,20 +33,24 @@ export const RAYDIUM_CPMM_PROGRAM_ID = new PublicKey(
   'DRaycpLY18LhpbydsBWbVJtxpNv9oXPgjRSfpF2bWpYb'
 );
 
-// Devnet AMM config index 0 — derived from [amm_config, u64le(0)]
+// Devnet AMM config index 0 — derived from [amm_config, u16le(0)]
+// Verified on-chain: Raydium CPMM uses a u16 (2-byte) index, NOT u64.
+// Correct PDA: 5MxLgy9oPdTC3YgkiePHqr3EoCRD9uLVYRQS2ANAs7wy
 export const RAYDIUM_DEVNET_AMM_CONFIG = (() => {
+  const indexBuf = Buffer.alloc(2);
+  indexBuf.writeUInt16LE(0);
   const [pda] = PublicKey.findProgramAddressSync(
-    [Buffer.from('amm_config'), Buffer.from(new Uint8Array(new BigUint64Array([0n]).buffer))],
+    [Buffer.from('amm_config'), indexBuf],
     RAYDIUM_CPMM_PROGRAM_ID
   );
   return pda;
 })();
 
-// Create pool fee receiver. Docs only list mainnet: https://docs.raydium.io/raydium/for-developers/program-addresses
-// Mainnet CPMM Create Pool Fee: 3oE58BKVt8KuYkGxx8zBojugnymWmBiyafWgMrnb6eYy
-// Devnet fee is not documented; using placeholder — replace if Raydium publishes devnet fee.
+// Create pool fee receiver.
+// Verified from devnet CPMM pool creation transactions — devnet uses the same address as mainnet.
+// https://docs.raydium.io/raydium/for-developers/program-addresses
 export const RAYDIUM_DEVNET_CREATE_POOL_FEE = new PublicKey(
-  'G11FKBRaAkHAKuLCgLM6K4WFcZhE2qWqtRKrVANhGbhF'
+  '3oE58BKVt8KuYkGxx8zBojugnymWmBiyafWgMrnb6eYy'
 );
 
 // ============== Raydium PDA Derivation ==============

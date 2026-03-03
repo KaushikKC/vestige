@@ -26,6 +26,44 @@ import {
 } from './vestige-transactions';
 import { RPC_ENDPOINT, CONNECTION_CONFIG } from '../constants/solana';
 
+// ============== Simulation diagnostic ==============
+
+const VESTIGE_ERRORS: Record<number, string> = {
+  6009: 'LaunchNotStarted — buy called before start_time',
+  6010: 'LaunchEnded — launch period has expired',
+  6011: 'AlreadyGraduated',
+  6012: 'InvalidSolAmount — sol_amount must be > 0',
+  6013: 'ZeroBaseTokens — buy too small for current price',
+  6014: 'ZeroCurvePrice — curve price is zero',
+  6015: 'TokenSupplyExceeded',
+  6016: 'BonusPoolExceeded',
+  6026: 'Overflow',
+  6027: 'CreatorMustBuyFirst — non-creator tried to buy before initial buy',
+  6028: 'InitialBuyTooSmall — initial buy must be >= 0.01 SOL',
+};
+
+async function simulateAndLog(connection: Connection, tx: any, label: string) {
+  try {
+    const result = await connection.simulateTransaction(tx, undefined, true);
+    const logs = result.value.logs ?? [];
+    if (result.value.err) {
+      const errJson = JSON.stringify(result.value.err);
+      // Parse Anchor/Vestige custom error code
+      const match = errJson.match(/"Custom":(\d+)/);
+      const code = match ? parseInt(match[1]) : null;
+      const name = code ? (VESTIGE_ERRORS[code] ?? `Custom(${code})`) : errJson;
+      console.error(`[${label}] Simulation FAILED: ${name}`);
+      console.error(`[${label}] Logs:\n  ${logs.slice(-10).join('\n  ')}`);
+      return name;
+    }
+    console.log(`[${label}] Simulation OK`);
+    return null;
+  } catch (e: any) {
+    console.warn(`[${label}] simulateTransaction threw: ${e?.message}`);
+    return null;
+  }
+}
+
 // ============== Shared singleton (module-level) ==============
 
 let _sharedConnection: Connection | null = null;
@@ -247,6 +285,12 @@ export function useVestige() {
         userTokenAccount,
         launch.tokenMint
       );
+
+      // Diagnostic: simulate before sending so Metro shows the exact error
+      const simError = await simulateAndLog(connection, tx, 'Buy');
+      if (simError) {
+        throw new Error(`Buy simulation failed: ${simError}`);
+      }
 
       const signature = await signAndSendTransaction(tx);
       invalidateLaunchCache();

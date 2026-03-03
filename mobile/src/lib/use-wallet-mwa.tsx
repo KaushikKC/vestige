@@ -170,6 +170,10 @@ export function MWAWalletProvider({ children }: { children: ReactNode }) {
 
       const connection = getConnection();
 
+      // Capture blockhash info for post-send confirmation (set inside transact callback)
+      let savedBlockhash = '';
+      let savedLastValidBlockHeight = 0;
+
       // Use signTransactions + manual send for reliability.
       // Everything happens inside transact() so blockhash stays fresh.
       const signedTx = await transact(
@@ -182,7 +186,9 @@ export function MWAWalletProvider({ children }: { children: ReactNode }) {
           }
 
           // 2. Fresh blockhash INSIDE transact so it doesn't go stale
-          const { blockhash } = await connection.getLatestBlockhash('confirmed');
+          const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+          savedBlockhash = blockhash;
+          savedLastValidBlockHeight = lastValidBlockHeight;
           tx.recentBlockhash = blockhash;
           tx.feePayer = publicKey;
 
@@ -225,6 +231,21 @@ export function MWAWalletProvider({ children }: { children: ReactNode }) {
       });
 
       console.log('[MWA] Transaction sent:', signature);
+
+      // 6. Confirm on-chain — without this, sendRawTransaction returns a signature
+      // even if the tx eventually fails/expires. Use blockhash strategy for a clean timeout.
+      const confirmResult = await connection.confirmTransaction(
+        { signature, blockhash: savedBlockhash, lastValidBlockHeight: savedLastValidBlockHeight },
+        'confirmed'
+      );
+
+      if (confirmResult.value.err) {
+        throw new Error(
+          `Transaction failed on-chain: ${JSON.stringify(confirmResult.value.err)}`
+        );
+      }
+
+      console.log('[MWA] Transaction confirmed:', signature);
       return signature;
     },
     [authToken, publicKey]

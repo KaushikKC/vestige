@@ -334,6 +334,8 @@ export default function LaunchDetailScreen({ route }: Props) {
   const waitingForCreatorBuy =
     !launch.hasInitialBuy && connected && !isCreator;
 
+  const isExpired = !launch.isGraduated && launch.endTime < Date.now() / 1000;
+
   // Discount from pMax
   const discountPct = pMaxSol > 0 ? ((priceSol - pMaxSol) / pMaxSol) * 100 : 0;
   const discountColor = discountPct >= 0 ? COLORS.success : COLORS.error;
@@ -496,7 +498,14 @@ export default function LaunchDetailScreen({ route }: Props) {
         {/* 7. Trade Panel (Buy + Sell) */}
         {!launch.isGraduated && (
           <View style={styles.section}>
-            {waitingForCreatorBuy ? (
+            {isExpired ? (
+              <View style={styles.waitingBox}>
+                <Text style={styles.waitingTitle}>Launch Expired</Text>
+                <Text style={styles.waitingSubtext}>
+                  This launch's trading period has ended. It can still be graduated to Raydium below.
+                </Text>
+              </View>
+            ) : waitingForCreatorBuy ? (
               <View style={styles.waitingBox}>
                 <Text style={styles.waitingTitle}>Waiting for Creator</Text>
                 <Text style={styles.waitingSubtext}>
@@ -514,7 +523,7 @@ export default function LaunchDetailScreen({ route }: Props) {
                 isCreator={!!isCreator}
               />
             )}
-            {!connected && !waitingForCreatorBuy && (
+            {!connected && !waitingForCreatorBuy && !isExpired && (
               <Text style={styles.connectHint}>
                 Connect wallet to trade tokens
               </Text>
