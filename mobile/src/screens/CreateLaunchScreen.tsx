@@ -1,4 +1,4 @@
-import React, { useState, useCallback, memo, useEffect } from 'react';
+import React, { useState, useCallback, memo, useRef, useImperativeHandle, forwardRef } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const LAMPORTS = 1_000_000_000;
 
+export type IdentityFormRef = { getValues: () => { tokenName: string; tokenSymbol: string; tokenUri: string } };
+
 export default function CreateLaunchScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { initializeLaunch } = useVestige();
@@ -35,9 +37,7 @@ export default function CreateLaunchScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [createdPda, setCreatedPda] = useState<string | null>(null);
 
-  const [tokenName, setTokenName] = useState('');
-  const [tokenSymbol, setTokenSymbol] = useState('');
-  const [tokenUri, setTokenUri] = useState('');
+  const identityFormRef = useRef<IdentityFormRef>(null);
   const [tokenSupply, setTokenSupply] = useState('1000000');
   const [bonusPool, setBonusPool] = useState('500000');
   const [pMax, setPMax] = useState('1');
@@ -89,6 +89,7 @@ export default function CreateLaunchScreen({ navigation }: any) {
       const endTime = new BN(now + 5 + durationSec);
 
       const mintKeypair = Keypair.generate();
+      const identity = identityFormRef.current?.getValues() ?? { tokenName: '', tokenSymbol: '', tokenUri: '' };
 
       await initializeLaunch(
         mintKeypair,
@@ -101,9 +102,9 @@ export default function CreateLaunchScreen({ navigation }: any) {
         rBestVal,
         rMinVal,
         target,
-        tokenName || 'Vestige Token',
-        tokenSymbol || 'VSTG',
-        tokenUri || '',
+        identity.tokenName || 'Vestige Token',
+        identity.tokenSymbol || 'VSTG',
+        identity.tokenUri || '',
       );
 
       const [launchPda] = VestigeClient.deriveLaunchPda(publicKey, mintKeypair.publicKey);
@@ -159,9 +160,10 @@ export default function CreateLaunchScreen({ navigation }: any) {
     <ScrollView
       style={styles.container}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + SPACING.md, paddingBottom: SPACING.xxl + 40 }]}
-      keyboardShouldPersistTaps="handled"
+      keyboardShouldPersistTaps="always"
       keyboardDismissMode="on-drag"
       showsVerticalScrollIndicator={false}
+      removeClippedSubviews={false}
     >
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
@@ -187,11 +189,8 @@ export default function CreateLaunchScreen({ navigation }: any) {
         </View>
       </View>
 
-      <View style={styles.formSection}>
-        <Text style={styles.sectionTitle}>Identity</Text>
-        <FormField label="Token Name" value={tokenName} onChangeText={setTokenName} placeholder="e.g. Hyperion" />
-        <FormField label="Ticker" value={tokenSymbol} onChangeText={setTokenSymbol} placeholder="e.g. HYP" />
-        <FormField label="Metadata URI" value={tokenUri} onChangeText={setTokenUri} placeholder="https://..." />
+      <View style={styles.formSection} {...(Platform.OS === 'android' && { collapsable: false })}>
+        <IdentityFormSection ref={identityFormRef} />
       </View>
 
       <View style={styles.formSection}>
@@ -238,6 +237,81 @@ export default function CreateLaunchScreen({ navigation }: any) {
   );
 }
 
+// Uncontrolled Identity inputs: no state, no value prop. Stops Android focus cycling from re-renders.
+const IdentityFormSection = memo(forwardRef<IdentityFormRef>(function IdentityFormSection(_, ref) {
+  const tokenNameRef = useRef('');
+  const tokenSymbolRef = useRef('');
+  const tokenUriRef = useRef('');
+
+  useImperativeHandle(ref, () => ({
+    getValues: () => ({
+      tokenName: tokenNameRef.current,
+      tokenSymbol: tokenSymbolRef.current,
+      tokenUri: tokenUriRef.current,
+    }),
+  }), []);
+
+  return (
+    <>
+      <Text style={styles.sectionTitle}>Identity</Text>
+      <View style={styles.fieldContainer}>
+        <Text style={styles.inputLabel}>Token Name</Text>
+        <View style={styles.inputWrap}>
+          <TextInput
+            style={styles.input}
+            defaultValue=""
+            onChangeText={(t) => { tokenNameRef.current = t; }}
+            placeholder="e.g. Hyperion"
+            placeholderTextColor={COLORS.textMuted}
+            blurOnSubmit={false}
+            {...(Platform.OS === 'android' && {
+              includeFontPadding: false,
+              autoComplete: 'off',
+              importantForAutofill: 'no',
+            })}
+          />
+        </View>
+      </View>
+      <View style={styles.fieldContainer}>
+        <Text style={styles.inputLabel}>Ticker</Text>
+        <View style={styles.inputWrap}>
+          <TextInput
+            style={styles.input}
+            defaultValue=""
+            onChangeText={(t) => { tokenSymbolRef.current = t; }}
+            placeholder="e.g. HYP"
+            placeholderTextColor={COLORS.textMuted}
+            blurOnSubmit={false}
+            {...(Platform.OS === 'android' && {
+              includeFontPadding: false,
+              autoComplete: 'off',
+              importantForAutofill: 'no',
+            })}
+          />
+        </View>
+      </View>
+      <View style={styles.fieldContainer}>
+        <Text style={styles.inputLabel}>Metadata URI</Text>
+        <View style={styles.inputWrap}>
+          <TextInput
+            style={styles.input}
+            defaultValue=""
+            onChangeText={(t) => { tokenUriRef.current = t; }}
+            placeholder="https://..."
+            placeholderTextColor={COLORS.textMuted}
+            blurOnSubmit={false}
+            {...(Platform.OS === 'android' && {
+              includeFontPadding: false,
+              autoComplete: 'off',
+              importantForAutofill: 'no',
+            })}
+          />
+        </View>
+      </View>
+    </>
+  );
+}));
+
 const FormField = memo(function FormField({
   label,
   value,
@@ -254,29 +328,8 @@ const FormField = memo(function FormField({
   hint?: string;
 }) {
   const [focused, setFocused] = useState(false);
-  const [localValue, setLocalValue] = useState(value);
-
-  useEffect(() => {
-    if (!focused) setLocalValue(value);
-  }, [value, focused]);
-
   const onFocus = useCallback(() => setFocused(true), []);
-  const onBlur = useCallback(() => {
-    setFocused(false);
-    if (localValue !== value) onChangeText(localValue);
-  }, [localValue, value, onChangeText]);
-
-  const displayValue = focused ? localValue : value;
-  const handleChangeText = useCallback(
-    (text: string) => {
-      if (focused) {
-        setLocalValue(text);
-      } else {
-        onChangeText(text);
-      }
-    },
-    [focused, onChangeText]
-  );
+  const onBlur = useCallback(() => setFocused(false), []);
 
   return (
     <View style={styles.fieldContainer}>
@@ -284,15 +337,19 @@ const FormField = memo(function FormField({
       <View style={[styles.inputWrap, focused && styles.inputWrapFocused]}>
         <TextInput
           style={styles.input}
-          value={displayValue}
-          onChangeText={handleChangeText}
+          value={value}
+          onChangeText={onChangeText}
           keyboardType={keyboardType}
           placeholder={placeholder}
           placeholderTextColor={COLORS.textMuted}
           onFocus={onFocus}
           onBlur={onBlur}
           blurOnSubmit={false}
-          {...(Platform.OS === 'android' && { includeFontPadding: false })}
+          {...(Platform.OS === 'android' && {
+            includeFontPadding: false,
+            autoComplete: 'off',
+            importantForAutofill: 'no',
+          })}
         />
       </View>
       {hint ? <Text style={styles.hintText}>{hint}</Text> : null}

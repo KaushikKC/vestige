@@ -15,10 +15,14 @@ import {
   buildBuyTx,
   buildSellTx,
   buildGraduateTx,
+  buildGraduateToDexTx,
   buildClaimBonusTx,
   buildCreatorClaimFeesTx,
   buildAdvanceMilestoneTx,
   buildInitializeLaunchTx,
+  RAYDIUM_DEVNET_AMM_CONFIG,
+  RAYDIUM_DEVNET_CREATE_POOL_FEE,
+  deriveRaydiumCpmmAccounts,
 } from './vestige-transactions';
 import { RPC_ENDPOINT, CONNECTION_CONFIG } from '../constants/solana';
 
@@ -272,6 +276,37 @@ export function useVestige() {
     [publicKey, getConnection, getClient, signAndSendTransaction]
   );
 
+  const graduateToDex = useCallback(
+    async (launchPda: PublicKey, launch: LaunchData) => {
+      if (!publicKey) throw new Error('Wallet not connected');
+
+      const connection = getConnection();
+      const client = getClient();
+
+      const tokenVault = getAssociatedTokenAddressSync(
+        launch.tokenMint,
+        launchPda,
+        true
+      );
+
+      const tx = await buildGraduateToDexTx(
+        client.program,
+        connection,
+        launchPda,
+        publicKey,
+        launch.tokenMint,
+        tokenVault,
+        RAYDIUM_DEVNET_AMM_CONFIG,
+        RAYDIUM_DEVNET_CREATE_POOL_FEE,
+      );
+
+      const signature = await signAndSendTransaction(tx);
+      invalidateLaunchCache();
+      return signature;
+    },
+    [publicKey, getConnection, getClient, signAndSendTransaction]
+  );
+
   const claimBonus = useCallback(
     async (launchPda: PublicKey, launch: LaunchData) => {
       if (!publicKey) throw new Error('Wallet not connected');
@@ -445,6 +480,7 @@ export function useVestige() {
     buy,
     sell,
     graduate,
+    graduateToDex,
     claimBonus,
     creatorClaimFees,
     advanceMilestone,

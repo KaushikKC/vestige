@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Image,
   StatusBar,
+  Linking,
 } from 'react-native';
 import { PublicKey, Connection } from '@solana/web3.js';
 import * as Clipboard from 'expo-clipboard';
@@ -22,6 +23,7 @@ import {
   MIN_INITIAL_BUY,
 } from '../lib/vestige-client';
 import { useVestige } from '../lib/use-vestige';
+import { deriveRaydiumCpmmAccounts, RAYDIUM_DEVNET_AMM_CONFIG } from '../lib/vestige-transactions';
 import { useWallet } from '../lib/use-wallet';
 import ProgressBar from '../components/ProgressBar';
 import TradePanel from '../components/TradePanel';
@@ -84,6 +86,7 @@ export default function LaunchDetailScreen({ route }: Props) {
     buy,
     sell,
     graduate,
+    graduateToDex,
     claimBonus,
     creatorClaimFees,
     advanceMilestone,
@@ -207,6 +210,24 @@ export default function LaunchDetailScreen({ route }: Props) {
       Toast.show({
         type: 'error',
         text1: 'Graduate failed',
+        text2: err?.message || 'Unknown error',
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleGraduateToDex = async () => {
+    if (!launch) return;
+    setActionLoading(true);
+    try {
+      await graduateToDex(launchPda, launch);
+      Toast.show({ type: 'success', text1: 'Pool live on Raydium!' });
+      setTimeout(fetchData, 3000);
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Graduate to DEX failed',
         text2: err?.message || 'Unknown error',
       });
     } finally {
@@ -522,32 +543,69 @@ export default function LaunchDetailScreen({ route }: Props) {
           </View>
         )}
 
-        {/* Graduate button */}
-        {!launch.isGraduated && connected && (
+        {/* Graduate to Raydium DEX button (primary) */}
+        {!launch.isGraduated && !launch.poolCreated && connected && (
           <View style={styles.section}>
             <TouchableOpacity
-              style={styles.graduateButton}
-              onPress={handleGraduate}
+              style={styles.graduateToDexButton}
+              onPress={handleGraduateToDex}
               disabled={actionLoading}
+              activeOpacity={0.8}
             >
               {actionLoading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.graduateButtonText}>Graduate Launch</Text>
+                <Text style={styles.graduateToDexButtonText}>Graduate to Raydium</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.graduateButton, { marginTop: SPACING.sm }]}
+              onPress={handleGraduate}
+              disabled={actionLoading}
+              activeOpacity={0.8}
+            >
+              {actionLoading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.graduateButtonText}>Graduate (simple fallback)</Text>
               )}
             </TouchableOpacity>
           </View>
         )}
 
-        {/* SOL Locked for Liquidity */}
-        {launch.isGraduated && (
+        {/* Trading Live on Raydium banner */}
+        {launch.poolCreated && (
+          <TouchableOpacity
+            style={styles.raydiumLiveBanner}
+            activeOpacity={0.8}
+            onPress={() => {
+              const { poolState } = deriveRaydiumCpmmAccounts(
+                launch.tokenMint,
+                RAYDIUM_DEVNET_AMM_CONFIG
+              );
+              Linking.openURL(
+                `https://explorer.solana.com/address/${poolState.toBase58()}?cluster=devnet`
+              );
+            }}
+          >
+            <Text style={styles.raydiumLiveIcon}>🎉</Text>
+            <View style={styles.raydiumLiveTextCol}>
+              <Text style={styles.raydiumLiveTitle}>Trading Live on Raydium</Text>
+              <Text style={styles.raydiumLiveSubtext}>Tap to view pool on explorer</Text>
+            </View>
+            <Ionicons name="open-outline" size={16} color="#00E5FF" />
+          </TouchableOpacity>
+        )}
+
+        {/* SOL Locked for Liquidity (shown only when graduated but pool not yet created) */}
+        {launch.isGraduated && !launch.poolCreated && (
           <View style={styles.lockedBox}>
             <Text style={styles.lockedTitle}>SOL Locked for Liquidity</Text>
             <Text style={styles.lockedSubtext}>
               {VestigeClient.lamportsToSol(
                 launch.totalSolCollected
               ).toFixed(4)}{' '}
-              SOL locked in vault for future Raydium LP
+              SOL locked in vault pending Raydium LP creation
             </Text>
           </View>
         )}
@@ -664,7 +722,7 @@ export default function LaunchDetailScreen({ route }: Props) {
         )}
 
         {/* Graduated Badge */}
-        {launch.isGraduated && (
+        {launch.isGraduated && !launch.poolCreated && (
           <View style={styles.graduatedBox}>
             <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
             <Text style={styles.graduatedLabel}>
@@ -881,15 +939,60 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: COLORS.textSecondary,
   },
+  graduateToDexButton: {
+    backgroundColor: '#00C2FF',
+    borderRadius: RADIUS.lg,
+    height: 54,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...SHADOWS.card,
+  },
+  graduateToDexButtonText: {
+    ...TYPOGRAPHY.bodyBold,
+    color: '#000',
+    fontSize: 16,
+  },
   graduateButton: {
     borderRadius: RADIUS.lg,
     overflow: 'hidden',
-    height: 54,
-    ...SHADOWS.card,
+    height: 46,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.surfaceLight,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   graduateButtonText: {
     ...TYPOGRAPHY.bodyBold,
-    color: '#FFF',
+    color: COLORS.textSecondary,
+    fontSize: 13,
+  },
+  raydiumLiveBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 194, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 194, 255, 0.3)',
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.xl,
+    gap: SPACING.md,
+  },
+  raydiumLiveIcon: {
+    fontSize: 22,
+  },
+  raydiumLiveTextCol: {
+    flex: 1,
+  },
+  raydiumLiveTitle: {
+    ...TYPOGRAPHY.bodyBold,
+    color: '#00E5FF',
+    fontSize: 14,
+  },
+  raydiumLiveSubtext: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textMuted,
+    marginTop: 2,
   },
   lockedBox: {
     backgroundColor: 'rgba(29, 4, 225, 0.05)',

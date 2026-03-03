@@ -63,6 +63,7 @@ export interface LaunchData {
   graduationTime: number;
   vaultBump: number;
   creatorFeeVaultBump: number;
+  poolCreated: boolean;
 }
 
 export interface UserPositionData {
@@ -423,6 +424,7 @@ export class VestigeClient {
       symbol: a.symbol ? VestigeClient.bytesToString(a.symbol) : '',
       vaultBump: typeof a.vaultBump === 'number' ? a.vaultBump : 0,
       creatorFeeVaultBump: typeof a.creatorFeeVaultBump === 'number' ? a.creatorFeeVaultBump : 0,
+      poolCreated: typeof a.poolCreated === 'boolean' ? a.poolCreated : false,
     };
   }
 

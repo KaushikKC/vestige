@@ -1,5 +1,6 @@
 import { BN } from '@coral-xyz/anchor';
 import {
+  ComputeBudgetProgram,
   Connection,
   Keypair,
   PublicKey,
@@ -8,6 +9,7 @@ import {
 } from '@solana/web3.js';
 import {
   TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
   MINT_SIZE,
   createInitializeMintInstruction,
   getAssociatedTokenAddressSync,
@@ -23,6 +25,77 @@ import {
 export const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
   'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
 );
+
+// ============== Raydium CPMM Constants (Devnet) ==============
+// Radium Devnet CPMM: DRaycpLY18LhpbydsBWbVJtxpNv9oXPgjRSfpF2bWpYb
+
+export const RAYDIUM_CPMM_PROGRAM_ID = new PublicKey(
+  'DRaycpLY18LhpbydsBWbVJtxpNv9oXPgjRSfpF2bWpYb'
+);
+
+// Devnet AMM config index 0 — derived from [amm_config, u64le(0)]
+export const RAYDIUM_DEVNET_AMM_CONFIG = (() => {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from('amm_config'), Buffer.from(new Uint8Array(new BigUint64Array([0n]).buffer))],
+    RAYDIUM_CPMM_PROGRAM_ID
+  );
+  return pda;
+})();
+
+// Create pool fee receiver. Docs only list mainnet: https://docs.raydium.io/raydium/for-developers/program-addresses
+// Mainnet CPMM Create Pool Fee: 3oE58BKVt8KuYkGxx8zBojugnymWmBiyafWgMrnb6eYy
+// Devnet fee is not documented; using placeholder — replace if Raydium publishes devnet fee.
+export const RAYDIUM_DEVNET_CREATE_POOL_FEE = new PublicKey(
+  'G11FKBRaAkHAKuLCgLM6K4WFcZhE2qWqtRKrVANhGbhF'
+);
+
+// ============== Raydium PDA Derivation ==============
+
+export function deriveRaydiumCpmmAccounts(tokenMint: PublicKey, ammConfig: PublicKey) {
+  const wsolMint = new PublicKey('So11111111111111111111111111111111111111112');
+
+  // Sort mints lexicographically: token_0 = smaller pubkey bytes
+  const [token0Mint, token1Mint] = Buffer.compare(wsolMint.toBuffer(), tokenMint.toBuffer()) < 0
+    ? [wsolMint, tokenMint]
+    : [tokenMint, wsolMint];
+
+  const [authority] = PublicKey.findProgramAddressSync(
+    [Buffer.from('vault_and_lp_mint_auth_seed')],
+    RAYDIUM_CPMM_PROGRAM_ID
+  );
+  const [poolState] = PublicKey.findProgramAddressSync(
+    [Buffer.from('pool'), ammConfig.toBuffer(), token0Mint.toBuffer(), token1Mint.toBuffer()],
+    RAYDIUM_CPMM_PROGRAM_ID
+  );
+  const [lpMint] = PublicKey.findProgramAddressSync(
+    [Buffer.from('pool_lp_mint'), poolState.toBuffer()],
+    RAYDIUM_CPMM_PROGRAM_ID
+  );
+  const [token0Vault] = PublicKey.findProgramAddressSync(
+    [Buffer.from('pool_vault'), poolState.toBuffer(), token0Mint.toBuffer()],
+    RAYDIUM_CPMM_PROGRAM_ID
+  );
+  const [token1Vault] = PublicKey.findProgramAddressSync(
+    [Buffer.from('pool_vault'), poolState.toBuffer(), token1Mint.toBuffer()],
+    RAYDIUM_CPMM_PROGRAM_ID
+  );
+  const [observationState] = PublicKey.findProgramAddressSync(
+    [Buffer.from('observation'), poolState.toBuffer()],
+    RAYDIUM_CPMM_PROGRAM_ID
+  );
+
+  return {
+    wsolMint,
+    token0Mint,
+    token1Mint,
+    authority,
+    poolState,
+    lpMint,
+    token0Vault,
+    token1Vault,
+    observationState,
+  };
+}
 
 /**
  * Transaction builders return unsigned Transaction objects.
@@ -279,6 +352,72 @@ export async function buildInitializeLaunchTx(
   // Don't set blockhash here — the wallet provider sets a fresh one
   // inside the transact() callback to avoid stale blockhash issues.
   return tx;
+}
+
+/**
+ * Build a transaction that graduates a launch directly to Raydium CPMM DEX.
+ * Creates idempotent ATAs for wSOL, token, and LP then calls graduate_to_dex.
+ */
+export async function buildGraduateToDexTx(
+  program: any,
+  connection: Connection,
+  launchPda: PublicKey,
+  payer: PublicKey,
+  tokenMint: PublicKey,
+  tokenVault: PublicKey,
+  ammConfig: PublicKey = RAYDIUM_DEVNET_AMM_CONFIG,
+  createPoolFee: PublicKey = RAYDIUM_DEVNET_CREATE_POOL_FEE,
+): Promise<Transaction> {
+  const tx = new Transaction();
+
+  // Higher compute budget for CPMM pool creation CPI
+  tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 500_000 }));
+
+  // Derive all CPMM PDAs
+  const { wsolMint, authority, poolState, lpMint, token0Vault, token1Vault, observationState } =
+    deriveRaydiumCpmmAccounts(tokenMint, ammConfig);
+
+  const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
+
+  // Payer ATAs (created idempotently — no-op if they exist)
+  const payerWsolAta = getAssociatedTokenAddressSync(wsolMint, payer, false);
+  const payerTokenAta = getAssociatedTokenAddressSync(tokenMint, payer, false);
+  const payerLpAta = getAssociatedTokenAddressSync(lpMint, payer, false);
+
+  tx.add(createAssociatedTokenAccountIdempotentInstruction(payer, payerWsolAta, payer, wsolMint));
+  tx.add(createAssociatedTokenAccountIdempotentInstruction(payer, payerTokenAta, payer, tokenMint));
+  tx.add(createAssociatedTokenAccountIdempotentInstruction(payer, payerLpAta, payer, lpMint));
+
+  // graduate_to_dex instruction
+  const ix = await program.methods
+    .graduateToDex()
+    .accounts({
+      launch: launchPda,
+      vault: vaultPda,
+      tokenVault,
+      tokenMint,
+      payer,
+      payerWsolAccount: payerWsolAta,
+      payerTokenAccount: payerTokenAta,
+      cpmmProgram: RAYDIUM_CPMM_PROGRAM_ID,
+      ammConfig,
+      cpmmAuthority: authority,
+      poolState,
+      wsolMint,
+      lpMint,
+      payerLpAccount: payerLpAta,
+      token0Vault,
+      token1Vault,
+      createPoolFee,
+      observationState,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+
+  tx.add(ix);
+  return setRecentBlockhash(connection, tx, payer);
 }
 
 export async function buildSellTx(
