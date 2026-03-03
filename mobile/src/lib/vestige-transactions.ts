@@ -4,6 +4,7 @@ import {
   Connection,
   Keypair,
   PublicKey,
+  SYSVAR_RENT_PUBKEY,
   SystemProgram,
   Transaction,
 } from '@solana/web3.js';
@@ -383,14 +384,15 @@ export async function buildGraduateToDexTx(
 
   const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
 
-  // Payer ATAs (created idempotently — no-op if they exist)
+  // Create wSOL and token ATAs idempotently (these mints exist, so safe to pre-create).
+  // Do NOT pre-create the LP ATA — lpMint is a PDA that Raydium creates during
+  // initialize, so it doesn't exist yet. Raydium's initialize creates the LP ATA itself.
   const payerWsolAta = getAssociatedTokenAddressSync(wsolMint, payer, false);
   const payerTokenAta = getAssociatedTokenAddressSync(tokenMint, payer, false);
   const payerLpAta = getAssociatedTokenAddressSync(lpMint, payer, false);
 
   tx.add(createAssociatedTokenAccountIdempotentInstruction(payer, payerWsolAta, payer, wsolMint));
   tx.add(createAssociatedTokenAccountIdempotentInstruction(payer, payerTokenAta, payer, tokenMint));
-  tx.add(createAssociatedTokenAccountIdempotentInstruction(payer, payerLpAta, payer, lpMint));
 
   // graduate_to_dex instruction
   const ix = await program.methods
@@ -417,6 +419,7 @@ export async function buildGraduateToDexTx(
       tokenProgram: TOKEN_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
+      rent: SYSVAR_RENT_PUBKEY,
     })
     .instruction();
 

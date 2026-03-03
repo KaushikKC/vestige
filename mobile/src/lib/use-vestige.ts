@@ -31,15 +31,19 @@ import { RPC_ENDPOINT, CONNECTION_CONFIG } from '../constants/solana';
 const VESTIGE_ERRORS: Record<number, string> = {
   6009: 'LaunchNotStarted — buy called before start_time',
   6010: 'LaunchEnded — launch period has expired',
-  6011: 'AlreadyGraduated',
+  6011: 'AlreadyGraduated — launch is already graduated',
   6012: 'InvalidSolAmount — sol_amount must be > 0',
   6013: 'ZeroBaseTokens — buy too small for current price',
   6014: 'ZeroCurvePrice — curve price is zero',
   6015: 'TokenSupplyExceeded',
   6016: 'BonusPoolExceeded',
+  6017: 'GraduationConditionsNotMet — target not reached and time not expired',
   6026: 'Overflow',
   6027: 'CreatorMustBuyFirst — non-creator tried to buy before initial buy',
   6028: 'InitialBuyTooSmall — initial buy must be >= 0.01 SOL',
+  6036: 'InvalidRaydiumProgram — wrong CPMM program address',
+  6037: 'PoolAlreadyCreated — Raydium pool already exists',
+  6038: 'InsufficientPoolLiquidity — vault has 0 SOL or 0 tokens available for pool',
 };
 
 async function simulateAndLog(connection: Connection, tx: any, label: string) {
@@ -343,6 +347,12 @@ export function useVestige() {
         RAYDIUM_DEVNET_AMM_CONFIG,
         RAYDIUM_DEVNET_CREATE_POOL_FEE,
       );
+
+      // Diagnostic: simulate before sending so Metro shows the exact error
+      const simError = await simulateAndLog(connection, tx, 'GraduateToDex');
+      if (simError) {
+        throw new Error(`GraduateToDex simulation failed: ${simError}`);
+      }
 
       const signature = await signAndSendTransaction(tx);
       invalidateLaunchCache();

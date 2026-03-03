@@ -858,8 +858,7 @@ pub mod vestige {
         // Compute amounts
         let rent = Rent::get()?;
         let rent_exempt_min = rent.minimum_balance(0);
-        let vault_ai = ctx.accounts.vault.to_account_info();
-        let vault_lamports = vault_ai.lamports();
+        let vault_lamports = ctx.accounts.vault.to_account_info().lamports();
 
         require!(vault_lamports > rent_exempt_min, VestigeError::InsufficientPoolLiquidity);
         let sol_for_pool = vault_lamports - rent_exempt_min;
@@ -871,9 +870,33 @@ pub mod vestige {
         require!(sol_for_pool > 0, VestigeError::InsufficientPoolLiquidity);
         require!(tokens_for_pool > 0, VestigeError::InsufficientPoolLiquidity);
 
-        // Step 1: Transfer SOL from vault to payer_wsol_account (direct lamport manipulation)
-        **vault_ai.try_borrow_mut_lamports()? -= sol_for_pool;
-        **ctx.accounts.payer_wsol_account.try_borrow_mut_lamports()? += sol_for_pool;
+        msg!("DBG A: sol_for_pool={} tokens_for_pool={}", sol_for_pool, tokens_for_pool);
+
+        // Step 1a: Transfer SOL from vault to payer (direct lamport manipulation).
+        // Direct lamport manipulation to a Token-Program-owned account (payer_wsol_account)
+        // causes UnbalancedInstruction. The workaround: transfer to the payer (a signer,
+        // so the runtime allows the credit), then forward to payer_wsol_account via
+        // system_program::transfer (which accepts transfers from signers to any account).
+        **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? -= sol_for_pool;
+        msg!("DBG B: vault debited");
+        **ctx.accounts.payer.to_account_info().try_borrow_mut_lamports()? += sol_for_pool;
+        msg!("DBG C: payer credited payer_lam={}", ctx.accounts.payer.to_account_info().lamports());
+        msg!("DBG C2: payer_wsol={} vault_now={}", ctx.accounts.payer_wsol_account.to_account_info().lamports(), ctx.accounts.vault.to_account_info().lamports());
+
+        // Step 1b: Forward SOL from payer to payer_wsol_account via System Program CPI.
+        // Payer is a signer so system_program::transfer accepts it as the source.
+        msg!("DBG C3: calling system_program::transfer");
+        system_program::transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::Transfer {
+                    from: ctx.accounts.payer.to_account_info(),
+                    to: ctx.accounts.payer_wsol_account.to_account_info(),
+                },
+            ),
+            sol_for_pool,
+        )?;
+        msg!("DBG D: system transfer done");
 
         // Step 2: Sync native — converts lamports in wSOL ATA to token balance
         let sync_ix = Instruction {
