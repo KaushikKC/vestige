@@ -68,8 +68,8 @@ export default function PriceCurveChart({ pMax, pMin, startTime, endTime }: Prop
       gridLines, timeLabels, gradientPoints, priceBadgeLabel,
       startY: mapY(pMax), endX: PAD.left + PLOT_W, endY: mapY(pMin),
     };
-  // Update roughly every 10 seconds
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Update roughly every 10 seconds
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pMax, pMin, startTime, endTime, Math.floor(Date.now() / 10000)]);
 
   const {
@@ -95,7 +95,7 @@ export default function PriceCurveChart({ pMax, pMin, startTime, endTime }: Prop
             />
             <SvgText
               x={PAD.left - 6} y={gl.y + 3}
-              fill={COLORS.textMuted} fontSize={9} fontFamily="monospace"
+              fill="rgba(255, 255, 255, 0.6)" fontSize={9} fontFamily="monospace"
               textAnchor="end"
             >
               {gl.label}
@@ -112,7 +112,7 @@ export default function PriceCurveChart({ pMax, pMin, startTime, endTime }: Prop
             />
             <SvgText
               x={tl.x} y={CHART_HEIGHT - 8}
-              fill={COLORS.textMuted} fontSize={9}
+              fill="rgba(255, 255, 255, 0.6)" fontSize={9}
               textAnchor="middle"
             >
               {tl.label}
@@ -135,14 +135,14 @@ export default function PriceCurveChart({ pMax, pMin, startTime, endTime }: Prop
         <Line
           x1={PAD.left} y1={startY}
           x2={active ? nowX : endX} y2={active ? nowY : endY}
-          stroke={COLORS.primary} strokeWidth={2.5} strokeLinecap="round"
+          stroke="#FFFFFF" strokeWidth={2.5} strokeLinecap="round"
         />
 
         {/* Dashed future line */}
         {active && (
           <Line
             x1={nowX} y1={nowY} x2={endX} y2={endY}
-            stroke={COLORS.primary} strokeWidth={2} strokeLinecap="round"
+            stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round"
             strokeDasharray="6,4" opacity={0.3}
           />
         )}
@@ -151,17 +151,17 @@ export default function PriceCurveChart({ pMax, pMin, startTime, endTime }: Prop
         {active && (
           <Line
             x1={nowX} y1={PAD.top} x2={nowX} y2={PAD.top + PLOT_H}
-            stroke={COLORS.textMuted} strokeWidth={0.8} strokeDasharray="4,4"
-            opacity={0.5}
+            stroke="#FFFFFF" strokeWidth={0.8} strokeDasharray="4,4"
+            opacity={0.3}
           />
         )}
 
         {/* Current price dot */}
         {active && (
           <>
-            <Circle cx={nowX} cy={nowY} r={8} fill={COLORS.primary} opacity={0.3} />
-            <Circle cx={nowX} cy={nowY} r={5} fill={COLORS.primary} />
-            <Circle cx={nowX} cy={nowY} r={3} fill="#FFFFFF" />
+            <Circle cx={nowX} cy={nowY} r={8} fill="#FFFFFF" opacity={0.3} />
+            <Circle cx={nowX} cy={nowY} r={5} fill="#FFFFFF" />
+            <Circle cx={nowX} cy={nowY} r={3} fill="#000000" />
           </>
         )}
 

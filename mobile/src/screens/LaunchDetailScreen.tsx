@@ -13,7 +13,7 @@ import { PublicKey, Connection } from '@solana/web3.js';
 import * as Clipboard from 'expo-clipboard';
 import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY, GRADIENTS } from '../constants/theme';
 import {
   LaunchData,
   UserPositionData,
@@ -287,7 +287,10 @@ export default function LaunchDetailScreen({ route }: Props) {
   if (!launch) {
     return (
       <View style={styles.center}>
-        <Ionicons name="close-circle-outline" size={48} color={COLORS.error} style={{ marginBottom: SPACING.md }} />
+        <BackgroundEffect />
+        <LinearGradient colors={GRADIENTS.error} style={styles.errorIcon}>
+          <Ionicons name="close" size={40} color="#FFF" />
+        </LinearGradient>
         <Text style={styles.errorText}>Launch not found</Text>
         <Text style={styles.errorSubtext}>{launchPdaStr}</Text>
       </View>
@@ -325,7 +328,7 @@ export default function LaunchDetailScreen({ route }: Props) {
       <StatusBar barStyle="dark-content" />
       <ScrollView
         style={styles.container}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + SPACING.sm }]}
+        contentContainerStyle={[styles.content,]}
       >
         {/* 1. Compact Token Header */}
         <View style={styles.compactHeader}>
@@ -419,8 +422,8 @@ export default function LaunchDetailScreen({ route }: Props) {
         </View>
 
         {/* 5. Progress */}
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>Progress</Text>
+        <View style={[styles.section, styles.progressSection]}>
+          <Text style={styles.sectionHeader}>Graduation Progress</Text>
           <ProgressBar
             progress={progress}
             collected={VestigeClient.lamportsToSol(
@@ -626,7 +629,7 @@ export default function LaunchDetailScreen({ route }: Props) {
               disabled={actionLoading}
             >
               {actionLoading ? (
-                <ActivityIndicator color="#1A1A2E" />
+                <ActivityIndicator color={COLORS.primary} />
               ) : (
                 <Text style={styles.claimBonusButtonText}>
                   Claim Bonus Tokens
@@ -684,7 +687,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: SPACING.lg,
-    paddingBottom: 40,
+    paddingBottom: 80,
   },
   center: {
     flex: 1,
@@ -692,54 +695,74 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.background,
   },
+  errorIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+    ...SHADOWS.lg,
+  },
   // Compact header
   compactHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
+    backgroundColor: COLORS.surface,
+    padding: SPACING.md,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderDark,
+    ...SHADOWS.card,
   },
   headerImage: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: RADIUS.md,
     backgroundColor: COLORS.surfaceLight,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   headerImagePlaceholder: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: RADIUS.md,
     backgroundColor: COLORS.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   headerNameCol: {
     flex: 1,
     marginLeft: SPACING.md,
   },
   headerName: {
-    ...TYPOGRAPHY.h2,
-    fontSize: 20,
+    ...TYPOGRAPHY.h3,
+    fontSize: 22,
+    fontWeight: '800',
   },
   headerSymbol: {
     ...TYPOGRAPHY.caption,
-    color: COLORS.primaryLight,
+    color: COLORS.textSecondary,
     fontWeight: '800',
   },
   mintChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: COLORS.surfaceLight,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    backgroundColor: COLORS.background,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: RADIUS.full,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderDark,
   },
   mintChipText: {
-    color: COLORS.textSecondary,
-    fontSize: 11,
-    fontWeight: '600',
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: '800',
   },
   // Price hero
   priceHero: {
@@ -747,14 +770,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 12,
+    paddingHorizontal: SPACING.xs,
   },
   heroPrice: {
     ...TYPOGRAPHY.h1,
-    fontSize: 34,
+    fontSize: 30,
+    fontWeight: '900',
   },
   heroDiscount: {
     ...TYPOGRAPHY.bodyBold,
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: '800',
   },
   // Chart toggle
   chartToggleRow: {
@@ -767,25 +793,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.full,
-    padding: 2,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    padding: 4,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderDark,
+    ...SHADOWS.sm,
   },
   chartToggleBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 18,
     borderRadius: RADIUS.full,
   },
   chartToggleBtnActive: {
-    backgroundColor: COLORS.surfaceLight,
+    backgroundColor: COLORS.primary,
   },
   chartToggleText: {
     ...TYPOGRAPHY.caption,
     color: COLORS.textMuted,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   chartToggleTextActive: {
-    color: COLORS.text,
+    color: '#FFF',
   },
   intervalGroup: {
     flexDirection: 'row',
@@ -796,51 +823,72 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: RADIUS.sm,
     backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderDark,
   },
   intervalBtnActive: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
   intervalText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+    color: COLORS.textSecondary,
   },
   intervalTextActive: {
     color: '#FFFFFF',
   },
   chartWrap: {
-    marginHorizontal: -SPACING.lg,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderDark,
+    overflow: 'hidden',
     marginBottom: SPACING.lg,
     height: 320,
+    ...SHADOWS.card,
   },
   // Stats
   section: {
     marginBottom: SPACING.xl,
   },
   sectionHeader: {
-    ...TYPOGRAPHY.label,
-    color: COLORS.textMuted,
+    ...TYPOGRAPHY.h3,
+    color: COLORS.primary,
     marginBottom: SPACING.md,
-    fontSize: 13,
+    fontSize: 18,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  progressSection: {
+    backgroundColor: COLORS.pastelMint,
+    padding: SPACING.lg,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderDark,
+    ...SHADOWS.card,
   },
   // Tabs
   infoTabRow: {
     flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
     marginBottom: SPACING.md,
+    gap: SPACING.lg,
+    backgroundColor: COLORS.background,
+    padding: 4,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   infoTab: {
-    marginRight: SPACING.xl,
-    paddingBottom: 10,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: RADIUS.full,
   },
   infoTabActive: {
-    borderBottomColor: COLORS.primary,
+    backgroundColor: COLORS.pastelIndigo,
+    borderWidth: 1,
+    borderColor: COLORS.borderDark,
   },
   infoTabText: {
     ...TYPOGRAPHY.bodyBold,
@@ -848,77 +896,103 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   infoTabTextActive: {
-    color: COLORS.text,
+    color: COLORS.primary,
   },
   // List blocks
   infoBox: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.pastelRose,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    gap: 8,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderDark,
+    gap: 12,
+    ...SHADOWS.card,
   },
   infoText: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textSecondary,
-    fontSize: 13,
+    ...TYPOGRAPHY.body,
+    color: '#333',
+    fontSize: 14,
+    fontWeight: '700',
   },
   waitingBox: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.pastelYellow,
     padding: SPACING.xl,
     borderRadius: RADIUS.xl,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderDark,
+    ...SHADOWS.card,
   },
   waitingTitle: {
     ...TYPOGRAPHY.h3,
     marginBottom: 8,
+    fontSize: 20,
+    fontWeight: '900',
+    color: COLORS.warning,
   },
   waitingSubtext: {
     ...TYPOGRAPHY.body,
     textAlign: 'center',
-    color: COLORS.textSecondary,
+    color: '#444',
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '600',
   },
   graduateButton: {
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.full,
     overflow: 'hidden',
-    height: 54,
-    ...SHADOWS.card,
+    height: 60,
+    backgroundColor: COLORS.pastelIndigo,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.borderDark,
+    ...SHADOWS.md,
   },
   graduateButtonText: {
     ...TYPOGRAPHY.bodyBold,
-    color: '#FFF',
+    color: COLORS.primary,
+    fontSize: 18,
+    fontWeight: '900',
+    textTransform: 'uppercase',
   },
   lockedBox: {
-    backgroundColor: 'rgba(29, 4, 225, 0.05)',
+    backgroundColor: COLORS.pastelBlue,
     padding: SPACING.lg,
     borderRadius: RADIUS.lg,
     marginBottom: SPACING.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(29, 4, 225, 0.2)',
+    borderWidth: 1.5,
+    borderColor: COLORS.borderDark,
+    ...SHADOWS.card,
   },
   lockedTitle: {
-    ...TYPOGRAPHY.bodyBold,
-    color: COLORS.primaryLight,
+    ...TYPOGRAPHY.h3,
+    color: COLORS.primary,
+    fontSize: 18,
+    fontWeight: '900',
   },
   lockedSubtext: {
     ...TYPOGRAPHY.caption,
-    color: COLORS.textSecondary,
-    marginTop: 4,
+    color: '#333',
+    marginTop: 6,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '700',
   },
   vestedSection: {
     backgroundColor: COLORS.surface,
     padding: SPACING.lg,
     borderRadius: RADIUS.lg,
     marginBottom: SPACING.xl,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderDark,
+    ...SHADOWS.card,
   },
   vestedTitle: {
     ...TYPOGRAPHY.h3,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
+    fontSize: 20,
+    fontWeight: '900',
   },
   vestedGrid: {
     gap: 12,
@@ -926,51 +1000,62 @@ const styles = StyleSheet.create({
   vestedItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
   vestedLabel: {
     ...TYPOGRAPHY.caption,
-    color: COLORS.textMuted,
+    color: COLORS.textSecondary,
+    fontWeight: '700',
   },
   vestedValue: {
-    ...TYPOGRAPHY.caption,
+    ...TYPOGRAPHY.bodyBold,
     color: COLORS.text,
-    fontFamily: 'monospace',
+    fontSize: 14,
   },
   claimableValue: {
     ...TYPOGRAPHY.bodyBold,
-    color: COLORS.primaryLight,
-    fontFamily: 'monospace',
+    color: COLORS.success,
+    fontSize: 15,
+    fontWeight: '900',
   },
   vestedActions: {
     flexDirection: 'row',
-    marginTop: SPACING.lg,
+    marginTop: SPACING.xl,
     gap: 12,
   },
   claimFeesButton: {
     flex: 2,
-    backgroundColor: COLORS.primary,
-    height: 44,
-    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.pastelLavender,
+    height: 52,
+    borderRadius: RADIUS.full,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: COLORS.borderDark,
+    ...SHADOWS.sm,
   },
   claimFeesButtonText: {
     ...TYPOGRAPHY.bodyBold,
-    color: '#FFF',
-    fontSize: 13,
+    color: '#111',
+    fontSize: 14,
   },
   advanceButton: {
     flex: 1,
-    backgroundColor: COLORS.surfaceLight,
-    height: 44,
-    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.pastelCyan,
+    height: 52,
+    borderRadius: RADIUS.full,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: COLORS.borderDark,
+    ...SHADOWS.sm,
   },
   advanceButtonText: {
     ...TYPOGRAPHY.bodyBold,
-    color: COLORS.text,
-    fontSize: 13,
+    color: '#111',
+    fontSize: 14,
   },
   disabledButton: {
     opacity: 0.5,
@@ -981,28 +1066,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     marginTop: SPACING.lg,
+    backgroundColor: COLORS.pastelMint,
+    padding: SPACING.md,
+    borderRadius: RADIUS.full,
+    borderWidth: 1.5,
+    borderColor: COLORS.buy,
+    ...SHADOWS.card,
   },
   graduatedLabel: {
     ...TYPOGRAPHY.bodyBold,
-    color: COLORS.success,
+    color: COLORS.buyDark,
+    fontSize: 16,
+    textTransform: 'uppercase',
   },
   milestoneDots: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 8,
+    marginVertical: SPACING.md,
   },
   milestoneDot: {
-    width: 24,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: COLORS.border,
+    width: 28,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   milestoneDotFilled: {
     backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   milestoneLabel: {
     ...TYPOGRAPHY.caption,
-    color: COLORS.textMuted,
+    color: COLORS.textSecondary,
+    fontWeight: '700',
   },
   errorText: {
     ...TYPOGRAPHY.h3,
@@ -1015,22 +1112,28 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
   },
   claimBonusButton: {
-    backgroundColor: COLORS.accent,
-    height: 54,
-    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.pastelMint,
+    height: 60,
+    borderRadius: RADIUS.full,
     justifyContent: 'center',
     alignItems: 'center',
-    ...SHADOWS.glow,
+    borderWidth: 2,
+    borderColor: COLORS.buy,
+    ...SHADOWS.md,
   },
   claimBonusButtonText: {
     ...TYPOGRAPHY.bodyBold,
-    color: '#000',
+    color: COLORS.buyDark,
+    fontSize: 18,
+    fontWeight: '900',
+    textTransform: 'uppercase',
   },
   connectHint: {
     textAlign: 'center',
     color: COLORS.textMuted,
-    fontSize: 12,
-    marginTop: 12,
+    fontSize: 14,
+    marginTop: 16,
+    fontWeight: '700',
   },
 });
 

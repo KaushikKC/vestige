@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS } from '../constants/theme';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import { UserPositionData, VestigeClient } from '../lib/vestige-client';
 
 interface PositionCardProps {
@@ -78,60 +78,59 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.lg,
-    padding: SPACING.md + 4,
-    ...SHADOWS.sm,
+    padding: SPACING.lg,
+    ...SHADOWS.card,
   },
   title: {
-    color: COLORS.text,
-    fontSize: FONT_SIZE.md,
-    fontWeight: '700',
+    ...TYPOGRAPHY.h3,
     marginBottom: SPACING.md,
   },
   launchKey: {
     color: COLORS.textMuted,
     fontSize: FONT_SIZE.xs,
-    fontFamily: 'monospace',
+    fontFamily: Platform.select({ ios: 'Courier New', android: 'monospace' }),
     marginBottom: SPACING.sm,
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: SPACING.sm,
+    paddingVertical: SPACING.md,
   },
   divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: COLORS.surfaceLight,
+    height: 1,
+    backgroundColor: COLORS.borderLight,
   },
   label: {
     color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.sm,
+    fontSize: FONT_SIZE.md,
+    fontWeight: '500',
   },
   value: {
     color: COLORS.text,
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '600',
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
   },
   claimedPill: {
-    backgroundColor: COLORS.success + '20',
-    paddingHorizontal: SPACING.sm + 4,
+    backgroundColor: COLORS.pastelGreen,
+    paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
     borderRadius: RADIUS.full,
   },
   claimedPillText: {
-    color: COLORS.success,
-    fontSize: FONT_SIZE.xs,
+    color: COLORS.successDark,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '700',
   },
   pendingPill: {
-    backgroundColor: COLORS.warning + '20',
-    paddingHorizontal: SPACING.sm + 4,
+    backgroundColor: COLORS.pastelYellow,
+    paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
     borderRadius: RADIUS.full,
   },
   pendingPillText: {
     color: COLORS.warning,
-    fontSize: FONT_SIZE.xs,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '700',
   },
 });

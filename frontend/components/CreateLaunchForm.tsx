@@ -375,7 +375,7 @@ export default function CreateLaunchForm({
               type="text"
               value={formData.name}
               onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
+                setFormData((prev) => ({ ...prev, name: e.target.value }))
               }
               className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
               placeholder="My Token"
@@ -390,7 +390,7 @@ export default function CreateLaunchForm({
               type="text"
               value={formData.symbol}
               onChange={(e) =>
-                setFormData({ ...formData, symbol: e.target.value })
+                setFormData((prev) => ({ ...prev, symbol: e.target.value }))
               }
               className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
               placeholder="TKN"
@@ -406,8 +406,8 @@ export default function CreateLaunchForm({
           <input
             type="text"
             value={formData.uri}
-            onChange={(e) =>
-              setFormData({ ...formData, uri: e.target.value })
+              onChange={(e) =>
+              setFormData((prev) => ({ ...prev, uri: e.target.value }))
             }
             className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
             placeholder="https://arweave.net/..."
@@ -426,7 +426,7 @@ export default function CreateLaunchForm({
               type="number"
               value={formData.tokenSupply}
               onChange={(e) =>
-                setFormData({ ...formData, tokenSupply: e.target.value })
+                setFormData((prev) => ({ ...prev, tokenSupply: e.target.value }))
               }
               className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
               placeholder="1000000"
@@ -440,7 +440,7 @@ export default function CreateLaunchForm({
               type="number"
               value={formData.bonusPool}
               onChange={(e) =>
-                setFormData({ ...formData, bonusPool: e.target.value })
+                setFormData((prev) => ({ ...prev, bonusPool: e.target.value }))
               }
               className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
               placeholder="500000"
@@ -458,7 +458,7 @@ export default function CreateLaunchForm({
           <input
             type="number"
             value={formData.pMax}
-            onChange={(e) => setFormData({ ...formData, pMax: e.target.value })}
+            onChange={(e) => setFormData((prev) => ({ ...prev, pMax: e.target.value }))}
             className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
             placeholder="1"
             step="0.01"
@@ -478,7 +478,7 @@ export default function CreateLaunchForm({
               type="number"
               value={formData.rBest}
               onChange={(e) =>
-                setFormData({ ...formData, rBest: e.target.value })
+                setFormData((prev) => ({ ...prev, rBest: e.target.value }))
               }
               className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
               placeholder="15"
@@ -495,7 +495,7 @@ export default function CreateLaunchForm({
               type="number"
               value={formData.rMin}
               onChange={(e) =>
-                setFormData({ ...formData, rMin: e.target.value })
+                setFormData((prev) => ({ ...prev, rMin: e.target.value }))
               }
               className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
               placeholder="1"
@@ -510,8 +510,8 @@ export default function CreateLaunchForm({
           <input
             type="number"
             value={formData.graduationTarget}
-            onChange={(e) =>
-              setFormData({ ...formData, graduationTarget: e.target.value })
+              onChange={(e) =>
+              setFormData((prev) => ({ ...prev, graduationTarget: e.target.value }))
             }
             className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
             placeholder="10"
@@ -525,9 +525,9 @@ export default function CreateLaunchForm({
           <input
             type="number"
             value={formData.durationMinutes}
-            onChange={(e) =>
-              setFormData({ ...formData, durationMinutes: e.target.value })
-            }
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, durationMinutes: e.target.value }))
+              }
             className="w-full px-4 py-3 bg-[#F5F6FA] border border-[#E6E8EF] rounded-xl focus:ring-2 focus:ring-[#1D04E1] outline-none"
             placeholder="1440"
           />
