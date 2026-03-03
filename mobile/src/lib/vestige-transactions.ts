@@ -1,5 +1,6 @@
 import { BN } from '@coral-xyz/anchor';
 import {
+  AccountMeta,
   ComputeBudgetProgram,
   Connection,
   Keypair,
@@ -7,6 +8,7 @@ import {
   SYSVAR_RENT_PUBKEY,
   SystemProgram,
   Transaction,
+  TransactionInstruction,
 } from '@solana/web3.js';
 import {
   TOKEN_PROGRAM_ID,
@@ -17,6 +19,7 @@ import {
   createAssociatedTokenAccountInstruction,
   createAssociatedTokenAccountIdempotentInstruction,
   createMintToInstruction,
+  createSyncNativeInstruction,
 } from '@solana/spl-token';
 import {
   VestigeClient,
@@ -100,6 +103,70 @@ export function deriveRaydiumCpmmAccounts(tokenMint: PublicKey, ammConfig: Publi
     token1Vault,
     observationState,
   };
+}
+
+// ============== Raydium CPMM initialize instruction builder ==============
+
+// sha256("global:initialize")[0..8]
+const RAYDIUM_CPMM_INIT_DISCRIMINATOR = Buffer.from([175, 175, 109, 31, 13, 152, 155, 237]);
+
+/**
+ * Manually build a Raydium CPMM `initialize` instruction.
+ * Account order must match the Raydium CPMM IDL exactly.
+ */
+function buildRaydiumCpmmInitializeIx(
+  payer: PublicKey,
+  ammConfig: PublicKey,
+  authority: PublicKey,
+  poolState: PublicKey,
+  token0Mint: PublicKey,
+  token1Mint: PublicKey,
+  lpMint: PublicKey,
+  creatorToken0: PublicKey,
+  creatorToken1: PublicKey,
+  creatorLpToken: PublicKey,
+  token0Vault: PublicKey,
+  token1Vault: PublicKey,
+  createPoolFee: PublicKey,
+  observationState: PublicKey,
+  initAmount0: BN,
+  initAmount1: BN,
+): TransactionInstruction {
+  // Encode args: init_amount_0 (u64 LE) + init_amount_1 (u64 LE) + open_time (u64 LE, 0)
+  const data = Buffer.alloc(8 + 8 + 8 + 8);
+  RAYDIUM_CPMM_INIT_DISCRIMINATOR.copy(data, 0);
+  data.writeBigUInt64LE(BigInt(initAmount0.toString()), 8);
+  data.writeBigUInt64LE(BigInt(initAmount1.toString()), 16);
+  data.writeBigUInt64LE(0n, 24); // open_time = 0 (open immediately)
+
+  const keys: AccountMeta[] = [
+    { pubkey: payer, isSigner: true, isWritable: true },           // 0: creator
+    { pubkey: ammConfig, isSigner: false, isWritable: false },      // 1: amm_config
+    { pubkey: authority, isSigner: false, isWritable: false },      // 2: authority
+    { pubkey: poolState, isSigner: false, isWritable: true },       // 3: pool_state
+    { pubkey: token0Mint, isSigner: false, isWritable: false },     // 4: token_0_mint
+    { pubkey: token1Mint, isSigner: false, isWritable: false },     // 5: token_1_mint
+    { pubkey: lpMint, isSigner: false, isWritable: true },          // 6: lp_mint
+    { pubkey: creatorToken0, isSigner: false, isWritable: true },   // 7: creator_token_0
+    { pubkey: creatorToken1, isSigner: false, isWritable: true },   // 8: creator_token_1
+    { pubkey: creatorLpToken, isSigner: false, isWritable: true },  // 9: creator_lp_token
+    { pubkey: token0Vault, isSigner: false, isWritable: true },     // 10: token_0_vault
+    { pubkey: token1Vault, isSigner: false, isWritable: true },     // 11: token_1_vault
+    { pubkey: createPoolFee, isSigner: false, isWritable: true },   // 12: create_pool_fee
+    { pubkey: observationState, isSigner: false, isWritable: true }, // 13: observation_state
+    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // 14: token_program
+    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // 15: token_0_program
+    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // 16: token_1_program
+    { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // 17: associated_token_program
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // 18: system_program
+    { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // 19: rent
+  ];
+
+  return new TransactionInstruction({
+    programId: RAYDIUM_CPMM_PROGRAM_ID,
+    keys,
+    data,
+  });
 }
 
 /**
@@ -360,8 +427,18 @@ export async function buildInitializeLaunchTx(
 }
 
 /**
- * Build a transaction that graduates a launch directly to Raydium CPMM DEX.
- * Creates idempotent ATAs for wSOL, token, and LP then calls graduate_to_dex.
+ * Build an atomic transaction that graduates a launch to Raydium CPMM DEX.
+ *
+ * Instruction sequence (all atomic — if any fails, all roll back):
+ *   1. graduate_to_dex  — releases vault SOL to payer + pool tokens to payer ATA,
+ *                         marks is_graduated/pool_created on-chain
+ *   2. SystemProgram.transfer(payer → payerWsolAta, solForPool)  — sends SOL to wSOL ATA
+ *   3. SyncNative(payerWsolAta)  — wraps lamports to wSOL token balance
+ *   4. Raydium CPMM initialize  — creates the pool using wSOL + token balances
+ *
+ * solForPool and tokensForPool are pre-computed by the caller from on-chain state:
+ *   solForPool     = vaultLamports - rentExemptMin
+ *   tokensForPool  = tokenVaultAmount - totalBonusReserved
  */
 export async function buildGraduateToDexTx(
   program: any,
@@ -370,60 +447,83 @@ export async function buildGraduateToDexTx(
   payer: PublicKey,
   tokenMint: PublicKey,
   tokenVault: PublicKey,
+  solForPool: BN,
+  tokensForPool: BN,
   ammConfig: PublicKey = RAYDIUM_DEVNET_AMM_CONFIG,
   createPoolFee: PublicKey = RAYDIUM_DEVNET_CREATE_POOL_FEE,
 ): Promise<Transaction> {
   const tx = new Transaction();
 
-  // Higher compute budget for CPMM pool creation CPI
-  tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 500_000 }));
+  // Higher compute budget: graduate_to_dex + Raydium pool creation
+  tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 }));
 
-  // Derive all CPMM PDAs
-  const { wsolMint, authority, poolState, lpMint, token0Vault, token1Vault, observationState } =
+  // Derive all Raydium CPMM PDAs
+  const { wsolMint, authority, poolState, lpMint, token0Mint, token1Mint, token0Vault, token1Vault, observationState } =
     deriveRaydiumCpmmAccounts(tokenMint, ammConfig);
 
   const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
 
-  // Create wSOL and token ATAs idempotently (these mints exist, so safe to pre-create).
-  // Do NOT pre-create the LP ATA — lpMint is a PDA that Raydium creates during
-  // initialize, so it doesn't exist yet. Raydium's initialize creates the LP ATA itself.
   const payerWsolAta = getAssociatedTokenAddressSync(wsolMint, payer, false);
   const payerTokenAta = getAssociatedTokenAddressSync(tokenMint, payer, false);
   const payerLpAta = getAssociatedTokenAddressSync(lpMint, payer, false);
 
+  // Pre-create wSOL and token ATAs idempotently.
+  // Do NOT pre-create LP ATA — Raydium creates it during initialize.
   tx.add(createAssociatedTokenAccountIdempotentInstruction(payer, payerWsolAta, payer, wsolMint));
   tx.add(createAssociatedTokenAccountIdempotentInstruction(payer, payerTokenAta, payer, tokenMint));
 
-  // graduate_to_dex instruction
-  const ix = await program.methods
+  // Instruction 1: graduate_to_dex — releases SOL (to payer) + tokens (to payer ATA)
+  const graduateIx = await program.methods
     .graduateToDex()
     .accounts({
       launch: launchPda,
       vault: vaultPda,
       tokenVault,
-      tokenMint,
       payer,
-      payerWsolAccount: payerWsolAta,
       payerTokenAccount: payerTokenAta,
-      cpmmProgram: RAYDIUM_CPMM_PROGRAM_ID,
-      ammConfig,
-      cpmmAuthority: authority,
-      poolState,
-      wsolMint,
-      lpMint,
-      payerLpAccount: payerLpAta,
-      token0Vault,
-      token1Vault,
-      createPoolFee,
-      observationState,
       tokenProgram: TOKEN_PROGRAM_ID,
-      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
-      rent: SYSVAR_RENT_PUBKEY,
     })
     .instruction();
+  tx.add(graduateIx);
 
-  tx.add(ix);
+  // Instruction 2: SystemProgram.transfer — send the released SOL from payer to wSOL ATA
+  tx.add(SystemProgram.transfer({
+    fromPubkey: payer,
+    toPubkey: payerWsolAta,
+    lamports: BigInt(solForPool.toString()),
+  }));
+
+  // Instruction 3: SyncNative — convert the lamports in wSOL ATA to token balance
+  tx.add(createSyncNativeInstruction(payerWsolAta));
+
+  // Instruction 4: Raydium CPMM initialize — create the pool
+  // Sort token amounts to match token_0/token_1 order
+  const wsolIsToken0 = token0Mint.equals(wsolMint);
+  const initAmount0 = wsolIsToken0 ? solForPool : tokensForPool;
+  const initAmount1 = wsolIsToken0 ? tokensForPool : solForPool;
+  const creatorToken0 = wsolIsToken0 ? payerWsolAta : payerTokenAta;
+  const creatorToken1 = wsolIsToken0 ? payerTokenAta : payerWsolAta;
+
+  tx.add(buildRaydiumCpmmInitializeIx(
+    payer,
+    ammConfig,
+    authority,
+    poolState,
+    token0Mint,
+    token1Mint,
+    lpMint,
+    creatorToken0,
+    creatorToken1,
+    payerLpAta,
+    token0Vault,
+    token1Vault,
+    createPoolFee,
+    observationState,
+    initAmount0,
+    initAmount1,
+  ));
+
   return setRecentBlockhash(connection, tx, payer);
 }
 

@@ -1,22 +1,12 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 use anchor_spl::token::{self, Token, TokenAccount, Mint, Transfer};
-use anchor_spl::associated_token::AssociatedToken;
 use anchor_lang::solana_program::program::invoke;
 use anchor_lang::solana_program::instruction::{Instruction, AccountMeta};
 use borsh::BorshSerialize;
 
 /// Metaplex Token Metadata program ID
 pub const TOKEN_METADATA_PROGRAM_ID: Pubkey = pubkey!("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
-
-/// Raydium CPMM program ID (Radium devnet)
-pub const RAYDIUM_CPMM_PROGRAM_ID: Pubkey = pubkey!("DRaycpLY18LhpbydsBWbVJtxpNv9oXPgjRSfpF2bWpYb");
-
-/// Wrapped SOL mint
-pub const WSOL_MINT: Pubkey = pubkey!("So11111111111111111111111111111111111111112");
-
-/// Raydium CPMM initialize discriminator = sha256("global:initialize")[0..8]
-pub const RAYDIUM_CPMM_INIT_DISCRIMINATOR: [u8; 8] = [175, 175, 109, 31, 13, 152, 155, 237];
 
 declare_id!("4RQMkiv5Lp4p862UeQxQs6YgWRPBud2fwLMR5GcSo1bf");
 
@@ -185,66 +175,6 @@ fn build_create_metadata_v3_ix(
     }
 }
 
-/// Borsh args for Raydium CPMM initialize instruction
-#[derive(BorshSerialize)]
-struct RaydiumCpmmInitArgs {
-    init_amount_0: u64,
-    init_amount_1: u64,
-    open_time: u64,
-}
-
-/// Build a Raydium CPMM initialize (create pool) instruction.
-/// Accounts must be in the exact order from the Raydium CPMM IDL.
-#[allow(clippy::too_many_arguments)]
-fn build_raydium_cpmm_initialize_ix(
-    creator: Pubkey,
-    amm_config: Pubkey,
-    authority: Pubkey,
-    pool_state: Pubkey,
-    token_0_mint: Pubkey,
-    token_1_mint: Pubkey,
-    lp_mint: Pubkey,
-    creator_token_0: Pubkey,
-    creator_token_1: Pubkey,
-    creator_lp_token: Pubkey,
-    token_0_vault: Pubkey,
-    token_1_vault: Pubkey,
-    create_pool_fee: Pubkey,
-    observation_state: Pubkey,
-    init_amount_0: u64,
-    init_amount_1: u64,
-) -> Instruction {
-    let args = RaydiumCpmmInitArgs { init_amount_0, init_amount_1, open_time: 0 };
-    let mut data = RAYDIUM_CPMM_INIT_DISCRIMINATOR.to_vec();
-    args.serialize(&mut data).unwrap();
-
-    Instruction {
-        program_id: RAYDIUM_CPMM_PROGRAM_ID,
-        accounts: vec![
-            AccountMeta::new(creator, true),                                                                                           // 0: creator
-            AccountMeta::new_readonly(amm_config, false),                                                                              // 1: amm_config
-            AccountMeta::new_readonly(authority, false),                                                                               // 2: authority
-            AccountMeta::new(pool_state, false),                                                                                       // 3: pool_state
-            AccountMeta::new_readonly(token_0_mint, false),                                                                            // 4: token_0_mint
-            AccountMeta::new_readonly(token_1_mint, false),                                                                            // 5: token_1_mint
-            AccountMeta::new(lp_mint, false),                                                                                          // 6: lp_mint
-            AccountMeta::new(creator_token_0, false),                                                                                  // 7: creator_token_0
-            AccountMeta::new(creator_token_1, false),                                                                                  // 8: creator_token_1
-            AccountMeta::new(creator_lp_token, false),                                                                                 // 9: creator_lp_token
-            AccountMeta::new(token_0_vault, false),                                                                                    // 10: token_0_vault
-            AccountMeta::new(token_1_vault, false),                                                                                    // 11: token_1_vault
-            AccountMeta::new(create_pool_fee, false),                                                                                  // 12: create_pool_fee
-            AccountMeta::new(observation_state, false),                                                                                // 13: observation_state
-            AccountMeta::new_readonly(anchor_spl::token::ID, false),                                                                  // 14: token_program
-            AccountMeta::new_readonly(anchor_spl::token::ID, false),                                                                  // 15: token_0_program
-            AccountMeta::new_readonly(anchor_spl::token::ID, false),                                                                  // 16: token_1_program
-            AccountMeta::new_readonly(pubkey!("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe1bsv"), false),                               // 17: associated_token_program
-            AccountMeta::new_readonly(anchor_lang::solana_program::system_program::ID, false),                                        // 18: system_program
-            AccountMeta::new_readonly(anchor_lang::solana_program::sysvar::rent::ID, false),                                          // 19: rent
-        ],
-        data,
-    }
-}
 
 /// Convert a String to a fixed [u8; 32] array, zero-padded
 fn string_to_fixed_bytes_32(s: &str) -> [u8; 32] {
@@ -832,8 +762,12 @@ pub mod vestige {
     }
 
     /// Graduate the launch directly to Raydium CPMM DEX.
-    /// Wraps vault SOL → wSOL, transfers remaining tokens to payer ATAs,
-    /// CPIs into Raydium CPMM initialize, then burns all LP tokens (fair launch).
+    /// Transfers vault SOL to payer and pool tokens to payer's token ATA.
+    /// The client builds the full atomic transaction:
+    ///   1. graduate_to_dex (this ix) — releases SOL + tokens, marks graduated
+    ///   2. SystemProgram.transfer(payer → payer_wsol_ata) — wraps SOL
+    ///   3. SyncNative(payer_wsol_ata) — syncs wSOL balance
+    ///   4. Raydium CPMM initialize — creates the pool using the released assets
     /// Permissionless — anyone can call once graduation conditions are met.
     pub fn graduate_to_dex(ctx: Context<GraduateToDex>) -> Result<()> {
         let clock = Clock::get()?;
@@ -870,43 +804,11 @@ pub mod vestige {
         require!(sol_for_pool > 0, VestigeError::InsufficientPoolLiquidity);
         require!(tokens_for_pool > 0, VestigeError::InsufficientPoolLiquidity);
 
-        msg!("DBG A: sol_for_pool={} tokens_for_pool={}", sol_for_pool, tokens_for_pool);
-
-        // Step 1a: Transfer SOL from vault to payer (direct lamport manipulation).
-        // Direct lamport manipulation to a Token-Program-owned account (payer_wsol_account)
-        // causes UnbalancedInstruction. The workaround: transfer to the payer (a signer,
-        // so the runtime allows the credit), then forward to payer_wsol_account via
-        // system_program::transfer (which accepts transfers from signers to any account).
+        // Transfer SOL from vault to payer (direct lamport — no subsequent CPI on payer needed)
         **ctx.accounts.vault.to_account_info().try_borrow_mut_lamports()? -= sol_for_pool;
-        msg!("DBG B: vault debited");
         **ctx.accounts.payer.to_account_info().try_borrow_mut_lamports()? += sol_for_pool;
-        msg!("DBG C: payer credited payer_lam={}", ctx.accounts.payer.to_account_info().lamports());
-        msg!("DBG C2: payer_wsol={} vault_now={}", ctx.accounts.payer_wsol_account.to_account_info().lamports(), ctx.accounts.vault.to_account_info().lamports());
 
-        // Step 1b: Forward SOL from payer to payer_wsol_account via System Program CPI.
-        // Payer is a signer so system_program::transfer accepts it as the source.
-        msg!("DBG C3: calling system_program::transfer");
-        system_program::transfer(
-            CpiContext::new(
-                ctx.accounts.system_program.to_account_info(),
-                system_program::Transfer {
-                    from: ctx.accounts.payer.to_account_info(),
-                    to: ctx.accounts.payer_wsol_account.to_account_info(),
-                },
-            ),
-            sol_for_pool,
-        )?;
-        msg!("DBG D: system transfer done");
-
-        // Step 2: Sync native — converts lamports in wSOL ATA to token balance
-        let sync_ix = Instruction {
-            program_id: anchor_spl::token::ID,
-            accounts: vec![AccountMeta::new(ctx.accounts.payer_wsol_account.key(), false)],
-            data: vec![17u8], // SyncNative discriminator
-        };
-        invoke(&sync_ix, &[ctx.accounts.payer_wsol_account.to_account_info()])?;
-
-        // Step 3: Transfer tokens from token_vault to payer_token_account (launch PDA signs)
+        // Transfer tokens from token_vault to payer_token_account (launch PDA signs)
         let seeds = &[LAUNCH_SEED, creator.as_ref(), token_mint_key.as_ref(), &[bump]];
         let signer_seeds = &[&seeds[..]];
         token::transfer(
@@ -922,117 +824,17 @@ pub mod vestige {
             tokens_for_pool,
         )?;
 
-        // Step 4: Sort mints (token_0 = lexicographically smaller) for CPMM
-        let wsol_is_token0 = WSOL_MINT.to_bytes() < token_mint_key.to_bytes();
-        let (token_0_mint_key, token_1_mint_key, init_amount_0, init_amount_1,
-             creator_token_0_key, creator_token_1_key) = if wsol_is_token0 {
-            (WSOL_MINT, token_mint_key, sol_for_pool, tokens_for_pool,
-             ctx.accounts.payer_wsol_account.key(), ctx.accounts.payer_token_account.key())
-        } else {
-            (token_mint_key, WSOL_MINT, tokens_for_pool, sol_for_pool,
-             ctx.accounts.payer_token_account.key(), ctx.accounts.payer_wsol_account.key())
-        };
-        let (token_0_mint_ai, token_1_mint_ai, creator_token_0_ai, creator_token_1_ai) =
-            if wsol_is_token0 {
-                (ctx.accounts.wsol_mint.to_account_info(),
-                 ctx.accounts.token_mint.to_account_info(),
-                 ctx.accounts.payer_wsol_account.to_account_info(),
-                 ctx.accounts.payer_token_account.to_account_info())
-            } else {
-                (ctx.accounts.token_mint.to_account_info(),
-                 ctx.accounts.wsol_mint.to_account_info(),
-                 ctx.accounts.payer_token_account.to_account_info(),
-                 ctx.accounts.payer_wsol_account.to_account_info())
-            };
-
-        // Step 5: CPI → Raydium CPMM initialize (creates pool + mints LP)
-        let cpmm_ix = build_raydium_cpmm_initialize_ix(
-            ctx.accounts.payer.key(),
-            ctx.accounts.amm_config.key(),
-            ctx.accounts.cpmm_authority.key(),
-            ctx.accounts.pool_state.key(),
-            token_0_mint_key,
-            token_1_mint_key,
-            ctx.accounts.lp_mint.key(),
-            creator_token_0_key,
-            creator_token_1_key,
-            ctx.accounts.payer_lp_account.key(),
-            ctx.accounts.token_0_vault.key(),
-            ctx.accounts.token_1_vault.key(),
-            ctx.accounts.create_pool_fee.key(),
-            ctx.accounts.observation_state.key(),
-            init_amount_0,
-            init_amount_1,
-        );
-        invoke(
-            &cpmm_ix,
-            &[
-                ctx.accounts.payer.to_account_info(),
-                ctx.accounts.amm_config.to_account_info(),
-                ctx.accounts.cpmm_authority.to_account_info(),
-                ctx.accounts.pool_state.to_account_info(),
-                token_0_mint_ai,
-                token_1_mint_ai,
-                ctx.accounts.lp_mint.to_account_info(),
-                creator_token_0_ai,
-                creator_token_1_ai,
-                ctx.accounts.payer_lp_account.to_account_info(),
-                ctx.accounts.token_0_vault.to_account_info(),
-                ctx.accounts.token_1_vault.to_account_info(),
-                ctx.accounts.create_pool_fee.to_account_info(),
-                ctx.accounts.observation_state.to_account_info(),
-                ctx.accounts.token_program.to_account_info(),
-                ctx.accounts.token_program.to_account_info(), // token_0_program
-                ctx.accounts.token_program.to_account_info(), // token_1_program
-                ctx.accounts.associated_token_program.to_account_info(),
-                ctx.accounts.system_program.to_account_info(),
-                ctx.accounts.rent.to_account_info(),
-            ],
-        )?;
-
-        // Step 6: Read LP balance from raw token account data [64..72] = amount field
-        let lp_balance = {
-            let lp_data = ctx.accounts.payer_lp_account.try_borrow_data()?;
-            u64::from_le_bytes(
-                lp_data[64..72].try_into().map_err(|_| VestigeError::Overflow)?
-            )
-        };
-
-        // Step 7: Burn all LP tokens (fair launch — no LP retained)
-        if lp_balance > 0 {
-            let mut burn_data = vec![8u8]; // TokenInstruction::Burn
-            burn_data.extend_from_slice(&lp_balance.to_le_bytes());
-            let burn_ix = Instruction {
-                program_id: anchor_spl::token::ID,
-                accounts: vec![
-                    AccountMeta::new(ctx.accounts.payer_lp_account.key(), false),
-                    AccountMeta::new(ctx.accounts.lp_mint.key(), false),
-                    AccountMeta::new_readonly(ctx.accounts.payer.key(), true),
-                ],
-                data: burn_data,
-            };
-            invoke(
-                &burn_ix,
-                &[
-                    ctx.accounts.payer_lp_account.to_account_info(),
-                    ctx.accounts.lp_mint.to_account_info(),
-                    ctx.accounts.payer.to_account_info(),
-                ],
-            )?;
-        }
-
-        // Step 8: Update launch state
+        // Mark graduated — client is responsible for creating the Raydium pool
+        // in the same atomic transaction using the released SOL and tokens.
         let launch = &mut ctx.accounts.launch;
         launch.is_graduated = true;
         launch.pool_created = true;
         launch.milestones_unlocked = 1;
         launch.graduation_time = clock.unix_timestamp;
 
-        msg!("=== LAUNCH GRADUATED TO RAYDIUM CPMM ===");
-        msg!("Pool State: {}", ctx.accounts.pool_state.key());
-        msg!("SOL for pool: {} lamports", sol_for_pool);
-        msg!("Tokens for pool: {}", tokens_for_pool);
-        msg!("LP burned: {}", lp_balance);
+        msg!("=== LAUNCH GRADUATED ===");
+        msg!("SOL released: {} lamports", sol_for_pool);
+        msg!("Tokens released: {}", tokens_for_pool);
 
         Ok(())
     }
@@ -1363,7 +1165,7 @@ pub struct GraduateToDex<'info> {
     )]
     pub vault: AccountInfo<'info>,
 
-    /// Launch's token ATA (source of tokens for the pool)
+    /// Launch's token ATA — tokens transferred to payer_token_account
     #[account(
         mut,
         constraint = token_vault.mint == launch.token_mint @ VestigeError::InvalidTokenVault,
@@ -1371,68 +1173,16 @@ pub struct GraduateToDex<'info> {
     )]
     pub token_vault: Account<'info, TokenAccount>,
 
-    /// CHECK: Token mint for this launch
-    #[account(constraint = token_mint.key() == launch.token_mint @ VestigeError::InvalidTokenVault)]
-    pub token_mint: AccountInfo<'info>,
-
-    /// Pays for pool creation rent; also receives wSOL/token ATAs temporarily
+    /// Pays for pool creation rent; receives released SOL
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    /// CHECK: Payer's wSOL ATA — created idempotently by client before this ix
-    #[account(mut)]
-    pub payer_wsol_account: AccountInfo<'info>,
-
-    /// CHECK: Payer's token ATA — created idempotently by client before this ix
+    /// CHECK: Payer's token ATA — receives pool tokens
     #[account(mut)]
     pub payer_token_account: AccountInfo<'info>,
 
-    /// CHECK: Raydium CPMM program
-    #[account(address = RAYDIUM_CPMM_PROGRAM_ID @ VestigeError::InvalidRaydiumProgram)]
-    pub cpmm_program: AccountInfo<'info>,
-
-    /// CHECK: Raydium AMM config (devnet index-0 config passed by client)
-    pub amm_config: AccountInfo<'info>,
-
-    /// CHECK: Raydium CPMM authority PDA
-    pub cpmm_authority: AccountInfo<'info>,
-
-    /// CHECK: Raydium pool state PDA (created by CPMM during CPI)
-    #[account(mut)]
-    pub pool_state: AccountInfo<'info>,
-
-    /// CHECK: wSOL mint
-    #[account(address = WSOL_MINT)]
-    pub wsol_mint: AccountInfo<'info>,
-
-    /// CHECK: LP mint PDA (created by CPMM during CPI)
-    #[account(mut)]
-    pub lp_mint: AccountInfo<'info>,
-
-    /// CHECK: Payer's LP ATA — receives LP tokens, then they are burned
-    #[account(mut)]
-    pub payer_lp_account: AccountInfo<'info>,
-
-    /// CHECK: CPMM pool token_0 vault (PDA derived by client)
-    #[account(mut)]
-    pub token_0_vault: AccountInfo<'info>,
-
-    /// CHECK: CPMM pool token_1 vault (PDA derived by client)
-    #[account(mut)]
-    pub token_1_vault: AccountInfo<'info>,
-
-    /// CHECK: Raydium pool creation fee receiver
-    #[account(mut)]
-    pub create_pool_fee: AccountInfo<'info>,
-
-    /// CHECK: CPMM observation state PDA (created by CPMM during CPI)
-    #[account(mut)]
-    pub observation_state: AccountInfo<'info>,
-
     pub token_program: Program<'info, Token>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
-    pub rent: Sysvar<'info, Rent>,
 }
 
 // ============== Errors ==============

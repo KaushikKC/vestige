@@ -337,6 +337,24 @@ export function useVestige() {
         true
       );
 
+      // Fetch on-chain state to compute exact amounts for pool creation
+      const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
+      const [vaultInfo, tokenVaultInfo, rentExemptMin] = await Promise.all([
+        connection.getAccountInfo(vaultPda),
+        connection.getTokenAccountBalance(tokenVault),
+        connection.getMinimumBalanceForRentExemption(0),
+      ]);
+
+      if (!vaultInfo) throw new Error('Vault account not found');
+
+      const vaultLamports = vaultInfo.lamports;
+      const solForPool = new BN(vaultLamports - rentExemptMin);
+      const tokenVaultAmount = new BN(tokenVaultInfo.value.amount);
+      const tokensForPool = tokenVaultAmount.sub(launch.totalBonusReserved);
+
+      if (solForPool.lten(0)) throw new Error('Insufficient SOL in vault for pool creation');
+      if (tokensForPool.lten(0)) throw new Error('Insufficient tokens in vault for pool creation');
+
       const tx = await buildGraduateToDexTx(
         client.program,
         connection,
@@ -344,6 +362,8 @@ export function useVestige() {
         publicKey,
         launch.tokenMint,
         tokenVault,
+        solForPool,
+        tokensForPool,
         RAYDIUM_DEVNET_AMM_CONFIG,
         RAYDIUM_DEVNET_CREATE_POOL_FEE,
       );

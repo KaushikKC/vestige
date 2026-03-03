@@ -427,8 +427,12 @@
       "name": "graduate_to_dex",
       "docs": [
         "Graduate the launch directly to Raydium CPMM DEX.",
-        "Wraps vault SOL → wSOL, transfers remaining tokens to payer ATAs,",
-        "CPIs into Raydium CPMM initialize, then burns all LP tokens (fair launch).",
+        "Transfers vault SOL to payer and pool tokens to payer's token ATA.",
+        "The client builds the full atomic transaction:",
+        "1. graduate_to_dex (this ix) — releases SOL + tokens, marks graduated",
+        "2. SystemProgram.transfer(payer → payer_wsol_ata) — wraps SOL",
+        "3. SyncNative(payer_wsol_ata) — syncs wSOL balance",
+        "4. Raydium CPMM initialize — creates the pool using the released assets",
         "Permissionless — anyone can call once graduation conditions are met."
       ],
       "discriminator": [
@@ -496,69 +500,20 @@
         {
           "name": "token_vault",
           "docs": [
-            "Launch's token ATA (source of tokens for the pool)"
+            "Launch's token ATA — tokens transferred to payer_token_account"
           ],
           "writable": true
         },
         {
-          "name": "token_mint"
-        },
-        {
           "name": "payer",
           "docs": [
-            "Pays for pool creation rent; also receives wSOL/token ATAs temporarily"
+            "Pays for pool creation rent; receives released SOL"
           ],
           "writable": true,
           "signer": true
         },
         {
-          "name": "payer_wsol_account",
-          "writable": true
-        },
-        {
           "name": "payer_token_account",
-          "writable": true
-        },
-        {
-          "name": "cpmm_program",
-          "address": "DRaycpLY18LhpbydsBWbVJtxpNv9oXPgjRSfpF2bWpYb"
-        },
-        {
-          "name": "amm_config"
-        },
-        {
-          "name": "cpmm_authority"
-        },
-        {
-          "name": "pool_state",
-          "writable": true
-        },
-        {
-          "name": "wsol_mint",
-          "address": "So11111111111111111111111111111111111111112"
-        },
-        {
-          "name": "lp_mint",
-          "writable": true
-        },
-        {
-          "name": "payer_lp_account",
-          "writable": true
-        },
-        {
-          "name": "token_0_vault",
-          "writable": true
-        },
-        {
-          "name": "token_1_vault",
-          "writable": true
-        },
-        {
-          "name": "create_pool_fee",
-          "writable": true
-        },
-        {
-          "name": "observation_state",
           "writable": true
         },
         {
@@ -566,16 +521,8 @@
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          "name": "associated_token_program",
-          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
-        },
-        {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
-        },
-        {
-          "name": "rent",
-          "address": "SysvarRent111111111111111111111111111111111"
         }
       ],
       "args": []
