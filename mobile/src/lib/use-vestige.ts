@@ -337,20 +337,18 @@ export function useVestige() {
         true
       );
 
-      // Fetch on-chain state to compute exact amounts for pool creation
+      // Fetch vault SOL (tokens are always exactly lp_reserve — fixed at init)
       const [vaultPda] = VestigeClient.deriveVaultPda(launchPda);
-      const [vaultInfo, tokenVaultInfo, rentExemptMin] = await Promise.all([
+      const [vaultInfo, rentExemptMin] = await Promise.all([
         connection.getAccountInfo(vaultPda),
-        connection.getTokenAccountBalance(tokenVault),
         connection.getMinimumBalanceForRentExemption(0),
       ]);
 
       if (!vaultInfo) throw new Error('Vault account not found');
 
-      const vaultLamports = vaultInfo.lamports;
-      const solForPool = new BN(vaultLamports - rentExemptMin);
-      const tokenVaultAmount = new BN(tokenVaultInfo.value.amount);
-      const tokensForPool = tokenVaultAmount.sub(launch.totalBonusReserved);
+      const solForPool = new BN(vaultInfo.lamports - rentExemptMin);
+      // tokensForPool is always lp_reserve — stored in launch state at init
+      const tokensForPool = launch.lpReserve;
 
       if (solForPool.lten(0)) throw new Error('Insufficient SOL in vault for pool creation');
       if (tokensForPool.lten(0)) throw new Error('Insufficient tokens in vault for pool creation');
@@ -494,10 +492,9 @@ export function useVestige() {
       mintKeypair: Keypair,
       tokenSupply: BN,
       bonusPool: BN,
+      lpReserve: BN,
       startTime: BN,
       endTime: BN,
-      pMax: BN,
-      pMin: BN,
       rBest: BN,
       rMin: BN,
       graduationTarget: BN,
@@ -517,10 +514,9 @@ export function useVestige() {
         publicKey,
         tokenSupply,
         bonusPool,
+        lpReserve,
         startTime,
         endTime,
-        pMax,
-        pMin,
         rBest,
         rMin,
         graduationTarget,

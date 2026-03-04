@@ -63,6 +63,7 @@ export interface LaunchData {
   vaultBump: number;
   creatorFeeVaultBump: number;
   poolCreated: boolean;
+  lpReserve: BN; // tokens reserved for Raydium LP; p_min = graduationTarget * 1e9 / lpReserve
 }
 
 export interface UserPositionData {
@@ -423,6 +424,7 @@ export class VestigeClient {
       vaultBump: typeof a.vaultBump === 'number' ? a.vaultBump : 0,
       creatorFeeVaultBump: typeof a.creatorFeeVaultBump === 'number' ? a.creatorFeeVaultBump : 0,
       poolCreated: typeof a.poolCreated === 'boolean' ? a.poolCreated : false,
+      lpReserve: a.lpReserve instanceof BN ? a.lpReserve : new BN(a.lpReserve ?? 0),
     };
   }
 

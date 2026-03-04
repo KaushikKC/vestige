@@ -30,7 +30,6 @@ const LAMPORTS = 1_000_000_000;
 
 export type IdentityFormRef = { getValues: () => { tokenName: string; tokenSymbol: string; tokenUri: string } };
 const SWITCH_TRACK_COLOR = { true: COLORS.primary, false: COLORS.surfaceLight };
-const HINT_DROPS_10X = 'Drops 10x over duration';
 const GRADIENT_PRIMARY = [COLORS.primary, COLORS.primaryDark] as const;
 const GRADIENT_DISABLED = [COLORS.surfaceLight, COLORS.surface] as const;
 
@@ -86,8 +85,8 @@ export default function CreateLaunchScreen({ navigation }: any) {
   const initLaunchRef = useRef(initializeLaunch);
   initLaunchRef.current = initializeLaunch;
   const stableInitializeLaunch = useCallback(
-    (mintKeypair: Keypair, tokenSupply: BN, bonusPool: BN, startTime: BN, endTime: BN, pMax: BN, pMin: BN, rBest: BN, rMin: BN, graduationTarget: BN, name: string, symbol: string, uri: string) =>
-      initLaunchRef.current(mintKeypair, tokenSupply, bonusPool, startTime, endTime, pMax, pMin, rBest, rMin, graduationTarget, name, symbol, uri),
+    (mintKeypair: Keypair, tokenSupply: BN, bonusPool: BN, lpReserve: BN, startTime: BN, endTime: BN, rBest: BN, rMin: BN, graduationTarget: BN, name: string, symbol: string, uri: string) =>
+      initLaunchRef.current(mintKeypair, tokenSupply, bonusPool, lpReserve, startTime, endTime, rBest, rMin, graduationTarget, name, symbol, uri),
     [],
   );
 
@@ -219,34 +218,31 @@ const LaunchForm = memo(function LaunchForm({
   const tokenUriRef = useRef('');
   const tokenSupplyRef = useRef('1000000');
   const bonusPoolRef = useRef('500000');
-  const pMaxRef = useRef('1');
-  const rBestRef = useRef('15');
+  const lpPctRef = useRef('10'); // % of token supply reserved for Raydium LP
+  const rBestRef = useRef('10');
   const rMinRef = useRef('1');
   const graduationTargetRef = useRef('10');
   const durationMinutesRef = useRef('1440');
 
   const applyTestMode = useCallback((enabled: boolean) => {
     setTestMode(enabled);
-    // Update refs so handleCreate always reads the right values after toggle
     if (enabled) {
       tokenSupplyRef.current = '1000';
       bonusPoolRef.current = '500';
-      pMaxRef.current = '1';
-      rBestRef.current = '15';
+      lpPctRef.current = '10';
+      rBestRef.current = '10';
       rMinRef.current = '1';
       graduationTargetRef.current = '0.5';
       durationMinutesRef.current = '3';
     } else {
       tokenSupplyRef.current = '1000000';
       bonusPoolRef.current = '500000';
-      pMaxRef.current = '1';
-      rBestRef.current = '15';
+      lpPctRef.current = '10';
+      rBestRef.current = '10';
       rMinRef.current = '1';
       graduationTargetRef.current = '10';
       durationMinutesRef.current = '1440';
     }
-    // Bump key → numeric FormFields remount with the correct defaultValue derived
-    // from the new testMode value. Identity fields have no key, so they stay mounted.
     setFormKey(k => k + 1);
   }, []);
 
@@ -258,11 +254,13 @@ const LaunchForm = memo(function LaunchForm({
     }
     setLoading(true);
     try {
-      const supply = new BN(Math.floor(parseFloat(tokenSupplyRef.current || '0') * LAMPORTS));
+      const supplyTokens = parseFloat(tokenSupplyRef.current || '0');
+      const supply = new BN(Math.floor(supplyTokens * LAMPORTS));
       const bonus = new BN(Math.floor(parseFloat(bonusPoolRef.current || '0') * LAMPORTS));
-      const pMaxVal = VestigeClient.solToLamports(parseFloat(pMaxRef.current || '0'));
-      const pMinVal = VestigeClient.solToLamports(parseFloat(pMaxRef.current || '0') / 10);
-      const rBestVal = new BN(parseInt(rBestRef.current || '15'));
+      // lp_reserve = supply × lp_pct% (raw token units)
+      const lpPct = parseFloat(lpPctRef.current || '10') / 100;
+      const lpReserve = new BN(Math.floor(supplyTokens * lpPct * LAMPORTS));
+      const rBestVal = new BN(parseInt(rBestRef.current || '10'));
       const rMinVal = new BN(parseInt(rMinRef.current || '1'));
       const target = VestigeClient.solToLamports(parseFloat(graduationTargetRef.current || '0'));
       const now = Math.floor(Date.now() / 1000);
@@ -279,10 +277,9 @@ const LaunchForm = memo(function LaunchForm({
         mintKeypair,
         supply,
         bonus,
+        lpReserve,
         startTime,
         endTime,
-        pMaxVal,
-        pMinVal,
         rBestVal,
         rMinVal,
         target,
@@ -306,12 +303,8 @@ const LaunchForm = memo(function LaunchForm({
     [connected, loading],
   );
 
-  // Numeric defaults derived from testMode — stable strings, only change on toggle.
-  // Identity fields always start empty; they are never remounted so defaultValue=""
-  // is a permanent constant → FormField memo always passes → zero re-renders.
   const supply0 = testMode ? '1000' : '1000000';
   const bonus0 = testMode ? '500' : '500000';
-  const pMax0 = '1';
   const grad0 = testMode ? '0.5' : '10';
 
   return (
@@ -341,10 +334,6 @@ const LaunchForm = memo(function LaunchForm({
         <Text style={styles.sectionTitle}>Economics</Text>
         <View style={styles.row}>
           <View style={styles.rowItem}>
-            {/*
-              key={...-formKey} → remounts on test-mode toggle with fresh defaultValue.
-              Between toggles, defaultValue is stable → memo passes → no re-render.
-            */}
             <FormField
               key={`supply-${formKey}`}
               label="Supply"
@@ -357,29 +346,54 @@ const LaunchForm = memo(function LaunchForm({
           <View style={styles.rowItem}>
             <FormField
               key={`bonus-${formKey}`}
-              label="Bonus"
+              label="Bonus Pool"
               defaultValue={bonus0}
               valueRef={bonusPoolRef}
               keyboardType="numeric"
             />
           </View>
         </View>
-        <FormField
-          key={`pmax-${formKey}`}
-          label="Initial Price (SOL)"
-          defaultValue={pMax0}
-          valueRef={pMaxRef}
-          keyboardType="decimal-pad"
-          hint={HINT_DROPS_10X}
-        />
+        <View style={styles.row}>
+          <View style={styles.rowItem}>
+            <FormField
+              key={`lppct-${formKey}`}
+              label="LP Allocation %"
+              defaultValue="10"
+              valueRef={lpPctRef}
+              keyboardType="decimal-pad"
+              hint="% of supply → Raydium LP"
+            />
+          </View>
+          <View style={styles.rowGap} />
+          <View style={styles.rowItem}>
+            <FormField
+              key={`rbest-${formKey}`}
+              label="Early Bonus (x)"
+              defaultValue="10"
+              valueRef={rBestRef}
+              keyboardType="numeric"
+              hint="Multiplier for early buyers"
+            />
+          </View>
+        </View>
         <FormField
           key={`grad-${formKey}`}
           label="Graduation Goal (SOL)"
           defaultValue={grad0}
           valueRef={graduationTargetRef}
           keyboardType="decimal-pad"
+          hint="DEX listing price = Goal ÷ LP tokens"
         />
       </View>
+
+      {/* Derived Price Preview */}
+      <PricePreview
+        supplyRef={tokenSupplyRef}
+        lpPctRef={lpPctRef}
+        rBestRef={rBestRef}
+        graduationRef={graduationTargetRef}
+        formKey={formKey}
+      />
 
       <TouchableOpacity
         style={createButtonStyle}
@@ -409,6 +423,53 @@ const LaunchForm = memo(function LaunchForm({
     </>
   );
 });
+
+// ─── Price Preview ─────────────────────────────────────────────────────────────
+// Shows derived p_min (DEX listing price), p_max (starting price), FDV.
+// Reads from refs on every render — no state, no input callbacks.
+
+interface PricePreviewProps {
+  supplyRef: React.MutableRefObject<string>;
+  lpPctRef: React.MutableRefObject<string>;
+  rBestRef: React.MutableRefObject<string>;
+  graduationRef: React.MutableRefObject<string>;
+  formKey: number; // changes on test-mode toggle → re-renders preview
+}
+
+function PricePreview({ supplyRef, lpPctRef, rBestRef, graduationRef, formKey: _ }: PricePreviewProps) {
+  const supply = parseFloat(supplyRef.current || '0');
+  const lpPct = parseFloat(lpPctRef.current || '10') / 100;
+  const rBest = parseFloat(rBestRef.current || '10');
+  const gradSol = parseFloat(graduationRef.current || '0');
+
+  const lpTokens = supply * lpPct; // display tokens
+  const pMinSol = lpTokens > 0 ? gradSol / lpTokens : 0;        // DEX opening price
+  const pMaxSol = pMinSol * rBest;                               // starting curve price
+  const fdvSol = lpTokens > 0 ? gradSol / lpPct : 0;            // FDV = Goal / LP%
+
+  if (gradSol <= 0 || supply <= 0) return null;
+
+  return (
+    <View style={styles.previewCard}>
+      <Text style={styles.previewTitle}>Derived Pricing</Text>
+      <View style={styles.previewRow}>
+        <Text style={styles.previewLabel}>Starting Price (p_max)</Text>
+        <Text style={styles.previewValue}>{pMaxSol.toFixed(6)} SOL</Text>
+      </View>
+      <View style={styles.previewRow}>
+        <Text style={styles.previewLabel}>DEX Listing Price (p_min)</Text>
+        <Text style={[styles.previewValue, { color: COLORS.success }]}>{pMinSol.toFixed(6)} SOL</Text>
+      </View>
+      <View style={styles.previewRow}>
+        <Text style={styles.previewLabel}>FDV at Graduation</Text>
+        <Text style={styles.previewValue}>{fdvSol.toFixed(2)} SOL</Text>
+      </View>
+      <Text style={styles.previewNote}>
+        Early buyers pay {rBest}x higher visual price but receive {rBest}x bonus tokens → same effective entry as late buyers
+      </Text>
+    </View>
+  );
+}
 
 // ─── Field Component ───────────────────────────────────────────────────────────
 // UNCONTROLLED: uses defaultValue (not value). Static wrap style so this component
@@ -663,4 +724,35 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xxl,
   },
   openButtonText: { ...TYPOGRAPHY.bodyBold, color: '#FFF' },
+  previewCard: {
+    backgroundColor: 'rgba(29, 4, 225, 0.06)',
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+    gap: 6,
+  },
+  previewTitle: {
+    ...TYPOGRAPHY.label,
+    color: COLORS.primaryLight,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  previewRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  previewLabel: { ...TYPOGRAPHY.caption, color: COLORS.textMuted, fontSize: 12 },
+  previewValue: { ...TYPOGRAPHY.bodyBold, color: COLORS.text, fontSize: 13 },
+  previewNote: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    marginTop: 6,
+    lineHeight: 16,
+  },
 });

@@ -335,10 +335,9 @@ export async function buildInitializeLaunchTx(
   creator: PublicKey,
   tokenSupply: BN,
   bonusPool: BN,
+  lpReserve: BN,
   startTime: BN,
   endTime: BN,
-  pMax: BN,
-  pMin: BN,
   rBest: BN,
   rMin: BN,
   graduationTarget: BN,
@@ -385,10 +384,9 @@ export async function buildInitializeLaunchTx(
     .initializeLaunch(
       tokenSupply,
       bonusPool,
+      lpReserve,
       startTime,
       endTime,
-      pMax,
-      pMin,
       rBest,
       rMin,
       graduationTarget,
@@ -415,8 +413,8 @@ export async function buildInitializeLaunchTx(
     createAssociatedTokenAccountInstruction(creator, launchTokenVault, launchPda, tokenMint)
   );
 
-  // 5. Mint supply + bonus directly to vault (no intermediate creator ATA needed)
-  const totalMintRaw = BigInt(tokenSupply.toString()) + BigInt(bonusPool.toString());
+  // 5. Mint supply + bonus + lp_reserve directly to vault
+  const totalMintRaw = BigInt(tokenSupply.toString()) + BigInt(bonusPool.toString()) + BigInt(lpReserve.toString());
   tx.add(
     createMintToInstruction(tokenMint, launchTokenVault, creator, totalMintRaw)
   );

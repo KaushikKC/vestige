@@ -200,14 +200,20 @@ pub mod vestige {
     /// Initialize a new launch with inverted bonding curve parameters.
     /// Creates the Launch PDA and SOL vault PDA.
     /// Also creates Metaplex token metadata via CPI.
+    /// Initialize a new launch.
+    /// Prices are derived automatically from economic parameters:
+    ///   p_min = graduation_target * TOKEN_PRECISION / lp_reserve  (= DEX opening price)
+    ///   p_max = p_min * r_best                                    (= starting curve price)
+    ///
+    /// This guarantees the curve's final price == Raydium listing price.
+    /// Total minted = token_supply (tradeable) + bonus_pool + lp_reserve.
     pub fn initialize_launch(
         ctx: Context<InitializeLaunch>,
         token_supply: u64,
         bonus_pool: u64,
+        lp_reserve: u64,
         start_time: i64,
         end_time: i64,
-        p_max: u64,
-        p_min: u64,
         r_best: u64,
         r_min: u64,
         graduation_target: u64,
@@ -218,10 +224,23 @@ pub mod vestige {
         require!(end_time > start_time, VestigeError::InvalidTimeRange);
         require!(token_supply > 0, VestigeError::InvalidTokenSupply);
         require!(bonus_pool > 0, VestigeError::InvalidBonusPool);
+        require!(lp_reserve > 0, VestigeError::InvalidLpReserve);
         require!(graduation_target > 0, VestigeError::InvalidGraduationTarget);
-        require!(p_max > p_min, VestigeError::InvalidPriceRange);
         require!(r_best > r_min, VestigeError::InvalidWeightRange);
         require!(r_min >= 1, VestigeError::WeightBelowMinimum);
+
+        // Derive prices from economics — this links the curve endpoint to the DEX listing price
+        // p_min = graduation_target * TOKEN_PRECISION / lp_reserve
+        let p_min = (graduation_target as u128)
+            .checked_mul(TOKEN_PRECISION)
+            .ok_or(VestigeError::Overflow)?
+            .checked_div(lp_reserve as u128)
+            .ok_or(VestigeError::InvalidLpReserve)? as u64;
+        // p_max = p_min * r_best (so early buyers' effective price == p_min after bonus)
+        let p_max = (p_min as u128)
+            .checked_mul(r_best as u128)
+            .ok_or(VestigeError::Overflow)? as u64;
+        require!(p_max > p_min, VestigeError::InvalidPriceRange);
 
         // Create vault PDA (program-owned, holds lamports)
         let vault = &ctx.accounts.vault;
@@ -297,6 +316,7 @@ pub mod vestige {
         launch.vault_bump = vault_bump;
         launch.creator_fee_vault_bump = fee_vault_bump;
         launch.pool_created = false;
+        launch.lp_reserve = lp_reserve;
 
         // CPI to Metaplex to create token metadata
         // Manually construct the CreateMetadataAccountV3 instruction to avoid crate dependency conflicts
@@ -335,8 +355,8 @@ pub mod vestige {
 
         msg!("Vestige Launch Initialized with Metadata!");
         msg!("Token: {} ({})", name, symbol);
-        msg!("Token Supply: {}, Bonus Pool: {}", token_supply, bonus_pool);
-        msg!("Price: {} -> {} lamports", p_max, p_min);
+        msg!("Token Supply: {}, Bonus Pool: {}, LP Reserve: {}", token_supply, bonus_pool, lp_reserve);
+        msg!("Price: {} (start) -> {} (DEX listing) lamports", p_max, p_min);
         msg!("Risk Weight: {} -> {}", r_best, r_min);
         msg!("Graduation Target: {} lamports", graduation_target);
 
@@ -766,21 +786,19 @@ pub mod vestige {
         let clock = Clock::get()?;
 
         // Cache launch fields before any mutable borrow
-        let (creator, token_mint_key, bump, total_bonus_reserved,
+        let (creator, token_mint_key, bump, lp_reserve,
              is_graduated, pool_created, total_sol_collected,
-             graduation_target, end_time) = {
+             graduation_target) = {
             let l = &ctx.accounts.launch;
-            (l.creator, l.token_mint, l.bump, l.total_bonus_reserved,
+            (l.creator, l.token_mint, l.bump, l.lp_reserve,
              l.is_graduated, l.pool_created, l.total_sol_collected,
-             l.graduation_target, l.end_time)
+             l.graduation_target)
         };
 
         require!(!is_graduated, VestigeError::AlreadyGraduated);
         require!(!pool_created, VestigeError::PoolAlreadyCreated);
-
-        let target_reached = total_sol_collected >= graduation_target;
-        let time_expired = clock.unix_timestamp > end_time;
-        require!(target_reached || time_expired, VestigeError::GraduationConditionsNotMet);
+        // Graduation requires the SOL target to be reached — no time expiry
+        require!(total_sol_collected >= graduation_target, VestigeError::GraduationConditionsNotMet);
 
         // Compute amounts
         let rent = Rent::get()?;
@@ -790,9 +808,9 @@ pub mod vestige {
         require!(vault_lamports > rent_exempt_min, VestigeError::InsufficientPoolLiquidity);
         let sol_for_pool = vault_lamports - rent_exempt_min;
 
-        let tokens_for_pool = ctx.accounts.token_vault.amount
-            .checked_sub(total_bonus_reserved)
-            .ok_or(VestigeError::Overflow)?;
+        // Always use the fixed lp_reserve for pool creation — this guarantees
+        // the Raydium listing price equals p_min (the curve's endpoint price).
+        let tokens_for_pool = lp_reserve;
 
         require!(sol_for_pool > 0, VestigeError::InsufficientPoolLiquidity);
         require!(tokens_for_pool > 0, VestigeError::InsufficientPoolLiquidity);
@@ -865,22 +883,21 @@ pub struct Launch {
     pub vault_bump: u8,               // 1
     pub creator_fee_vault_bump: u8,   // 1
     pub pool_created: bool,           // 1 — true after graduate_to_dex succeeds
+    pub lp_reserve: u64,              // 8 — tokens reserved for Raydium LP (never sold during curve)
+                                      //     p_min = graduation_target * TOKEN_PRECISION / lp_reserve
+                                      //     p_max = p_min * r_best
 }
 
 impl Launch {
-    // disc=8
-    // creator=32, token_mint=32
+    // disc=8, creator=32, token_mint=32
     // token_supply..graduation_target (8 u64s)=64, duration=8
     // total_base_sold..total_participants (4 u64s)=32
-    // is_graduated=1, bump=1
-    // total_creator_fees=8, creator_fees_claimed=8
-    // milestones_unlocked=1, has_initial_buy=1
-    // name=32, symbol=10
-    // graduation_time=8, vault_bump=1, creator_fee_vault_bump=1
-    // pool_created=1
-    // Total data = 32+32+64+8+32+1+1+8+8+1+1+32+10+8+1+1+1 = 241 (wrong — let me count each field)
-    // 32+32+8+8+8+8+8+8+8+8+8+8+8+8+8+8+1+1+8+8+1+1+32+10+8+1+1+1 = 256+1 = 257
-    pub const SIZE: usize = 8 + 32 + 32 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 1 + 1 + 8 + 8 + 1 + 1 + 32 + 10 + 8 + 1 + 1 + 1;
+    // is_graduated=1, bump=1, total_creator_fees=8, creator_fees_claimed=8
+    // milestones_unlocked=1, has_initial_buy=1, name=32, symbol=10
+    // graduation_time=8, vault_bump=1, creator_fee_vault_bump=1, pool_created=1
+    // lp_reserve=8
+    // Total = 8+32+32+8*9+8+8*4+1+1+8+8+1+1+32+10+8+1+1+1+8 = 265
+    pub const SIZE: usize = 8 + 32 + 32 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 1 + 1 + 8 + 8 + 1 + 1 + 32 + 10 + 8 + 1 + 1 + 1 + 8;
 }
 
 #[account]
@@ -1188,6 +1205,8 @@ pub enum VestigeError {
     InvalidTokenSupply,
     #[msg("Bonus pool must be greater than zero")]
     InvalidBonusPool,
+    #[msg("LP reserve must be greater than zero")]
+    InvalidLpReserve,
     #[msg("Graduation target must be greater than zero")]
     InvalidGraduationTarget,
     #[msg("Price max must be greater than price min")]
