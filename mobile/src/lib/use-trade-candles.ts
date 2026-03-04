@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Connection, PublicKey } from '@solana/web3.js';
-import { VestigeClient } from './vestige-client';
 import { RPC_ENDPOINT, CONNECTION_CONFIG } from '../constants/solana';
 
 interface TradePoint {
@@ -76,9 +75,9 @@ export function useTradeCandles(launchPda: string) {
     setLoading(true);
     try {
       const conn = new Connection(RPC_ENDPOINT, CONNECTION_CONFIG);
-      const [vaultPda] = VestigeClient.deriveVaultPda(new PublicKey(launchPda));
-
-      const sigs = await conn.getSignaturesForAddress(vaultPda, { limit: 50 });
+      // Use the launch PDA directly — it's written in every buy/sell transaction
+      // and is reliably indexed by all RPC nodes.
+      const sigs = await conn.getSignaturesForAddress(new PublicKey(launchPda), { limit: 50 });
 
       const parsed: TradePoint[] = [];
       const BATCH = 3;
@@ -105,12 +104,18 @@ export function useTradeCandles(launchPda: string) {
           for (const log of logs) {
             const buyMatch = log.match(BUY_RE);
             if (buyMatch) {
-              const solAmount = parseInt(buyMatch[1], 10);
-              const baseTokens = parseInt(buyMatch[2], 10);
-              if (baseTokens > 0) {
+              // Use BigInt for large token amounts to avoid precision loss
+              const solAmount = Number(buyMatch[1]);
+              const baseTokensBig = BigInt(buyMatch[2]);
+              if (baseTokensBig > 0n) {
+                // price = sol_lamports / raw_tokens — multiply by 1e9 to get lamports/display-token
+                // then divide to get lamports per raw token for chart consistency
+                const price = baseTokensBig > 0n
+                  ? Number((BigInt(buyMatch[1]) * 10_000_000_000n) / baseTokensBig) / 10
+                  : 0;
                 parsed.push({
                   timestamp,
-                  price: solAmount / baseTokens,
+                  price,
                   volume: solAmount,
                   type: 'buy',
                 });
@@ -120,12 +125,15 @@ export function useTradeCandles(launchPda: string) {
 
             const sellMatch = log.match(SELL_RE);
             if (sellMatch) {
-              const tokenAmount = parseInt(sellMatch[1], 10);
-              const solGross = parseInt(sellMatch[2], 10);
-              if (tokenAmount > 0) {
+              const tokenAmountBig = BigInt(sellMatch[1]);
+              const solGross = Number(sellMatch[2]);
+              if (tokenAmountBig > 0n) {
+                const price = tokenAmountBig > 0n
+                  ? Number((BigInt(sellMatch[2]) * 10_000_000_000n) / tokenAmountBig) / 10
+                  : 0;
                 parsed.push({
                   timestamp,
-                  price: solGross / tokenAmount,
+                  price,
                   volume: solGross,
                   type: 'sell',
                 });

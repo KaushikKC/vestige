@@ -13,10 +13,10 @@ import Svg, {
 import { COLORS } from '../constants/theme';
 
 interface Props {
-  pMax: number;
-  pMin: number;
-  startTime: number;
-  endTime: number;
+  pMax: number;          // starting price (lamports) at 0% supply sold
+  pMin: number;          // ending price (lamports) at 100% supply sold
+  tokenSupply: number;   // total base token supply (raw, 9 decimals)
+  totalBaseSold: number; // base tokens sold so far (raw, 9 decimals)
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -25,60 +25,69 @@ const PAD = { top: 24, bottom: 36, left: 54, right: 16 };
 const PLOT_W = SCREEN_WIDTH - PAD.left - PAD.right;
 const PLOT_H = CHART_HEIGHT - PAD.top - PAD.bottom;
 
-export default function PriceCurveChart({ pMax, pMin, startTime, endTime }: Props) {
+export default function PriceCurveChart({ pMax, pMin, tokenSupply, totalBaseSold }: Props) {
   const data = useMemo(() => {
-    const now = Math.floor(Date.now() / 1000);
-    const duration = endTime - startTime;
-    const elapsed = Math.max(0, Math.min(duration, now - startTime));
-    const progress = duration > 0 ? elapsed / duration : 0;
+    const progress = tokenSupply > 0 ? Math.min(1, totalBaseSold / tokenSupply) : 0;
+    // Inverted: price starts at pMax (0% sold) and decreases to pMin (100% sold)
     const currentPrice = pMax - (pMax - pMin) * progress;
-    const ended = now >= endTime;
-    const notStarted = now < startTime;
 
-    const mapX = (t: number) => PAD.left + ((t - startTime) / (duration || 1)) * PLOT_W;
-    const mapY = (p: number) => PAD.top + (1 - (p - pMin) / ((pMax - pMin) || 1)) * PLOT_H;
+    // X: 0% sold (left) → 100% sold (right)
+    const mapX = (pct: number) => PAD.left + pct * PLOT_W;
+    // Y: pMax at top, pMin at bottom (inverted axis — higher price = higher on chart)
+    const mapY = (p: number) => PAD.top + ((pMax - p) / ((pMax - pMin) || 1)) * PLOT_H;
 
-    const nowX = mapX(Math.min(now, endTime));
+    const nowX = mapX(progress);
     const nowY = mapY(currentPrice);
+    // Start point: top-left (pMax at 0% sold)
+    const startX = mapX(0);
+    const startY = mapY(pMax);
+    // End point: bottom-right (pMin at 100% sold)
+    const endX = mapX(1);
+    const endY = mapY(pMin);
 
-    // Y-axis grid: 5 evenly spaced prices
+    // Y-axis: 5 price grid lines from pMin to pMax
     const gridLines: { y: number; label: string }[] = [];
     for (let i = 0; i <= 4; i++) {
       const p = pMin + ((pMax - pMin) * i) / 4;
       gridLines.push({ y: mapY(p), label: (p / 1e9).toFixed(4) });
     }
 
-    // X-axis time labels
-    const timeLabels: { x: number; label: string }[] = [
-      { x: PAD.left, label: 'Start' },
-      { x: PAD.left + PLOT_W * 0.25, label: '+' + formatDuration(duration * 0.25) },
-      { x: PAD.left + PLOT_W * 0.5, label: '+' + formatDuration(duration * 0.5) },
-      { x: PAD.left + PLOT_W * 0.75, label: '+' + formatDuration(duration * 0.75) },
-      { x: PAD.left + PLOT_W, label: 'End' },
+    // X-axis: supply % labels
+    const xLabels = [
+      { x: mapX(0), label: '0%' },
+      { x: mapX(0.25), label: '25%' },
+      { x: mapX(0.5), label: '50%' },
+      { x: mapX(0.75), label: '75%' },
+      { x: mapX(1), label: '100%' },
     ];
 
-    // Gradient polygon points (only up to "now")
-    const gradientPoints = `${PAD.left},${mapY(pMax)} ${nowX},${nowY} ${nowX},${PAD.top + PLOT_H} ${PAD.left},${PAD.top + PLOT_H}`;
+    // Filled area polygon under the sold portion (top-left corner to current position)
+    // The sold area goes from (startX, startY) diagonally down to (nowX, nowY),
+    // then down to the x-axis baseline, then back left.
+    const gradientPoints = [
+      `${startX},${startY}`,
+      `${nowX},${nowY}`,
+      `${nowX},${PAD.top + PLOT_H}`,
+      `${startX},${PAD.top + PLOT_H}`,
+    ].join(' ');
 
-    // Price badge label
     const priceBadgeLabel = (currentPrice / 1e9).toFixed(5) + ' SOL';
+    const pctLabel = (progress * 100).toFixed(1) + '%';
 
     return {
-      nowX, nowY, currentPrice, ended, notStarted,
-      gridLines, timeLabels, gradientPoints, priceBadgeLabel,
-      startY: mapY(pMax), endX: PAD.left + PLOT_W, endY: mapY(pMin),
+      nowX, nowY, startX, startY, endX, endY,
+      gridLines, xLabels, gradientPoints,
+      priceBadgeLabel, pctLabel, progress,
     };
-    // Update roughly every 10 seconds
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pMax, pMin, startTime, endTime, Math.floor(Date.now() / 10000)]);
+  }, [pMax, pMin, tokenSupply, totalBaseSold]);
 
   const {
-    nowX, nowY, ended, notStarted,
-    gridLines, timeLabels, gradientPoints, priceBadgeLabel,
-    startY, endX, endY,
+    nowX, nowY, startX, startY, endX, endY,
+    gridLines, xLabels, gradientPoints,
+    priceBadgeLabel, pctLabel, progress,
   } = data;
 
-  const active = !ended && !notStarted;
+  const hasSales = progress > 0;
 
   return (
     <View style={styles.container}>
@@ -86,7 +95,7 @@ export default function PriceCurveChart({ pMax, pMin, startTime, endTime }: Prop
         {/* Background */}
         <Rect x={0} y={0} width={SCREEN_WIDTH} height={CHART_HEIGHT} fill={COLORS.chartArea} />
 
-        {/* Horizontal grid lines + Y-axis labels */}
+        {/* Horizontal grid lines + Y-axis price labels */}
         {gridLines.map((gl, i) => (
           <React.Fragment key={i}>
             <Line
@@ -95,7 +104,7 @@ export default function PriceCurveChart({ pMax, pMin, startTime, endTime }: Prop
             />
             <SvgText
               x={PAD.left - 6} y={gl.y + 3}
-              fill="rgba(255, 255, 255, 0.6)" fontSize={9} fontFamily="monospace"
+              fill="rgba(255,255,255,0.6)" fontSize={9} fontFamily="monospace"
               textAnchor="end"
             >
               {gl.label}
@@ -103,61 +112,59 @@ export default function PriceCurveChart({ pMax, pMin, startTime, endTime }: Prop
           </React.Fragment>
         ))}
 
-        {/* Vertical time grid lines */}
-        {timeLabels.map((tl, i) => (
+        {/* Vertical supply% grid lines + X-axis labels */}
+        {xLabels.map((xl, i) => (
           <React.Fragment key={i}>
             <Line
-              x1={tl.x} y1={PAD.top} x2={tl.x} y2={PAD.top + PLOT_H}
+              x1={xl.x} y1={PAD.top} x2={xl.x} y2={PAD.top + PLOT_H}
               stroke={COLORS.chartGrid} strokeWidth={0.5} strokeDasharray="4,4"
             />
             <SvgText
-              x={tl.x} y={CHART_HEIGHT - 8}
-              fill="rgba(255, 255, 255, 0.6)" fontSize={9}
+              x={xl.x} y={CHART_HEIGHT - 8}
+              fill="rgba(255,255,255,0.6)" fontSize={9}
               textAnchor="middle"
             >
-              {tl.label}
+              {xl.label}
             </SvgText>
           </React.Fragment>
         ))}
 
-        {/* Gradient fill (up to now) */}
+        {/* Gradient fill under sold portion of curve */}
         <Defs>
           <LinearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0" stopColor={COLORS.primary} stopOpacity={0.25} />
             <Stop offset="1" stopColor={COLORS.primary} stopOpacity={0.02} />
           </LinearGradient>
         </Defs>
-        {active && (
+        {hasSales && (
           <Polygon points={gradientPoints} fill="url(#areaGrad)" />
         )}
 
-        {/* Solid past line */}
+        {/* Solid line: 0% → current% (sold portion, descending) */}
         <Line
-          x1={PAD.left} y1={startY}
-          x2={active ? nowX : endX} y2={active ? nowY : endY}
+          x1={startX} y1={startY}
+          x2={hasSales ? nowX : startX} y2={hasSales ? nowY : startY}
           stroke="#FFFFFF" strokeWidth={2.5} strokeLinecap="round"
         />
 
-        {/* Dashed future line */}
-        {active && (
-          <Line
-            x1={nowX} y1={nowY} x2={endX} y2={endY}
-            stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round"
-            strokeDasharray="6,4" opacity={0.3}
-          />
-        )}
+        {/* Dashed line: current% → 100% (future potential, continuing descent) */}
+        <Line
+          x1={hasSales ? nowX : startX} y1={hasSales ? nowY : startY}
+          x2={endX} y2={endY}
+          stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round"
+          strokeDasharray="6,4" opacity={0.3}
+        />
 
-        {/* "Now" vertical dashed line */}
-        {active && (
+        {/* Current position vertical dashed line */}
+        {hasSales && (
           <Line
             x1={nowX} y1={PAD.top} x2={nowX} y2={PAD.top + PLOT_H}
-            stroke="#FFFFFF" strokeWidth={0.8} strokeDasharray="4,4"
-            opacity={0.3}
+            stroke="#FFFFFF" strokeWidth={0.8} strokeDasharray="4,4" opacity={0.3}
           />
         )}
 
         {/* Current price dot */}
-        {active && (
+        {hasSales && (
           <>
             <Circle cx={nowX} cy={nowY} r={8} fill="#FFFFFF" opacity={0.3} />
             <Circle cx={nowX} cy={nowY} r={5} fill="#FFFFFF" />
@@ -166,7 +173,7 @@ export default function PriceCurveChart({ pMax, pMin, startTime, endTime }: Prop
         )}
 
         {/* Price badge */}
-        {active && (
+        {hasSales && (
           <>
             <Rect
               x={Math.min(SCREEN_WIDTH - 110, Math.max(PAD.left, nowX - 45))}
@@ -180,20 +187,13 @@ export default function PriceCurveChart({ pMax, pMin, startTime, endTime }: Prop
               fill="#FFFFFF" fontSize={9} fontFamily="monospace"
               textAnchor="middle"
             >
-              {priceBadgeLabel}
+              {priceBadgeLabel} · {pctLabel}
             </SvgText>
           </>
         )}
       </Svg>
     </View>
   );
-}
-
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const d = Math.floor(seconds / 86400);
-  if (d >= 1) return `${d}d`;
-  return `${h}h`;
 }
 
 const styles = StyleSheet.create({

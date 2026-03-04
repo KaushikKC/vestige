@@ -16,7 +16,6 @@ export const CREATOR_FEE_VAULT_SEED = Buffer.from('creator_fee');
 
 // Constants (matching on-chain)
 export const WEIGHT_PRECISION = 1_000;
-export const PRICE_RATIO = 10;
 export const TOKEN_PRECISION = 1_000_000_000;
 
 // Fee constants (basis points, matching on-chain)
@@ -173,16 +172,15 @@ export class VestigeClient {
 
   // ============== Static Math ==============
 
+  /** Inverted curve: p_max at 0 tokens sold → p_min at full supply sold. */
   static getCurrentCurvePrice(launch: LaunchData): number {
-    const now = Math.floor(Date.now() / 1000);
     const pMax = launch.pMax.toNumber();
     const pMin = launch.pMin.toNumber();
-    if (now <= launch.startTime) return pMax;
-    if (now >= launch.endTime) return pMin;
-    const elapsed = now - launch.startTime;
-    const duration = launch.endTime - launch.startTime;
+    const tokenSupply = launch.tokenSupply.toNumber();
+    if (tokenSupply === 0) return pMax;
+    const sold = Math.min(launch.totalBaseSold.toNumber(), tokenSupply);
     const priceRange = pMax - pMin;
-    return pMax - Math.floor((priceRange * elapsed) / duration);
+    return pMax - Math.floor((priceRange * sold) / tokenSupply);
   }
 
   static getCurrentRiskWeight(launch: LaunchData): number {
@@ -279,8 +277,8 @@ export class VestigeClient {
 
   static getMarketCapSol(launch: LaunchData): number {
     const price = VestigeClient.getCurrentCurvePrice(launch);
-    const supply = launch.tokenSupply.toNumber();
-    return (price * supply) / (TOKEN_PRECISION * 1e9);
+    const sold = launch.totalBaseSold.toNumber();
+    return (price * sold) / (TOKEN_PRECISION * 1e9);
   }
 
   static getProgress(launch: LaunchData): number {

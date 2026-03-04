@@ -18,7 +18,6 @@ pub const CREATOR_FEE_VAULT_SEED: &[u8] = b"creator_fee";
 
 // Constants
 pub const WEIGHT_PRECISION: u128 = 1_000;
-pub const PRICE_RATIO: u64 = 10;
 pub const TOKEN_PRECISION: u128 = 1_000_000_000;
 
 // Fee constants (basis points)
@@ -43,19 +42,19 @@ pub const MILESTONE_INTERVAL: i64 = 5 * 60;
 
 // ============== Helper Functions ==============
 
-/// Linear interpolation: p_max -> p_min over the launch duration
-fn get_curve_price(launch: &Launch, current_time: i64) -> u64 {
-    if current_time <= launch.start_time {
+/// Inverted bonding curve: p_max (at 0 tokens sold) → p_min (at full supply sold).
+/// Price decreases linearly as more tokens are purchased — early buyers pay the highest
+/// visual price but receive the largest bonus multiplier (risk weight), so their effective
+/// entry is rewarded. Late buyers pay lowest visual price with no bonus.
+fn get_curve_price(launch: &Launch, total_base_sold: u64) -> u64 {
+    if launch.token_supply == 0 {
         return launch.p_max;
     }
-    if current_time >= launch.end_time {
-        return launch.p_min;
-    }
-    let elapsed = (current_time - launch.start_time) as u128;
-    let duration = (launch.end_time - launch.start_time) as u128;
+    let sold = (total_base_sold.min(launch.token_supply)) as u128;
+    let supply = launch.token_supply as u128;
     let price_range = (launch.p_max - launch.p_min) as u128;
-    let decrease = price_range.checked_mul(elapsed).unwrap() / duration;
-    launch.p_max.checked_sub(decrease as u64).unwrap()
+    let decrease = price_range.checked_mul(sold).unwrap_or(0) / supply;
+    launch.p_max.saturating_sub(decrease as u64)
 }
 
 /// Linear interpolation: r_best -> r_min over the launch duration
@@ -221,13 +220,8 @@ pub mod vestige {
         require!(bonus_pool > 0, VestigeError::InvalidBonusPool);
         require!(graduation_target > 0, VestigeError::InvalidGraduationTarget);
         require!(p_max > p_min, VestigeError::InvalidPriceRange);
-        require!(
-            p_max == p_min.checked_mul(PRICE_RATIO).ok_or(VestigeError::Overflow)?,
-            VestigeError::InvalidPriceRatio
-        );
         require!(r_best > r_min, VestigeError::InvalidWeightRange);
         require!(r_min >= 1, VestigeError::WeightBelowMinimum);
-        require!(r_best > PRICE_RATIO, VestigeError::RiskWeightTooLow);
 
         // Create vault PDA (program-owned, holds lamports)
         let vault = &ctx.accounts.vault;
@@ -360,7 +354,6 @@ pub mod vestige {
         let clock = Clock::get()?;
 
         require!(clock.unix_timestamp >= launch.start_time, VestigeError::LaunchNotStarted);
-        require!(clock.unix_timestamp <= launch.end_time, VestigeError::LaunchEnded);
         require!(!launch.is_graduated, VestigeError::AlreadyGraduated);
 
         // Initial buy check: creator must buy first
@@ -386,8 +379,9 @@ pub mod vestige {
             .checked_sub(protocol_fee).ok_or(VestigeError::Overflow)?
             .checked_sub(creator_fee).ok_or(VestigeError::Overflow)?;
 
-        // Calculate curve price and risk weight at current time
-        let curve_price = get_curve_price(launch, clock.unix_timestamp);
+        // Price = f(supply already sold) — increases as demand grows.
+        // Risk weight = f(time) — decreases over launch window (rewards early buyers with bonus).
+        let curve_price = get_curve_price(launch, launch.total_base_sold);
         require!(curve_price > 0, VestigeError::ZeroCurvePrice);
 
         let weight_scaled = get_risk_weight_scaled(launch, clock.unix_timestamp);
@@ -512,14 +506,13 @@ pub mod vestige {
         let clock = Clock::get()?;
 
         require!(clock.unix_timestamp >= launch.start_time, VestigeError::LaunchNotStarted);
-        require!(clock.unix_timestamp <= launch.end_time, VestigeError::LaunchEnded);
         require!(!launch.is_graduated, VestigeError::AlreadyGraduated);
 
         let position = &ctx.accounts.user_position;
         require!(position.total_base_tokens >= token_amount, VestigeError::InsufficientTokens);
 
-        // Calculate SOL to return at current curve price
-        let curve_price = get_curve_price(launch, clock.unix_timestamp);
+        // Calculate SOL to return at current demand-based price
+        let curve_price = get_curve_price(launch, launch.total_base_sold);
         require!(curve_price > 0, VestigeError::ZeroCurvePrice);
 
         let sol_gross = (token_amount as u128)

@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../constants/theme';
-import { VestigeClient } from '../lib/vestige-client';
 import { RPC_ENDPOINT, CONNECTION_CONFIG } from '../constants/solana';
 
 interface TradeFeedProps {
@@ -45,11 +44,8 @@ export default function TradeFeed({ launchPda }: TradeFeedProps) {
     setLoading(true);
     try {
       const conn = new Connection(RPC_ENDPOINT, CONNECTION_CONFIG);
-      const [vaultPda] = VestigeClient.deriveVaultPda(
-        new PublicKey(launchPda)
-      );
-
-      const sigs = await conn.getSignaturesForAddress(vaultPda, { limit: 20 });
+      // Use the launch PDA directly — it's written in every buy/sell tx and reliably indexed
+      const sigs = await conn.getSignaturesForAddress(new PublicKey(launchPda), { limit: 20 });
 
       const parsed: TradeItem[] = [];
       // Fetch in small batches to avoid rate limits
@@ -75,34 +71,20 @@ export default function TradeFeed({ launchPda }: TradeFeedProps) {
           let type: 'buy' | 'sell' | null = null;
           let solAmount = 0;
 
+          // Log format: "Buy: 500000000 lamports (net 495000000 after fees) -> ..."
+          // Log format: "Sell: 990000000 tokens -> 500000000 lamports (net 495000000 after fees)"
           for (const log of logs) {
-            if (log.includes('Buy:')) {
+            const buyMatch = log.match(/Buy:\s*(\d+)\s*lamports/);
+            if (buyMatch) {
               type = 'buy';
-              const match = log.match(/lamports:\s*(\d+)/);
-              if (match) solAmount = parseInt(match[1], 10);
+              solAmount = Number(buyMatch[1]);
               break;
             }
-            if (log.includes('Sell:')) {
+            const sellMatch = log.match(/Sell:\s*\d+\s*tokens\s*->\s*(\d+)\s*lamports/);
+            if (sellMatch) {
               type = 'sell';
-              const match = log.match(/lamports:\s*(\d+)/);
-              if (match) solAmount = parseInt(match[1], 10);
+              solAmount = Number(sellMatch[1]);
               break;
-            }
-          }
-
-          // Fallback: detect by SOL balance changes
-          if (!type && tx.meta) {
-            const preBalances = tx.meta.preBalances;
-            const postBalances = tx.meta.postBalances;
-            if (preBalances.length > 0 && postBalances.length > 0) {
-              const diff = postBalances[0] - preBalances[0];
-              if (diff < -10000) {
-                type = 'buy';
-                solAmount = Math.abs(diff);
-              } else if (diff > 10000) {
-                type = 'sell';
-                solAmount = diff;
-              }
             }
           }
 

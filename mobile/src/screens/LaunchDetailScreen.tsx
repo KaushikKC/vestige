@@ -104,7 +104,7 @@ export default function LaunchDetailScreen({ route }: Props) {
   const [tokenImage, setTokenImage] = useState<string | null>(null);
   const [infoTab, setInfoTab] = useState<'comments' | 'trades' | 'holders'>('comments');
   const [chartMode, setChartMode] = useState<'curve' | 'candles'>('curve');
-  const { candles, loading: candlesLoading, interval: candleInterval, setInterval: setCandleInterval } = useTradeCandles(launchPdaStr);
+  const { candles, loading: candlesLoading, interval: candleInterval, setInterval: setCandleInterval, refresh: refreshCandles } = useTradeCandles(launchPdaStr);
 
   const publicKeyStr = publicKey?.toBase58() ?? null;
 
@@ -176,6 +176,7 @@ export default function LaunchDetailScreen({ route }: Props) {
       await buy(launchPda, launch, solAmount);
       Toast.show({ type: 'success', text1: 'Purchase successful!' });
       setTimeout(fetchData, 2000);
+      setTimeout(refreshCandles, 3000);
     } catch (err: any) {
       Toast.show({
         type: 'error',
@@ -191,6 +192,7 @@ export default function LaunchDetailScreen({ route }: Props) {
       await sell(launchPda, launch, tokenAmount);
       Toast.show({ type: 'success', text1: 'Sell successful!' });
       setTimeout(fetchData, 2000);
+      setTimeout(refreshCandles, 3000);
     } catch (err: any) {
       Toast.show({
         type: 'error',
@@ -337,11 +339,12 @@ export default function LaunchDetailScreen({ route }: Props) {
   const waitingForCreatorBuy =
     !launch.hasInitialBuy && connected && !isCreator;
 
-  const isExpired = !launch.isGraduated && launch.endTime < Date.now() / 1000;
+  // No time-based expiry — launch only ends when it graduates (reaches market cap target)
+  const isExpired = false;
 
-  // Discount from pMax
-  const discountPct = pMaxSol > 0 ? ((priceSol - pMaxSol) / pMaxSol) * 100 : 0;
-  const discountColor = discountPct >= 0 ? COLORS.success : COLORS.error;
+  // How much the price has dropped from the starting price (pMax)
+  const discountPct = pMaxSol > 0 ? ((pMaxSol - priceSol) / pMaxSol) * 100 : 0;
+  const discountColor = discountPct > 0 ? COLORS.success : COLORS.textMuted;
 
   const insets = useSafeAreaInsets();
 
@@ -382,7 +385,7 @@ export default function LaunchDetailScreen({ route }: Props) {
         <View style={styles.priceHero}>
           <Text style={styles.heroPrice}>{priceSol.toFixed(6)} SOL</Text>
           <Text style={[styles.heroDiscount, { color: discountColor }]}>
-            {discountPct >= 0 ? '+' : ''}{discountPct.toFixed(1)}% from start
+            {discountPct > 0 ? `-${discountPct.toFixed(1)}%` : 'Starting price'} from peak
           </Text>
         </View>
 
@@ -424,8 +427,8 @@ export default function LaunchDetailScreen({ route }: Props) {
             <PriceCurveChart
               pMax={launch.pMax.toNumber()}
               pMin={launch.pMin.toNumber()}
-              startTime={launch.startTime}
-              endTime={launch.endTime}
+              tokenSupply={launch.tokenSupply.toNumber()}
+              totalBaseSold={launch.totalBaseSold.toNumber()}
             />
           ) : (
             <CandlestickChart candles={candles} loading={candlesLoading} />
