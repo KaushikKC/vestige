@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, {
   Rect,
   Line,
   Text as SvgText,
 } from 'react-native-svg';
-import { COLORS, SPACING, FONT_SIZE } from '../constants/theme';
+import { COLORS, SPACING, FONT_SIZE, TYPOGRAPHY } from '../constants/theme';
 import { Candle } from '../lib/use-trade-candles';
 
 interface Props {
@@ -24,8 +25,8 @@ export default function CandlestickChart({ candles, loading }: Props) {
   if (loading) {
     return (
       <View style={[styles.container, styles.center]}>
-        <ActivityIndicator color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading chart...</Text>
+        <ActivityIndicator color={COLORS.accent} />
+        <Text style={styles.loadingText}>Loading market data...</Text>
       </View>
     );
   }
@@ -33,7 +34,8 @@ export default function CandlestickChart({ candles, loading }: Props) {
   if (candles.length === 0) {
     return (
       <View style={[styles.container, styles.center]}>
-        <Text style={styles.emptyText}>No trades yet</Text>
+        <Ionicons name="bar-chart-outline" size={48} color={COLORS.divider} />
+        <Text style={styles.emptyText}>No trading activity yet</Text>
       </View>
     );
   }
@@ -54,14 +56,12 @@ export default function CandlestickChart({ candles, loading }: Props) {
   const candleWidth = Math.max(2, Math.min(16, (PLOT_W / candles.length) * 0.7));
   const candleGap = PLOT_W / candles.length;
 
-  // Y-axis grid: 5 lines
   const gridLines: { y: number; label: string }[] = [];
   for (let i = 0; i <= 4; i++) {
     const p = yMin + ((yMax - yMin) * i) / 4;
     gridLines.push({ y: mapY(p), label: (p / 1e9).toFixed(6) });
   }
 
-  // X-axis: show a few time labels
   const timeLabels: { x: number; label: string }[] = [];
   const labelCount = Math.min(candles.length, 5);
   const step = Math.max(1, Math.floor(candles.length / labelCount));
@@ -76,19 +76,16 @@ export default function CandlestickChart({ candles, loading }: Props) {
   return (
     <View style={styles.container}>
       <Svg width={SCREEN_WIDTH} height={CHART_HEIGHT}>
-        {/* Background */}
-        <Rect x={0} y={0} width={SCREEN_WIDTH} height={CHART_HEIGHT} fill={COLORS.chartArea} />
-
-        {/* Horizontal grid + Y labels */}
+        {/* Background Grid */}
         {gridLines.map((gl, i) => (
           <React.Fragment key={`g${i}`}>
             <Line
               x1={PAD.left} y1={gl.y} x2={PAD.left + PLOT_W} y2={gl.y}
-              stroke={COLORS.chartGrid} strokeWidth={0.5}
+              stroke={COLORS.chartGrid} strokeWidth={1}
             />
             <SvgText
-              x={PAD.left - 6} y={gl.y + 3}
-              fill="rgba(255, 255, 255, 0.6)" fontSize={8} fontFamily="monospace"
+              x={PAD.left - 8} y={gl.y + 3}
+              fill={COLORS.textTertiary} fontSize={8} fontFamily="SpaceGrotesk_600SemiBold"
               textAnchor="end"
             >
               {gl.label}
@@ -100,8 +97,9 @@ export default function CandlestickChart({ candles, loading }: Props) {
         {timeLabels.map((tl, i) => (
           <SvgText
             key={`t${i}`}
-            x={tl.x} y={CHART_HEIGHT - 8}
-            fill="rgba(255, 255, 255, 0.6)" fontSize={9}
+            x={tl.x} y={CHART_HEIGHT - 10}
+            fill={COLORS.textTertiary} fontSize={9}
+            fontFamily="SpaceGrotesk_600SemiBold"
             textAnchor="middle"
           >
             {tl.label}
@@ -120,8 +118,8 @@ export default function CandlestickChart({ candles, loading }: Props) {
               y={PAD.top + PLOT_H - barH}
               width={candleWidth}
               height={barH}
-              fill={isGreen ? COLORS.chartGreen : COLORS.chartRed}
-              opacity={0.15}
+              fill={isGreen ? COLORS.success : COLORS.error}
+              opacity={0.05}
             />
           );
         })}
@@ -130,7 +128,7 @@ export default function CandlestickChart({ candles, loading }: Props) {
         {candles.map((c, i) => {
           const cx = PAD.left + i * candleGap + candleGap / 2;
           const isGreen = c.close >= c.open;
-          const color = isGreen ? COLORS.chartGreen : COLORS.chartRed;
+          const color = isGreen ? COLORS.success : COLORS.error;
           const bodyTop = mapY(Math.max(c.open, c.close));
           const bodyBottom = mapY(Math.min(c.open, c.close));
           const bodyH = Math.max(1, bodyBottom - bodyTop);
@@ -139,20 +137,17 @@ export default function CandlestickChart({ candles, loading }: Props) {
 
           return (
             <React.Fragment key={`c${i}`}>
-              {/* Wick */}
               <Line
                 x1={cx} y1={wickTop} x2={cx} y2={wickBottom}
-                stroke={color} strokeWidth={1}
+                stroke={color} strokeWidth={1.5}
               />
-              {/* Body */}
               <Rect
                 x={cx - candleWidth / 2}
                 y={bodyTop}
                 width={candleWidth}
                 height={bodyH}
-                fill={isGreen ? color : color}
-                stroke={color}
-                strokeWidth={0.5}
+                fill={color}
+                rx={1}
               />
             </React.Fragment>
           );
@@ -166,19 +161,22 @@ const styles = StyleSheet.create({
   container: {
     width: SCREEN_WIDTH,
     height: CHART_HEIGHT,
+    backgroundColor: 'transparent',
   },
   center: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.surfaceDark,
   },
   loadingText: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.sm,
-    marginTop: SPACING.sm,
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
+    marginTop: 12,
+    fontFamily: 'SpaceGrotesk_500Medium',
   },
   emptyText: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.sm,
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
+    marginTop: 8,
+    fontFamily: 'SpaceGrotesk_500Medium',
   },
 });

@@ -1,19 +1,20 @@
 import React from 'react';
-import { View, ImageStyle, ViewStyle } from 'react-native';
-import VestigeLogoSVG from './VestigeLogoSVG';
+import { ViewStyle } from 'react-native';
+import VestigeLogoSvg from '../../assets/vestige-logo.svg';
 
 interface VestigeLogoProps {
   size?: number;
-  /** Logo color (e.g. #3D4B9C). Omit to use default. */
   color?: string;
-  style?: ViewStyle | ImageStyle;
+  style?: ViewStyle;
 }
 
-export default function VestigeLogo({ size = 40, color = '#3D4B9C', style }: VestigeLogoProps) {
+export default function VestigeLogo({ size = 40, color, style }: VestigeLogoProps) {
   return (
-    <View style={style}>
-      <VestigeLogoSVG width={size} height={size} color={color} />
-    </View>
+    <VestigeLogoSvg
+      width={size}
+      height={size}
+      style={style}
+      {...(color ? { fill: color } : {})}
+    />
   );
 }
-

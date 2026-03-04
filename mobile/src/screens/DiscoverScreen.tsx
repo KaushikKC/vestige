@@ -56,8 +56,8 @@ function SkeletonCard() {
   return (
     <View style={skeletonStyles.card}>
       <View style={skeletonStyles.topRow}>
-        <SkeletonLoader width={48} height={48} borderRadius={RADIUS.md} />
-        <View style={{ flex: 1, marginLeft: SPACING.md }}>
+        <SkeletonLoader width={48} height={48} borderRadius={RADIUS.pills} />
+        <View style={{ flex: 1, marginLeft: 16 }}>
           <SkeletonLoader width={120} height={16} />
           <SkeletonLoader width={80} height={12} style={{ marginTop: 6 }} />
         </View>
@@ -79,6 +79,7 @@ export default function DiscoverScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("all");
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   const fetchLaunches = useCallback(
     async (force = false) => {
@@ -110,16 +111,6 @@ export default function DiscoverScreen({ navigation }: Props) {
     navigation.navigate("LaunchDetail", { launchPda: pda });
   };
 
-  const kingLaunch = useMemo(() => {
-    const active = launches.filter((l) => !l.isGraduated);
-    if (!active.length) return null;
-    return active.reduce((best, l) =>
-      l.totalSolCollected.toNumber() > best.totalSolCollected.toNumber()
-        ? l
-        : best,
-    );
-  }, [launches]);
-
   const aboutToGraduate = useMemo(
     () =>
       launches.filter(
@@ -129,7 +120,6 @@ export default function DiscoverScreen({ navigation }: Props) {
   );
 
   const trimmedQuery = query.trim();
-  const showPdaLink = trimmedQuery.length > 0 && isValidPublicKey(trimmedQuery);
 
   const filteredLaunches = useMemo(() => {
     let list = launches;
@@ -150,44 +140,53 @@ export default function DiscoverScreen({ navigation }: Props) {
       case "graduating": list = list.filter((l) => !l.isGraduated && VestigeClient.getProgress(l) > 80); break;
       case "favorites": list = list.filter((l) => isFavorite(l.publicKey.toBase58())); break;
     }
-    // When King of the Hill card is shown, exclude it from list; when card is commented out, include it
-    // if (kingLaunch) list = list.filter((l) => !l.publicKey.equals(kingLaunch.publicKey));
     return list;
-  }, [launches, trimmedQuery, sortMode, kingLaunch, isFavorite]);
+  }, [launches, trimmedQuery, sortMode, isFavorite]);
 
   return (
     <View style={styles.container}>
       <BackgroundEffect />
-      <StatusBar barStyle="dark-content" />
-      <View style={[styles.header, { paddingTop: insets.top + SPACING.sm }]}>
-        <View style={styles.brandRow}>
-          <View style={styles.logoGroup}>
-            <VestigeLogo size={32} />
-            <Text style={styles.headerTitle}>VESTIGE</Text>
+      <StatusBar barStyle="light-content" />
+
+      {/* Premium Header */}
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+        <View style={styles.topRow}>
+          <VestigeLogo size={32} />
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => setIsSearchVisible(!isSearchVisible)}
+            >
+              <Ionicons name="search-outline" size={20} color="#FFF" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton}>
+              <Ionicons name="notifications-outline" size={20} color="#FFF" />
+            </TouchableOpacity>
           </View>
-          <WalletButton />
         </View>
 
-        {/* Search */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <Ionicons name="search" size={18} color={COLORS.textSecondary} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search coin..."
-              placeholderTextColor={COLORS.textMuted}
-              value={query}
-              onChangeText={setQuery}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {query.length > 0 && (
-              <TouchableOpacity onPress={() => setQuery("")}>
-                <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
-              </TouchableOpacity>
-            )}
+        <Text style={styles.screenTitle}>Market Activity</Text>
+
+        {isSearchVisible && (
+          <View style={styles.searchContainer}>
+            <View style={styles.searchBar}>
+              <Ionicons name="search" size={18} color={COLORS.textTertiary} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search assets..."
+                placeholderTextColor={COLORS.textTertiary}
+                value={query}
+                onChangeText={setQuery}
+                autoCapitalize="none"
+              />
+              {query.length > 0 && (
+                <TouchableOpacity onPress={() => setQuery("")}>
+                  <Ionicons name="close-circle" size={18} color={COLORS.textTertiary} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
-        </View>
+        )}
       </View>
 
       <FlatList
@@ -214,45 +213,53 @@ export default function DiscoverScreen({ navigation }: Props) {
               ))}
             </ScrollView>
 
-            {/* King of the Hill — commented out for now */}
-            {/* {kingLaunch && !loading && (
-              <View style={styles.kingContainer}>
-                <KingOfTheHill
-                  launch={kingLaunch}
-                  onPress={() => goToLaunch(kingLaunch.publicKey.toBase58())}
-                />
+            {/* Stats Summary (Spending/Income style cards from spec) */}
+            <View style={styles.statsOverview}>
+              <View style={[styles.statCard, { backgroundColor: '#17181D' }]}>
+                <View style={styles.statIconContainer}>
+                  <Ionicons name="trending-up" size={16} color={COLORS.accent} />
+                </View>
+                <Text style={styles.statLabel}>24h Volume</Text>
+                <Text style={styles.statValue}>1,240 SOL</Text>
               </View>
-            )} */}
+              <View style={[styles.statCard, { backgroundColor: '#17181D' }]}>
+                <View style={[styles.statIconContainer, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                  <Ionicons name="rocket-outline" size={16} color="#FFF" />
+                </View>
+                <Text style={styles.statLabel}>Active Now</Text>
+                <Text style={styles.statValue}>{launches.filter(l => !l.isGraduated).length}</Text>
+              </View>
+            </View>
 
-            {/* Trending / Graduating */}
+            {/* Trending Section */}
             {aboutToGraduate.length > 0 && (
               <View style={styles.trendingSection}>
-                <Text style={styles.sectionTitle}>Trending Searches</Text>
+                <Text style={styles.sectionHeader}>Graduating Soon</Text>
                 <FlatList
                   horizontal
                   data={aboutToGraduate}
                   keyExtractor={(item) => item.publicKey.toBase58()}
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.trendingList}
-                  renderItem={({ item, index }) => (
+                  renderItem={({ item }) => (
                     <TouchableOpacity
-                      style={[
-                        styles.trendingCard,
-                        index % 3 === 1 && styles.trendingCardAlt,
-                        index % 3 === 2 && styles.trendingCardAlt2,
-                      ]}
+                      style={styles.trendingCard}
                       onPress={() => goToLaunch(item.publicKey.toBase58())}
                     >
-                      <View style={styles.trendingCardHeader}>
-                        <View style={styles.trendingAvatar} />
+                      <View style={styles.trendingCardTop}>
+                        <View style={styles.trendingIcon}>
+                          <Text style={styles.trendingIconText}>{item.symbol.charAt(0)}</Text>
+                        </View>
                         <View>
                           <Text style={styles.trendingName} numberOfLines={1}>{item.name}</Text>
                           <Text style={styles.trendingSymbol}>${item.symbol}</Text>
                         </View>
                       </View>
-                      <View style={styles.miniChart} />
-                      <Text style={styles.trendingPrice}>
-                        {VestigeClient.getProgress(item).toFixed(1)}% Full
+                      <View style={styles.trendingChartPlaceholder}>
+                        <View style={[styles.miniPriceLine, { width: '70%', height: 2, backgroundColor: COLORS.accent }]} />
+                      </View>
+                      <Text style={styles.trendingProgressText}>
+                        {VestigeClient.getProgress(item).toFixed(0)}% Graduated
                       </Text>
                     </TouchableOpacity>
                   )}
@@ -260,9 +267,7 @@ export default function DiscoverScreen({ navigation }: Props) {
               </View>
             )}
 
-            <Text style={[styles.sectionTitle, { marginLeft: SPACING.lg, marginTop: SPACING.lg }]}>
-              Latest Launches
-            </Text>
+            <Text style={styles.sectionHeader}>Latest Launches</Text>
           </>
         }
         renderItem={({ item }) => (
@@ -275,17 +280,17 @@ export default function DiscoverScreen({ navigation }: Props) {
         )}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.accent} />
         }
         ListEmptyComponent={
           loading ? (
-            <View style={{ padding: SPACING.lg }}>
+            <View style={{ padding: 16 }}>
               <SkeletonCard />
               <SkeletonCard />
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No launches found</Text>
+              <Text style={styles.emptyText}>No launches matches your criteria</Text>
             </View>
           )
         }
@@ -294,175 +299,216 @@ export default function DiscoverScreen({ navigation }: Props) {
   );
 }
 
-function isValidPublicKey(str: string): boolean {
-  if (str.length < 32 || str.length > 44) return false;
-  try { new PublicKey(str); return true; } catch { return false; }
-}
-
 const skeletonStyles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    marginBottom: SPACING.md,
-    gap: SPACING.md,
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    gap: 12,
   },
   topRow: { flexDirection: "row", alignItems: "center" },
-  statsRow: { marginTop: SPACING.sm },
+  statsRow: { marginTop: 8 },
 });
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: COLORS.background,
   },
   header: {
-    backgroundColor: 'transparent',
-    paddingBottom: SPACING.md,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
   },
-  brandRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.lg,
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
   },
-  logoGroup: {
-    flexDirection: "row",
-    alignItems: "center",
+  headerActions: {
+    flexDirection: 'row',
+    gap: 12,
   },
-  headerTitle: {
-    ...TYPOGRAPHY.h2,
-    color: COLORS.text,
-    marginLeft: SPACING.sm,
-    fontSize: 22,
-    fontWeight: '900',
-    letterSpacing: -0.5,
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#17181D',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+  },
+  screenTitle: {
+    ...TYPOGRAPHY.screenTitle,
+    color: '#FFF',
+    fontSize: 32,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    letterSpacing: -1,
   },
   searchContainer: {
-    paddingHorizontal: SPACING.lg,
+    marginTop: 16,
   },
   searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.pastelBlue, // Slight tint
-    borderRadius: RADIUS.full,
-    paddingHorizontal: SPACING.md,
-    height: 52,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
-    ...SHADOWS.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#111216',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    height: 48,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   searchInput: {
     flex: 1,
-    paddingHorizontal: SPACING.sm,
+    paddingHorizontal: 10,
     color: COLORS.text,
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 15,
+    fontFamily: 'SpaceGrotesk_500Medium',
   },
   chipRow: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    gap: SPACING.sm,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    gap: 8,
   },
   chip: {
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: SPACING.lg,
+    backgroundColor: '#17181D',
+    paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: RADIUS.full,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
+    borderRadius: 32,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   chipActive: {
-    backgroundColor: COLORS.pastelLavender,
-    borderColor: COLORS.borderDark,
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
   },
   chipText: {
-    color: COLORS.textSecondary,
+    color: COLORS.textTertiary,
     fontSize: 14,
-    fontWeight: "800",
+    fontFamily: 'SpaceGrotesk_700Bold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   chipTextActive: {
-    color: COLORS.primary,
+    color: '#000',
   },
-  kingContainer: {
-    marginBottom: SPACING.xl,
+  statsOverview: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    gap: 16,
+    marginBottom: 24,
+  },
+  statCard: {
+    flex: 1,
+    padding: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    backgroundColor: '#17181D',
+  },
+  statIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(245, 241, 0, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  statLabel: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+  statValue: {
+    color: '#FFF',
+    fontSize: 20,
+    fontFamily: 'SpaceGrotesk_700Bold',
   },
   trendingSection: {
-    marginBottom: SPACING.xl,
+    marginBottom: 24,
   },
-  sectionTitle: {
-    ...TYPOGRAPHY.h3,
+  sectionHeader: {
+    ...TYPOGRAPHY.sectionTitle,
     color: COLORS.text,
-    marginBottom: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    fontSize: 20,
-    fontWeight: '800',
+    paddingHorizontal: 20,
+    marginBottom: 12,
+    fontSize: FONT_SIZE.sectionTitle,
   },
   trendingList: {
-    paddingHorizontal: SPACING.lg,
-    gap: SPACING.md,
+    paddingHorizontal: 20,
+    gap: 12,
   },
   trendingCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    width: 210,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
-    ...SHADOWS.card,
-  },
-  trendingCardAlt: {
-    backgroundColor: COLORS.pastelMint,
-  },
-  trendingCardAlt2: {
-    backgroundColor: COLORS.pastelRose,
-  },
-  trendingCardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  trendingAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.pastelBlue,
-    marginRight: SPACING.sm,
+    width: 190,
+    backgroundColor: '#17181D',
+    borderRadius: 24,
+    padding: 20,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.divider,
+  },
+  trendingCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  trendingIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#111216',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  trendingIconText: {
+    color: COLORS.accent,
+    fontSize: 18,
+    fontFamily: 'SpaceGrotesk_700Bold',
   },
   trendingName: {
-    ...TYPOGRAPHY.bodyBold,
-    color: COLORS.text,
-    fontSize: 16,
+    color: '#FFF',
+    fontSize: 14,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    width: 100,
   },
   trendingSymbol: {
     ...TYPOGRAPHY.caption,
-    color: COLORS.textSecondary,
-    fontWeight: '700',
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
+    fontSize: 11,
   },
-  miniChart: {
-    height: 32,
-    backgroundColor: COLORS.background,
-    borderRadius: RADIUS.sm,
-    marginVertical: SPACING.md,
-    opacity: 0.5,
+  trendingChartPlaceholder: {
+    height: 24,
+    justifyContent: 'center',
+    marginBottom: 16,
   },
-  trendingPrice: {
-    ...TYPOGRAPHY.label,
-    color: COLORS.text,
-    fontWeight: '800',
+  miniPriceLine: {
+    borderRadius: 1,
+  },
+  trendingProgressText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.accent,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 10,
   },
   listContent: {
-    paddingBottom: 120,
+    paddingBottom: 110,
   },
   emptyState: {
-    padding: 60,
-    alignItems: "center",
+    padding: 40,
+    alignItems: 'center',
   },
   emptyText: {
     ...TYPOGRAPHY.body,
-    color: COLORS.textMuted,
+    color: COLORS.textTertiary,
+    textAlign: 'center',
   },
 });
 

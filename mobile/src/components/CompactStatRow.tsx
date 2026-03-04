@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SPACING } from '../constants/theme';
+import { COLORS, SPACING, TYPOGRAPHY } from '../constants/theme';
 
 interface Stat {
   label: string;
@@ -30,32 +30,34 @@ export default function CompactStatRow({ stats }: Props) {
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 12,
-    paddingVertical: SPACING.sm + 4,
-    paddingHorizontal: SPACING.xs,
+    backgroundColor: '#111216',
+    borderRadius: 16,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   col: {
     flex: 1,
     alignItems: 'center',
+    paddingHorizontal: 8,
   },
   divider: {
     width: 1,
-    backgroundColor: COLORS.border,
-    marginVertical: 2,
+    backgroundColor: COLORS.divider,
+    marginVertical: 4,
   },
   value: {
-    fontSize: 14,
-    fontWeight: '700',
-    fontFamily: 'monospace',
+    fontSize: 15,
+    fontFamily: 'SpaceGrotesk_700Bold',
     color: COLORS.text,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   label: {
-    fontSize: 10,
-    fontWeight: '600',
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    fontFamily: 'SpaceGrotesk_700Bold',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    color: COLORS.textMuted,
+    letterSpacing: 1,
+    color: COLORS.textTertiary,
   },
 });

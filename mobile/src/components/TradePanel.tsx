@@ -133,40 +133,40 @@ export default function TradePanel({
       {/* Tab Toggle */}
       <View style={styles.tabRow}>
         <TouchableOpacity
-          style={[styles.tab, tab === 'buy' && styles.tabActiveBuy]}
+          style={[styles.tab, tab === 'buy' && styles.tabActive]}
           onPress={() => setTab('buy')}
           activeOpacity={0.7}
         >
           <Text
-            style={[styles.tabText, tab === 'buy' && styles.tabTextActiveBuy]}
+            style={[styles.tabText, tab === 'buy' && styles.tabTextActive]}
           >
-            BUY
+            Buy
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, tab === 'sell' && styles.tabActiveSell]}
+          style={[styles.tab, tab === 'sell' && styles.tabActive]}
           onPress={() => setTab('sell')}
           activeOpacity={0.7}
         >
           <Text
             style={[
               styles.tabText,
-              tab === 'sell' && styles.tabTextActiveSell,
+              tab === 'sell' && styles.tabTextActive,
             ]}
           >
-            SELL
+            Sell
           </Text>
         </TouchableOpacity>
       </View>
 
       {/* ===== BUY TAB ===== */}
       {tab === 'buy' && (
-        <>
-          <View style={styles.inputRow}>
+        <View style={styles.content}>
+          <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
-              placeholder={showInitialBuyHint ? 'Min 0.01' : '0.0'}
-              placeholderTextColor={COLORS.textMuted}
+              placeholder={showInitialBuyHint ? 'Min 0.01' : '0.00'}
+              placeholderTextColor={COLORS.textTertiary}
               keyboardType="decimal-pad"
               value={solInput}
               onChangeText={setSolInput}
@@ -174,7 +174,7 @@ export default function TradePanel({
             <Text style={styles.inputSuffix}>SOL</Text>
           </View>
 
-          <View style={styles.quickRow}>
+          <View style={styles.quickSelectorRow}>
             {QUICK_SOL_AMOUNTS.map((amt) => (
               <TouchableOpacity
                 key={amt}
@@ -194,100 +194,54 @@ export default function TradePanel({
           )}
 
           {buyEstimate && (
-            <View style={styles.estimateBox}>
-              <View style={styles.estimateRow}>
-                <Text style={styles.estimateLabel}>Protocol fee (0.5%)</Text>
-                <Text style={styles.feeValue}>
-                  {(buyEstimate.protocolFee / 1e9).toFixed(6)} SOL
-                </Text>
-              </View>
-              <View style={styles.estimateRow}>
-                <Text style={styles.estimateLabel}>Creator fee (0.5%)</Text>
-                <Text style={styles.feeValue}>
-                  {(buyEstimate.creatorFee / 1e9).toFixed(6)} SOL
-                </Text>
-              </View>
-              <View style={styles.hairline} />
-              <View style={styles.estimateRow}>
-                <Text style={styles.netLabel}>Net to liquidity</Text>
-                <Text style={styles.netValue}>
-                  {(buyEstimate.netAmount / 1e9).toFixed(6)} SOL
-                </Text>
-              </View>
-              <View style={styles.hairline} />
-              <View style={styles.estimateRow}>
-                <Text style={styles.estimateLabel}>Base tokens (now)</Text>
-                <Text style={styles.estimateValue}>
-                  {formatTokens(buyEstimate.baseTokens)}
-                </Text>
-              </View>
-              <View style={styles.estimateRow}>
-                <Text style={styles.estimateLabel}>
-                  Bonus ({buyEstimate.riskWeight.toFixed(2)}x)
-                </Text>
-                <Text style={styles.bonusValue}>
-                  +{formatTokens(buyEstimate.bonus)}
-                </Text>
-              </View>
-              <View style={styles.hairline} />
-              <View style={styles.estimateRow}>
-                <Text style={styles.totalLabel}>Total after graduation</Text>
-                <Text style={styles.totalValue}>
-                  {formatTokens(buyEstimate.baseTokens + buyEstimate.bonus)}
-                </Text>
-              </View>
-              <View style={styles.estimateRow}>
-                <Text style={styles.estimateLabel}>Effective Price</Text>
-                <Text style={styles.estimateValue}>
-                  {(buyEstimate.effectivePrice / 1e9).toFixed(6)} SOL
-                </Text>
+            <View style={styles.estimateSection}>
+              <View style={styles.estimateGrid}>
+                <View style={styles.estimateItem}>
+                  <Text style={styles.estimateLabel}>Receive</Text>
+                  <Text style={styles.estimateValue}>{formatTokens(buyEstimate.baseTokens)} tokens</Text>
+                </View>
+                <View style={styles.estimateItem}>
+                  <Text style={styles.estimateLabel}>Fees (1%)</Text>
+                  <Text style={styles.estimateValue}>{(buyEstimate.protocolFee / 1e9 + buyEstimate.creatorFee / 1e9).toFixed(5)} SOL</Text>
+                </View>
               </View>
             </View>
           )}
 
           <TouchableOpacity
             style={[
-              styles.buyButton,
-              showInitialBuyHint && styles.initialBuyButton,
+              styles.primaryButton,
               (disabled || loading) && styles.buttonDisabled,
             ]}
             onPress={handleBuy}
             disabled={
               disabled || loading || !solInput || parseFloat(solInput) <= 0
             }
-            activeOpacity={0.8}
+            activeOpacity={0.9}
           >
             {loading ? (
-              <ActivityIndicator color="#FFF" />
+              <ActivityIndicator color="#000" />
             ) : (
-              <Text style={styles.buyButtonText}>
-                {showInitialBuyHint ? 'Make Initial Buy' : 'Buy Tokens'}
+              <Text style={styles.primaryButtonText}>
+                {showInitialBuyHint ? 'Activate Launch' : 'Buy Tokens'}
               </Text>
             )}
           </TouchableOpacity>
-
-          <Text style={styles.disclaimer}>
-            Base tokens transferred immediately. Bonus at graduation. 1% fee
-            (0.5% protocol + 0.5% creator).
-          </Text>
-        </>
+        </View>
       )}
 
       {/* ===== SELL TAB ===== */}
       {tab === 'sell' && (
-        <>
-          <View style={styles.availableRow}>
-            <Text style={styles.availableLabel}>Available</Text>
-            <Text style={styles.availableValue}>
-              {formatTokens(availableTokens)} tokens
-            </Text>
+        <View style={styles.content}>
+          <View style={styles.availableBadge}>
+            <Text style={styles.availableText}>Available: {formatTokens(availableTokens)}</Text>
           </View>
 
-          <View style={styles.inputRow}>
+          <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
-              placeholder="0.0"
-              placeholderTextColor={COLORS.textMuted}
+              placeholder="0.00"
+              placeholderTextColor={COLORS.textTertiary}
               keyboardType="decimal-pad"
               value={tokenInput}
               onChangeText={setTokenInput}
@@ -295,7 +249,7 @@ export default function TradePanel({
             <Text style={styles.inputSuffix}>TOKENS</Text>
           </View>
 
-          <View style={styles.quickRow}>
+          <View style={styles.quickSelectorRow}>
             {QUICK_PCT.map((pct) => (
               <TouchableOpacity
                 key={pct}
@@ -310,38 +264,23 @@ export default function TradePanel({
           </View>
 
           {sellEstimate && (
-            <View style={styles.estimateBox}>
-              <View style={styles.estimateRow}>
-                <Text style={styles.estimateLabel}>Gross SOL</Text>
-                <Text style={styles.estimateValue}>
-                  {(sellEstimate.solGross / 1e9).toFixed(6)} SOL
-                </Text>
-              </View>
-              <View style={styles.estimateRow}>
-                <Text style={styles.estimateLabel}>Protocol fee (0.5%)</Text>
-                <Text style={styles.feeValue}>
-                  {(sellEstimate.protocolFee / 1e9).toFixed(6)} SOL
-                </Text>
-              </View>
-              <View style={styles.estimateRow}>
-                <Text style={styles.estimateLabel}>Creator fee (0.5%)</Text>
-                <Text style={styles.feeValue}>
-                  {(sellEstimate.creatorFee / 1e9).toFixed(6)} SOL
-                </Text>
-              </View>
-              <View style={styles.hairline} />
-              <View style={styles.estimateRow}>
-                <Text style={styles.netLabel}>Net SOL received</Text>
-                <Text style={styles.netValue}>
-                  {(sellEstimate.solNet / 1e9).toFixed(6)} SOL
-                </Text>
+            <View style={styles.estimateSection}>
+              <View style={styles.estimateGrid}>
+                <View style={styles.estimateItem}>
+                  <Text style={styles.estimateLabel}>Receive</Text>
+                  <Text style={styles.estimateValue}>{(sellEstimate.solNet / 1e9).toFixed(5)} SOL</Text>
+                </View>
+                <View style={styles.estimateItem}>
+                  <Text style={styles.estimateLabel}>Fees (1%)</Text>
+                  <Text style={styles.estimateValue}>{(sellEstimate.protocolFee / 1e9 + sellEstimate.creatorFee / 1e9).toFixed(5)} SOL</Text>
+                </View>
               </View>
             </View>
           )}
 
           <TouchableOpacity
             style={[
-              styles.sellButton,
+              styles.secondaryActionButton,
               (sellDisabled || loading) && styles.buttonDisabled,
             ]}
             onPress={handleSell}
@@ -351,260 +290,211 @@ export default function TradePanel({
               !tokenInput ||
               parseFloat(tokenInput) <= 0
             }
-            activeOpacity={0.8}
+            activeOpacity={0.9}
           >
             {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color="#FFF" />
             ) : (
-              <Text style={styles.sellButtonText}>Sell Tokens</Text>
+              <Text style={styles.secondaryActionButtonText}>Sell Tokens</Text>
             )}
           </TouchableOpacity>
-
-          {sellDisabled && !disabled && (
-            <Text style={styles.disclaimer}>
-              {!position
-                ? 'No position in this launch'
-                : 'No tokens available to sell'}
-            </Text>
-          )}
-        </>
+        </View>
       )}
+
+      <Text style={styles.disclaimer}>
+        Transaction fees and network costs apply. All trades are final.
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
-    ...SHADOWS.card,
+    backgroundColor: '#17181D',
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  // Tab toggle
   tabRow: {
     flexDirection: 'row',
-    backgroundColor: COLORS.background,
-    borderRadius: RADIUS.full,
+    backgroundColor: '#0C0D10',
+    borderRadius: 16,
     padding: 4,
-    marginBottom: SPACING.xl,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   tab: {
     flex: 1,
     paddingVertical: 12,
     alignItems: 'center',
-    borderRadius: RADIUS.full,
+    borderRadius: 12,
   },
-  tabActiveBuy: {
-    backgroundColor: COLORS.buyLight,
+  tabActive: {
+    backgroundColor: '#17181D',
     borderWidth: 1,
-    borderColor: COLORS.buy,
-  },
-  tabActiveSell: {
-    backgroundColor: COLORS.sellLight,
-    borderWidth: 1,
-    borderColor: COLORS.sell,
+    borderColor: COLORS.divider,
   },
   tabText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: COLORS.textMuted,
-    letterSpacing: 1,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
   },
-  tabTextActiveBuy: {
-    color: COLORS.buyDark,
+  tabTextActive: {
+    color: COLORS.text,
   },
-  tabTextActiveSell: {
-    color: COLORS.sellDark,
+  content: {
+    width: '100%',
   },
-  // Input
-  inputRow: {
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.background,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
+    backgroundColor: '#0C0D10',
+    borderRadius: 16,
+    paddingHorizontal: 20,
     height: 72,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    marginBottom: 12,
   },
   input: {
     flex: 1,
-    color: COLORS.buyDark,
-    fontSize: 32,
-    fontWeight: '900',
+    color: COLORS.text,
+    fontSize: 28,
+    fontFamily: 'SpaceGrotesk_700Bold',
   },
   inputSuffix: {
-    color: COLORS.textSecondary,
-    fontSize: 18,
-    fontWeight: '800',
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 12,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
-  // Quick pills
-  quickRow: {
+  quickSelectorRow: {
     flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.xl,
+    gap: 8,
+    marginBottom: 28,
   },
   quickPill: {
     flex: 1,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.full,
+    backgroundColor: '#111216',
+    borderRadius: 10,
     paddingVertical: 10,
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   quickPillText: {
-    color: COLORS.text,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  initialBuyHint: {
-    color: COLORS.buy,
-    fontSize: 13,
-    marginBottom: SPACING.md,
-    fontWeight: '900',
-    textAlign: 'center',
-    textTransform: 'uppercase',
-  },
-  // Available tokens row (sell)
-  availableRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-    paddingHorizontal: SPACING.xs,
-  },
-  availableLabel: {
     color: COLORS.textSecondary,
-    fontSize: 12,
-    fontWeight: '800',
-    textTransform: 'uppercase',
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 11,
   },
-  availableValue: {
-    color: COLORS.sellDark,
-    fontSize: 14,
-    fontWeight: '900',
+  estimateSection: {
+    marginBottom: 28,
   },
-  // Estimate box
-  estimateBox: {
-    backgroundColor: COLORS.background,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    marginBottom: SPACING.xl,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
-  },
-  estimateRow: {
+  estimateGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
+    gap: 12,
   },
-  hairline: {
-    height: 1,
-    backgroundColor: COLORS.borderDark,
-    marginVertical: 10,
-    opacity: 0.3,
+  estimateItem: {
+    flex: 1,
+    backgroundColor: '#111216',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   estimateLabel: {
-    color: COLORS.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 9,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 6,
   },
   estimateValue: {
     color: COLORS.text,
+    fontFamily: 'SpaceGrotesk_700Bold',
     fontSize: 13,
-    fontWeight: '900',
   },
-  feeValue: {
-    color: COLORS.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  netLabel: {
-    color: COLORS.textSecondary,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  netValue: {
-    color: COLORS.buyDark,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  bonusValue: {
-    color: COLORS.success,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  totalLabel: {
-    color: COLORS.buy,
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  totalValue: {
-    color: COLORS.buy,
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  // Buttons
-  buyButton: {
-    backgroundColor: COLORS.buy,
-    borderRadius: RADIUS.full,
+  primaryButton: {
+    backgroundColor: COLORS.accent,
+    borderRadius: 32,
     height: 64,
     justifyContent: 'center',
     alignItems: 'center',
-    ...SHADOWS.md,
-    borderWidth: 2,
-    borderColor: COLORS.buyDark,
-  },
-  initialBuyButton: {
-    backgroundColor: COLORS.buy,
-    borderColor: COLORS.buyDark,
-    shadowColor: COLORS.buy,
-    shadowOpacity: 0.5,
-    shadowRadius: 18,
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
     elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  buyButtonText: {
-    ...TYPOGRAPHY.bodyBold,
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: '900',
+  primaryButtonText: {
+    fontSize: 16,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: '#000',
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
   },
-  sellButton: {
-    backgroundColor: COLORS.sell,
-    borderRadius: RADIUS.full,
+  secondaryActionButton: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 32,
     height: 64,
     justifyContent: 'center',
     alignItems: 'center',
-    ...SHADOWS.md,
-    borderWidth: 2,
-    borderColor: COLORS.sellDark,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
   },
-  sellButtonText: {
-    ...TYPOGRAPHY.bodyBold,
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '900',
+  secondaryActionButtonText: {
+    fontSize: 16,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: COLORS.sell,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
   },
   buttonDisabled: {
-    opacity: 0.4,
+    opacity: 0.3,
+  },
+  availableBadge: {
+    alignSelf: 'center',
+    backgroundColor: '#111216',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+  },
+  availableText: {
+    color: COLORS.textSecondary,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
+    fontSize: 11,
+  },
+  initialBuyHint: {
+    color: COLORS.accent,
+    textAlign: 'center',
+    marginBottom: 16,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    textTransform: 'uppercase',
+    fontSize: 10,
+    letterSpacing: 1,
   },
   disclaimer: {
-    color: COLORS.textMuted,
-    fontSize: 11,
+    fontSize: 10,
+    color: COLORS.textTertiary,
     textAlign: 'center',
-    marginTop: SPACING.lg,
-    fontWeight: '600',
+    marginTop: 24,
     lineHeight: 16,
+    fontFamily: 'SpaceGrotesk_500Medium',
   },
 });

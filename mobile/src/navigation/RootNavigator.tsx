@@ -1,10 +1,9 @@
 import React from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, FONT_SIZE, TYPOGRAPHY, SHADOWS } from '../constants/theme';
-import { LinearGradient } from 'expo-linear-gradient';
+import { COLORS } from '../constants/theme';
 
 import DiscoverScreen from '../screens/DiscoverScreen';
 import LaunchDetailScreen from '../screens/LaunchDetailScreen';
@@ -38,11 +37,11 @@ function DiscoverNavigator() {
   return (
     <DiscoverStack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: COLORS.background },
+        headerStyle: { backgroundColor: '#0C0D10' },
         headerShadowVisible: false,
         headerTintColor: COLORS.text,
-        headerTitleStyle: { ...TYPOGRAPHY.bodyBold, fontSize: 18 },
-        contentStyle: { backgroundColor: COLORS.background },
+        headerTitleStyle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18 },
+        contentStyle: { backgroundColor: '#0C0D10' },
       }}
     >
       <DiscoverStack.Screen
@@ -53,7 +52,11 @@ function DiscoverNavigator() {
       <DiscoverStack.Screen
         name="LaunchDetail"
         component={LaunchDetailScreen as any}
-        options={{ title: '' }}
+        options={{
+          title: '',
+          headerTransparent: true,
+          headerTintColor: '#FFF',
+        }}
       />
     </DiscoverStack.Navigator>
   );
@@ -63,11 +66,11 @@ function PortfolioNavigator() {
   return (
     <PortfolioStack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: COLORS.background },
+        headerStyle: { backgroundColor: '#0C0D10' },
         headerShadowVisible: false,
         headerTintColor: COLORS.text,
-        headerTitleStyle: { ...TYPOGRAPHY.bodyBold, fontSize: 18 },
-        contentStyle: { backgroundColor: COLORS.background },
+        headerTitleStyle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18 },
+        contentStyle: { backgroundColor: '#0C0D10' },
       }}
     >
       <PortfolioStack.Screen
@@ -78,25 +81,37 @@ function PortfolioNavigator() {
       <PortfolioStack.Screen
         name="LaunchDetail"
         component={LaunchDetailScreen as any}
-        options={{ title: '' }}
+        options={{
+          title: '',
+          headerTransparent: true,
+          headerTintColor: '#FFF',
+        }}
       />
     </PortfolioStack.Navigator>
   );
 }
 
-function TabIcon({ label, focused }: { label: string; focused: boolean }) {
+function TabIconWithLabel({ label, focused }: { label: string; focused: boolean }) {
   const iconMap: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionicons.glyphMap]> = {
     Discover: ['compass-outline', 'compass'],
-    Create: ['add-circle-outline', 'add-circle'],
-    Profile: ['wallet-outline', 'wallet'],
+    Create: ['add-outline', 'add'],
+    Profile: ['person-outline', 'person'],
   };
   const [outline, filled] = iconMap[label] || ['help-outline', 'help'];
+  const color = focused ? COLORS.accent : COLORS.textTertiary;
   return (
-    <Ionicons
-      name={focused ? filled : outline}
-      size={24}
-      color={focused ? COLORS.primaryLight : COLORS.tabBarInactive}
-    />
+    <View style={styles.tabIconLabelWrap}>
+      <View style={[styles.iconWrap, { transform: [{ scale: focused ? 1.05 : 1 }] }]}>
+        <Ionicons name={focused ? filled : outline} size={22} color={color} />
+      </View>
+      <Text
+        style={[styles.tabLabel, focused && styles.tabLabelActive]}
+        numberOfLines={1}
+        allowFontScaling={false}
+      >
+        {label}
+      </Text>
+    </View>
   );
 }
 
@@ -105,33 +120,36 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={({ route, navigation }) => ({
         headerShown: false,
-        tabBarShowLabel: true,
+        tabBarShowLabel: false,
         tabBarStyle: {
-          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          backgroundColor: 'rgba(38, 40, 48, 0.95)',
           borderTopWidth: 0,
-          height: 70,
-          paddingBottom: 10,
-          paddingTop: 10,
+          borderTopColor: 'transparent',
+          height: 72,
           position: 'absolute',
-          bottom: 25,
-          left: 20,
-          right: 20,
-          borderRadius: 35,
-          marginHorizontal: 0,
-          ...SHADOWS.lg,
-          elevation: 10,
+          bottom: 20,
+          left: 40,
+          right: 40,
+          borderRadius: 28,
+          paddingHorizontal: 8,
+          paddingTop: 10,
+          paddingBottom: 8,
+          borderWidth: 1,
+          borderColor: 'rgba(255, 255, 255, 0.18)',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.35,
+          shadowRadius: 16,
+          elevation: 12,
+          overflow: 'hidden',
+          ...(Platform.OS === 'ios' && {
+            backgroundColor: 'rgba(50, 52, 62, 0.65)',
+          }),
         },
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.tabBarInactive,
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '700',
-          marginTop: 2,
-          textTransform: 'uppercase',
-          letterSpacing: 0.5,
-        },
+        tabBarActiveTintColor: COLORS.accent,
+        tabBarInactiveTintColor: COLORS.textTertiary,
         tabBarIcon: ({ focused }) => (
-          <TabIcon label={route.name} focused={focused} />
+          <TabIconWithLabel label={route.name} focused={focused} />
         ),
         tabBarButton: (props) => {
           const { children, style, onPress, onLongPress, ...rest } = props;
@@ -142,25 +160,22 @@ function MainTabs() {
 
           return (
             <View style={styles.tabButtonWrapper}>
-              {(focused && !isCreate) && <View style={styles.activeTabIndicator} />}
               <Pressable
                 style={[
                   style,
                   styles.tabButtonInner,
-                  isCreate && styles.createButtonContainer
                 ]}
                 onPress={onPress}
                 onLongPress={onLongPress}
-                android_ripple={{ color: 'rgba(29, 4, 225, 0.1)', borderless: true }}
                 {...pressableProps}
               >
                 {isCreate ? (
-                  <LinearGradient
-                    colors={[COLORS.primary, COLORS.primaryDark]}
-                    style={styles.createButtonGradient}
-                  >
-                    <Ionicons name="add" size={32} color="#FFF" />
-                  </LinearGradient>
+                  <View style={styles.tabIconLabelWrap}>
+                    <View style={[styles.createButton, focused && styles.createButtonActive]}>
+                      <Ionicons name="add" size={24} color={focused ? '#000' : COLORS.accent} />
+                    </View>
+                    <Text style={[styles.tabLabel, focused && styles.tabLabelActive]} allowFontScaling={false}>Create</Text>
+                  </View>
                 ) : (
                   children
                 )}
@@ -187,7 +202,7 @@ export default function RootNavigator() {
       initialRouteName="Landing"
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: COLORS.background },
+        contentStyle: { backgroundColor: '#0C0D10' },
       }}
     >
       <RootStack.Screen name="Landing" component={LandingScreen} />
@@ -198,39 +213,59 @@ export default function RootNavigator() {
 }
 
 const styles = StyleSheet.create({
+  tabIconLabelWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    minWidth: 70,
+  },
+  tabLabel: {
+    fontSize: 11,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
+    color: COLORS.textTertiary,
+    letterSpacing: 0.2,
+  },
+  tabLabelActive: {
+    color: COLORS.accent,
+  },
   tabButtonWrapper: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-  },
-  activeTabIndicator: {
-    position: 'absolute',
-    top: -10,
-    width: 20,
-    height: 4,
-    backgroundColor: COLORS.primary,
-    borderBottomLeftRadius: 4,
-    borderBottomRightRadius: 4,
+    minWidth: 0,
   },
   tabButtonInner: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
+    minWidth: 70,
   },
-  createButtonContainer: {
-    top: -20,
-  },
-  createButtonGradient: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  createButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(245, 241, 0, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
-    ...SHADOWS.glow,
-    borderWidth: 4,
-    borderColor: '#FFF',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  iconWrap: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  createButtonActive: {
+    backgroundColor: COLORS.accent,
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
 });
 

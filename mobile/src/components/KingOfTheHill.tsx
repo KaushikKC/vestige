@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
+import { COLORS, SPACING, RADIUS, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import { LaunchData, VestigeClient } from '../lib/vestige-client';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -22,221 +22,207 @@ export default function KingOfTheHill({ launch, onPress }: Props) {
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
-      <LinearGradient
-        colors={[COLORS.pastelIndigo, COLORS.surface]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradient}
-      >
-        <View style={styles.badge}>
-          <Ionicons name="trophy" size={14} color={COLORS.primary} />
-          <Text style={styles.badgeText}>#1 TOP LAUNCH</Text>
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <View style={styles.badge}>
+            <Ionicons name="trophy" size={12} color="#000" />
+            <Text style={styles.badgeText}>TOP LAUNCH</Text>
+          </View>
+          {!launch.isGraduated && (
+            <Text style={styles.timeTag}>{timeLeft}</Text>
+          )}
         </View>
 
-        <View style={styles.container}>
+        <View style={styles.mainInfo}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{symbol.charAt(0).toUpperCase()}</Text>
           </View>
 
-          <View style={styles.mainInfo}>
-            <View style={styles.headerRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.tokenName} numberOfLines={1}>{name}</Text>
-                <View style={styles.symbolRow}>
-                  <Text style={styles.tokenSymbol}>${symbol}</Text>
-                  {!launch.isGraduated && (
-                    <Text style={styles.timeTag}>• {timeLeft}</Text>
-                  )}
-                </View>
-              </View>
-              <View style={styles.priceCol}>
-                <Text style={styles.priceLabel}>{priceSol.toFixed(6)} SOL</Text>
-                <Text style={styles.mcapLabel}>${mcap.toFixed(2)} MC</Text>
-              </View>
-            </View>
+          <View style={styles.tokenData}>
+            <Text style={styles.tokenName} numberOfLines={1}>{name}</Text>
+            <Text style={styles.tokenSymbol}>${symbol}</Text>
+          </View>
 
-            <View style={styles.progressRow}>
-              <View style={styles.progressHeader}>
-                <Text style={styles.progressLabel}>Graduation Progress</Text>
-                <Text style={styles.progressValue}>
-                  {progress.toFixed(1)}%
-                </Text>
-              </View>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${Math.min(100, progress)}%` }]} />
-              </View>
-            </View>
-
-            <View style={styles.footerRow}>
-              <View style={styles.statsRow}>
-                <View style={styles.stat}>
-                  <Ionicons name="people" size={12} color={COLORS.textSecondary} />
-                  <Text style={styles.statValue}>{launch.totalParticipants}</Text>
-                </View>
-                <View style={styles.stat}>
-                  <Ionicons name="flame" size={12} color={COLORS.textSecondary} />
-                  <Text style={styles.statValue}>{solRaised.toFixed(2)} SOL Raised</Text>
-                </View>
-              </View>
-            </View>
+          <View style={styles.priceData}>
+            <Text style={styles.priceSol}>{priceSol.toFixed(4)} SOL</Text>
+            <Text style={styles.mcapLabel}>${(mcap / 1e3).toFixed(1)}k MC</Text>
           </View>
         </View>
-      </LinearGradient>
+
+        <View style={styles.progressSection}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressLabel}>Graduation Progress</Text>
+            <Text style={styles.progressValue}>{Math.round(progress)}%</Text>
+          </View>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${Math.min(100, progress)}%` }]} />
+          </View>
+        </View>
+
+        <View style={styles.footer}>
+          <View style={styles.stat}>
+            <Ionicons name="people-outline" size={14} color={COLORS.textTertiary} />
+            <Text style={styles.statValue}>{launch.totalParticipants}</Text>
+          </View>
+          <View style={styles.stat}>
+            <Ionicons name="flame-outline" size={14} color={COLORS.accent} />
+            <Text style={styles.statValue}>{solRaised.toFixed(2)} SOL RAISED</Text>
+          </View>
+        </View>
+      </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: RADIUS.lg,
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.xl,
-    borderWidth: 2,
-    borderColor: COLORS.pastelIndigo,
-    ...SHADOWS.md,
-    overflow: 'hidden',
+    backgroundColor: '#17181D',
+    borderRadius: 24,
+    marginHorizontal: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  gradient: {
-    padding: SPACING.lg,
+  content: {
+    padding: 24,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
   },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: RADIUS.full,
-    alignSelf: 'flex-start',
-    marginBottom: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.borderDark,
-    gap: 6,
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 8,
   },
   badgeText: {
     fontSize: 10,
-    fontWeight: '900',
-    color: COLORS.primary,
-    letterSpacing: 1,
-  },
-  container: {
-    flexDirection: 'row',
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING.md,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
-  },
-  avatarText: {
-    color: COLORS.text,
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  mainInfo: {
-    flex: 1,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: SPACING.md,
-  },
-  tokenName: {
-    ...TYPOGRAPHY.h3,
-    fontSize: 20,
-    color: COLORS.text,
-    letterSpacing: -0.5,
-  },
-  symbolRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  tokenSymbol: {
-    ...TYPOGRAPHY.label,
-    fontWeight: '800',
-    color: COLORS.textSecondary,
-    fontSize: 13,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: '#000',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
   timeTag: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textMuted,
-    marginLeft: 4,
-    fontWeight: '600',
+    fontSize: 10,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: COLORS.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  priceCol: {
+  mainInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 16,
+    backgroundColor: '#0C0D10',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 20,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+  },
+  avatarText: {
+    color: COLORS.accent,
+    fontSize: 24,
+    fontFamily: 'SpaceGrotesk_700Bold',
+  },
+  tokenData: {
+    flex: 1,
+  },
+  tokenName: {
+    fontSize: 18,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: '#FFF',
+  },
+  tokenSymbol: {
+    fontSize: 12,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
+    color: COLORS.textTertiary,
+    marginTop: 4,
+  },
+  priceData: {
     alignItems: 'flex-end',
   },
-  priceLabel: {
-    ...TYPOGRAPHY.bodyBold,
-    fontSize: 15,
-    color: COLORS.text,
+  priceSol: {
+    fontSize: 16,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: '#FFF',
   },
   mcapLabel: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textSecondary,
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 10,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: COLORS.accent,
+    marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  progressRow: {
-    marginBottom: SPACING.md,
+  progressSection: {
+    marginBottom: 24,
   },
   progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    alignItems: 'baseline',
+    marginBottom: 12,
   },
   progressLabel: {
-    ...TYPOGRAPHY.caption,
-    fontSize: 11,
+    fontSize: 10,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: COLORS.textTertiary,
     textTransform: 'uppercase',
-    letterSpacing: 1,
-    fontWeight: '800',
-    color: COLORS.textMuted,
+    letterSpacing: 1.5,
   },
   progressValue: {
-    ...TYPOGRAPHY.bodyBold,
-    fontSize: 14,
-    color: COLORS.primary,
+    fontSize: 12,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: COLORS.accent,
   },
   progressTrack: {
-    height: 10,
-    backgroundColor: 'rgba(0,0,0,0.05)',
-    borderRadius: 5,
+    height: 6,
+    backgroundColor: '#0C0D10',
+    borderRadius: 3,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: COLORS.primary,
-    borderRadius: 5,
+    backgroundColor: COLORS.accent,
+    borderRadius: 3,
   },
-  footerRow: {
+  footer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 24,
+    paddingTop: 20,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
-    paddingTop: SPACING.md,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: SPACING.lg,
+    borderTopColor: COLORS.divider,
   },
   stat: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   statValue: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.text,
-    fontWeight: '800',
-    fontSize: 13,
+    fontSize: 10,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });

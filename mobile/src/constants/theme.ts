@@ -1,185 +1,219 @@
 import { Platform } from 'react-native';
 
 export const COLORS = {
-  primary: '#111111',
-  primaryDark: '#000000',
-  primaryLight: '#333333',
-  primaryGlow: 'rgba(17, 17, 17, 0.1)',
+  // Primary background & surfaces
+  primary: '#0C0D10', // Main screen background
+  background: '#0C0D10',
+  surface: '#111216', // Secondary surface background
+  cardBg: '#17181D', // Card background
 
-  accent: '#111111',
-  accentGlow: 'rgba(17, 17, 17, 0.05)',
+  // Accent / Brand Yellow
+  accent: '#F5F100', // Primary Accent
+  accentHover: '#E6E200',
+  accentGlow: 'rgba(245, 241, 0, 0.25)',
 
-  background: '#F8F9FA',
-  surface: '#FFFFFF',
-  surfaceLight: '#FFFFFF',
-  surfaceDark: '#F1F3F5',
-  inputBg: '#FFFFFF',
+  // Text Colors
+  text: '#FFFFFF', // Primary Text
+  textSecondary: '#B3B3B8', // Secondary Text
+  textTertiary: '#6E6E73', // Tertiary Text
 
-  cardBg: '#FFFFFF',
-  border: '#E8EAEE',
-  borderLight: '#F3F4F6',
-  borderDark: '#D1D5DB', // More visible border
-  borderFocus: '#111111',
+  // Dividers / Borders
+  divider: '#23242A',
+  border: 'rgba(255, 255, 255, 0.04)', // Card Border (subtle)
 
-  text: '#111111',
-  textSecondary: '#4B5563',
-  textMuted: '#9CA3AF',
-
-  success: '#10B981',
-  successDark: '#059669',
-  error: '#EF4444',
-  errorDark: '#DC2626',
-  warning: '#F59E0B',
-
-  // Pastel Feature Blocks (Keep these as they are catchy)
-  pastelBlue: '#E3F2FD',
-  pastelGreen: '#E8F5E9',
-  pastelYellow: '#FFFDE7',
-  pastelLavender: '#F3E5F5',
-  pastelRose: '#FCE4EC',
-  pastelPeach: '#FFF3E0',
-  pastelCyan: '#E0F7FA',
-  pastelMint: '#F1F8E9',
-  pastelIndigo: '#E8EAF6',
-  pastelAmber: '#FFF8E1',
-
-  buy: '#10B981',
-  buyLight: '#D1FAE5',
-  buyDark: '#047857',
+  // States / Action Specific
+  success: '#22C55E', // Green
+  error: '#EF4444',   // Red
+  warning: '#FF9F0A',
+  buy: '#22C55E',
   sell: '#EF4444',
-  sellLight: '#FEE2E2',
-  sellDark: '#B91C1C',
 
-  tabBarBg: '#FFFFFF',
-  tabBarBorder: '#E8EAEE',
-  tabBarActive: '#111111',
-  tabBarInactive: '#9CA3AF',
+  // Chart Colors
+  chartLine: '#F5F100',
+  chartGradientStart: 'rgba(245, 241, 0, 0.35)',
+  chartGradientEnd: 'rgba(245, 241, 0, 0.02)',
+  chartGrid: '#1F2026',
 
-  chartArea: '#111111', // Dark background for white lines
-  chartGreen: '#10B981',
-  chartRed: '#EF4444',
-  chartGrid: 'rgba(255, 255, 255, 0.1)', // Subtle grid for dark chart
-};
+  // Bottom Nav
+  navBg: '#17181D',
+  navInactive: '#6E6E73',
+  navActive: '#F5F100',
+  shadow: 'rgba(0, 0, 0, 0.25)',
 
-export const GRADIENTS = {
-  success: ['#10B981', '#059669'] as const,
-  error: ['#EF4444', '#DC2626'] as const,
-  primary: ['#111111', '#333333'] as const,
+  // Pastels (e.g. onboarding cards)
+  pastelLavender: '#E9E0F5',
+  pastelBlue: '#DBEAFE',
+  pastelGreen: '#D1FAE5',
 };
 
 export const SPACING = {
-  xxs: 2,
   xs: 4,
   sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
-  xxl: 48,
-  xxxl: 64,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+  huge: 40,
 };
 
 export const RADIUS = {
-  xs: 8,
-  sm: 12,
-  md: 16,
-  lg: 24,
-  xl: 32,
+  cards: 20,
+  buttons: 28,
+  pills: 16,
+  xl: 24,
+  avatar: 999,
   full: 999,
 };
 
 export const FONT_SIZE = {
-  xs: 12,
-  sm: 14,
-  md: 16,
-  lg: 18,
-  xl: 24,
-  xxl: 36,
-  huge: 44,
+  caption: 12,
+  bodySecondary: 14,
+  bodyPrimary: 16,
+  cardTitle: 18,
+  sectionTitle: 20,
+  mediumCurrency: 22,
+  screenTitle: 28,
+  largeCurrency: 32,
 };
 
+// Font family name to match what will be loaded
+const FONT_FAMILY = 'SpaceGrotesk_400Regular';
+const FONT_FAMILY_MEDIUM = 'SpaceGrotesk_500Medium';
+const FONT_FAMILY_BOLD = 'SpaceGrotesk_600SemiBold';
+const FONT_FAMILY_BOLD_700 = 'SpaceGrotesk_700Bold';
+
 export const TYPOGRAPHY = {
-  h1: {
-    fontSize: FONT_SIZE.xxl,
-    fontWeight: '800' as const,
-    letterSpacing: -1,
+  screenTitle: {
+    fontSize: FONT_SIZE.screenTitle,
+    fontFamily: FONT_FAMILY_BOLD,
+    fontWeight: '600' as const,
+    letterSpacing: -0.3,
     color: COLORS.text,
-    lineHeight: 42,
   },
-  h2: {
-    fontSize: FONT_SIZE.xl,
+  sectionTitle: {
+    fontSize: FONT_SIZE.sectionTitle,
+    fontFamily: FONT_FAMILY_BOLD,
+    fontWeight: '600' as const,
+    letterSpacing: -0.2,
+    color: COLORS.text,
+  },
+  cardTitle: {
+    fontSize: FONT_SIZE.cardTitle,
+    fontFamily: FONT_FAMILY_BOLD,
+    fontWeight: '600' as const,
+    letterSpacing: -0.2,
+    color: COLORS.text,
+  },
+  largeCurrency: {
+    fontSize: FONT_SIZE.largeCurrency,
+    fontFamily: FONT_FAMILY_BOLD_700,
     fontWeight: '700' as const,
     letterSpacing: -0.5,
     color: COLORS.text,
-    lineHeight: 32,
   },
-  h3: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700' as const,
+  mediumCurrency: {
+    fontSize: FONT_SIZE.mediumCurrency,
+    fontFamily: FONT_FAMILY_BOLD,
+    fontWeight: '600' as const,
+    letterSpacing: -0.2,
     color: COLORS.text,
   },
-  body: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: '400' as const,
-    color: COLORS.textSecondary,
-    lineHeight: 24,
+  bodyPrimary: {
+    fontSize: FONT_SIZE.bodyPrimary,
+    fontFamily: FONT_FAMILY_MEDIUM,
+    fontWeight: '500' as const,
+    letterSpacing: 0,
+    color: COLORS.text,
   },
-  bodyBold: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: '600' as const,
+  bodySecondary: {
+    fontSize: FONT_SIZE.bodySecondary,
+    fontFamily: FONT_FAMILY,
+    fontWeight: '400' as const,
+    letterSpacing: 0,
     color: COLORS.text,
   },
   caption: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '500' as const,
-    color: COLORS.textMuted,
+    fontSize: FONT_SIZE.caption,
+    fontFamily: FONT_FAMILY,
+    fontWeight: '400' as const,
+    letterSpacing: 0.3,
+    color: COLORS.textTertiary,
   },
-  label: {
-    fontSize: FONT_SIZE.sm,
+  // Legacy mappings to avoid immediate breaks
+  h1: {
+    fontSize: FONT_SIZE.screenTitle,
+    fontFamily: FONT_FAMILY_BOLD,
     fontWeight: '600' as const,
+    color: COLORS.text,
+  },
+  h2: {
+    fontSize: FONT_SIZE.sectionTitle,
+    fontFamily: FONT_FAMILY_BOLD,
+    fontWeight: '600' as const,
+    color: COLORS.text,
+  },
+  h3: {
+    fontSize: FONT_SIZE.cardTitle,
+    fontFamily: FONT_FAMILY_BOLD,
+    fontWeight: '600' as const,
+    color: COLORS.text,
+  },
+  body: {
+    fontSize: FONT_SIZE.bodyPrimary,
+    fontFamily: FONT_FAMILY_MEDIUM,
+    fontWeight: '500' as const,
     color: COLORS.textSecondary,
   },
-  price: {
-    fontSize: 20,
-    fontWeight: '800' as const,
-    fontFamily: Platform.select({ ios: 'Courier New', android: 'monospace' }),
+  label: {
+    fontSize: FONT_SIZE.bodySecondary,
+    fontFamily: FONT_FAMILY,
+    fontWeight: '400' as const,
+    color: COLORS.textTertiary,
+  },
+  bodyBold: {
+    fontSize: FONT_SIZE.bodyPrimary,
+    fontFamily: FONT_FAMILY_BOLD,
+    fontWeight: '600' as const,
     color: COLORS.text,
   },
 };
 
 export const SHADOWS = {
-  sm: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  md: {
-    shadowColor: '#000',
+  primaryButton: {
+    shadowColor: COLORS.accent,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  lg: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.25,
     shadowRadius: 24,
     elevation: 8,
   },
-  glow: {
-    shadowColor: COLORS.primary,
+  nav: {
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  successCircle: {
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 6,
   },
-  card: {
+  sm: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 2,
-  }
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  md: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+  },
 };
+

@@ -20,7 +20,7 @@ export default function VestigeLogo({
   className = "",
 }: VestigeLogoProps) {
   const isLight = variant === "light";
-  const color = isLight ? "#FFFFFF" : "#3D4B9C";
+  const color = isLight ? "#FFFFFF" : "#F5F100";
 
   return (
     <svg

@@ -7,12 +7,11 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS } from '../constants/theme';
+import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../constants/theme';
 import {
   LaunchData,
   VestigeClient,
   TOKEN_PRECISION,
-  MIN_INITIAL_BUY,
 } from '../lib/vestige-client';
 
 interface BuyPanelProps {
@@ -83,7 +82,7 @@ export default function BuyPanel({
         <TextInput
           style={styles.input}
           placeholder={showInitialBuyHint ? 'Min 0.01' : '0.0'}
-          placeholderTextColor={COLORS.textMuted}
+          placeholderTextColor={COLORS.textTertiary}
           keyboardType="decimal-pad"
           value={solInput}
           onChangeText={setSolInput}
@@ -91,7 +90,6 @@ export default function BuyPanel({
         <Text style={styles.inputSuffix}>SOL</Text>
       </View>
 
-      {/* Quick amount pills */}
       <View style={styles.quickRow}>
         {QUICK_AMOUNTS.map((amt) => (
           <TouchableOpacity
@@ -114,44 +112,15 @@ export default function BuyPanel({
       {estimate && (
         <View style={styles.estimateBox}>
           <View style={styles.estimateRow}>
-            <Text style={styles.estimateLabel}>Protocol fee (0.5%)</Text>
+            <Text style={styles.estimateLabel}>Fees (1%)</Text>
             <Text style={styles.feeValue}>
-              {(estimate.protocolFee / 1e9).toFixed(6)} SOL
-            </Text>
-          </View>
-          <View style={styles.estimateRow}>
-            <Text style={styles.estimateLabel}>Creator fee (0.5%)</Text>
-            <Text style={styles.feeValue}>
-              {(estimate.creatorFee / 1e9).toFixed(6)} SOL
+              {((estimate.protocolFee + estimate.creatorFee) / 1e9).toFixed(6)} SOL
             </Text>
           </View>
           <View style={styles.hairline} />
           <View style={styles.estimateRow}>
-            <Text style={styles.netLabel}>Net to liquidity</Text>
-            <Text style={styles.netValue}>
-              {(estimate.netAmount / 1e9).toFixed(6)} SOL
-            </Text>
-          </View>
-
-          <View style={styles.hairline} />
-          <View style={styles.estimateRow}>
-            <Text style={styles.estimateLabel}>Base tokens (now)</Text>
+            <Text style={styles.estimateLabel}>Receive Tokens</Text>
             <Text style={styles.estimateValue}>
-              {formatTokens(estimate.baseTokens)}
-            </Text>
-          </View>
-          <View style={styles.estimateRow}>
-            <Text style={styles.estimateLabel}>
-              Bonus ({estimate.riskWeight.toFixed(2)}x)
-            </Text>
-            <Text style={styles.bonusValue}>
-              +{formatTokens(estimate.bonus)}
-            </Text>
-          </View>
-          <View style={styles.hairline} />
-          <View style={styles.estimateRow}>
-            <Text style={styles.totalLabel}>Total after graduation</Text>
-            <Text style={styles.totalValue}>
               {formatTokens(estimate.baseTokens + estimate.bonus)}
             </Text>
           </View>
@@ -174,17 +143,16 @@ export default function BuyPanel({
         activeOpacity={0.8}
       >
         {loading ? (
-          <ActivityIndicator color="#1A1A2E" />
+          <ActivityIndicator color="#000000" />
         ) : (
           <Text style={styles.buyButtonText}>
-            {showInitialBuyHint ? 'Make Initial Buy' : 'Buy Tokens'}
+            {showInitialBuyHint ? 'Activate Launch' : 'Send now'}
           </Text>
         )}
       </TouchableOpacity>
 
       <Text style={styles.disclaimer}>
-        Base tokens transferred immediately. Bonus at graduation. 1% fee (0.5%
-        protocol + 0.5% creator).
+        1% total fee (split between protocol and creator).
       </Text>
     </View>
   );
@@ -193,133 +161,115 @@ export default function BuyPanel({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: COLORS.cardBg,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.md + 4,
-    ...SHADOWS.lg,
+    borderRadius: RADIUS.cards,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   title: {
+    ...TYPOGRAPHY.sectionTitle,
     color: COLORS.text,
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '800',
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    marginBottom: SPACING.sm,
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    marginBottom: SPACING.md,
+    height: 70,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   input: {
     flex: 1,
     color: COLORS.text,
-    fontSize: FONT_SIZE.xxl,
-    fontWeight: '700',
-    paddingVertical: SPACING.md,
+    ...TYPOGRAPHY.mediumCurrency,
+    paddingVertical: 0,
   },
   inputSuffix: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.md,
+    ...TYPOGRAPHY.bodyPrimary,
+    color: COLORS.textTertiary,
     fontWeight: '600',
   },
   quickRow: {
     flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.md,
+    gap: SPACING.md,
+    marginBottom: 20,
   },
   quickPill: {
     flex: 1,
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: RADIUS.full,
-    paddingVertical: SPACING.sm,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.pills,
+    height: 40,
+    justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   quickPillText: {
+    ...TYPOGRAPHY.bodySecondary,
     color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.sm,
     fontWeight: '600',
   },
   initialBuyHint: {
-    color: COLORS.warning,
-    fontSize: FONT_SIZE.xs,
-    marginBottom: SPACING.sm,
-    fontWeight: '600',
+    ...TYPOGRAPHY.caption,
+    color: COLORS.accent,
+    marginBottom: SPACING.md,
+    textAlign: 'center',
   },
   estimateBox: {
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    marginBottom: SPACING.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
   },
   estimateRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: SPACING.xs,
+    paddingVertical: 6,
   },
   hairline: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: COLORS.border,
-    marginVertical: SPACING.xs,
+    height: 1,
+    backgroundColor: COLORS.divider,
+    marginVertical: 8,
   },
   estimateLabel: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.xs,
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
   },
   estimateValue: {
+    ...TYPOGRAPHY.bodySecondary,
     color: COLORS.text,
-    fontSize: FONT_SIZE.xs,
     fontWeight: '600',
   },
   feeValue: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.xs,
-    fontFamily: 'monospace',
-  },
-  netLabel: {
+    ...TYPOGRAPHY.caption,
     color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
-  },
-  netValue: {
-    color: COLORS.text,
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '700',
-  },
-  bonusValue: {
-    color: COLORS.success,
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
-  },
-  totalLabel: {
-    color: COLORS.accent,
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '700',
-  },
-  totalValue: {
-    color: COLORS.accent,
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
   },
   buyButton: {
     backgroundColor: COLORS.accent,
-    borderRadius: RADIUS.lg,
-    paddingVertical: SPACING.md + 2,
+    borderRadius: RADIUS.buttons,
+    height: 58,
+    justifyContent: 'center',
     alignItems: 'center',
+    ...SHADOWS.primaryButton,
   },
   buyButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.3,
   },
   buyButtonText: {
-    color: '#1A1A2E',
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '800',
+    ...TYPOGRAPHY.bodyPrimary,
+    color: '#000000',
+    fontWeight: '600',
   },
   disclaimer: {
-    color: COLORS.textMuted,
-    fontSize: 10,
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
     textAlign: 'center',
-    marginTop: SPACING.sm,
+    marginTop: 16,
+    fontSize: 11,
   },
 });

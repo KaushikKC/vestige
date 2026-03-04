@@ -1,16 +1,14 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions, Text } from 'react-native';
 import Svg, {
-  Rect,
-  Line,
-  Circle,
+  Path,
   Defs,
   LinearGradient,
   Stop,
-  Polygon,
+  Line,
   Text as SvgText,
 } from 'react-native-svg';
-import { COLORS } from '../constants/theme';
+import { COLORS, TYPOGRAPHY } from '../constants/theme';
 
 interface Props {
   pMax: number;          // starting price (lamports) at 0% supply sold
@@ -20,8 +18,8 @@ interface Props {
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const CHART_HEIGHT = 320;
-const PAD = { top: 24, bottom: 36, left: 54, right: 16 };
+const CHART_HEIGHT = 220;
+const PAD = { top: 20, bottom: 40, left: 20, right: 20 };
 const PLOT_W = SCREEN_WIDTH - PAD.left - PAD.right;
 const PLOT_H = CHART_HEIGHT - PAD.top - PAD.bottom;
 
@@ -45,160 +43,144 @@ export default function PriceCurveChart({ pMax, pMin, tokenSupply, totalBaseSold
     const endX = mapX(1);
     const endY = mapY(pMin);
 
-    // Y-axis: 5 price grid lines from pMin to pMax
-    const gridLines: { y: number; label: string }[] = [];
-    for (let i = 0; i <= 4; i++) {
-      const p = pMin + ((pMax - pMin) * i) / 4;
-      gridLines.push({ y: mapY(p), label: (p / 1e9).toFixed(4) });
+    // Master UI: curve path and horizontal grid (incoming UI)
+    const startX = PAD.left;
+    const startY = mapY(pMax);
+    const endX = PAD.left + PLOT_W;
+    const endY = mapY(pMin);
+
+    const curvePath = `M ${startX} ${startY} Q ${(startX + endX) / 2} ${startY} ${endX} ${endY}`;
+
+    const horizontalGrid: { y: number }[] = [];
+    for (let i = 0; i <= 3; i++) {
+      const p = pMin + ((pMax - pMin) * i) / 3;
+      horizontalGrid.push({ y: mapY(p) });
     }
 
-    // X-axis: supply % labels
-    const xLabels = [
-      { x: mapX(0), label: '0%' },
-      { x: mapX(0.25), label: '25%' },
-      { x: mapX(0.5), label: '50%' },
-      { x: mapX(0.75), label: '75%' },
-      { x: mapX(1), label: '100%' },
-    ];
-
-    // Filled area polygon under the sold portion (top-left corner to current position)
-    // The sold area goes from (startX, startY) diagonally down to (nowX, nowY),
-    // then down to the x-axis baseline, then back left.
-    const gradientPoints = [
-      `${startX},${startY}`,
-      `${nowX},${nowY}`,
-      `${nowX},${PAD.top + PLOT_H}`,
-      `${startX},${PAD.top + PLOT_H}`,
-    ].join(' ');
-
-    const priceBadgeLabel = (currentPrice / 1e9).toFixed(5) + ' SOL';
-    const pctLabel = (progress * 100).toFixed(1) + '%';
-
     return {
-      nowX, nowY, startX, startY, endX, endY,
-      gridLines, xLabels, gradientPoints,
-      priceBadgeLabel, pctLabel, progress,
+      nowX,
+      nowY,
+      startX,
+      startY,
+      endX,
+      endY,
+      curvePath,
+      horizontalGrid,
     };
   }, [pMax, pMin, tokenSupply, totalBaseSold]);
 
-  const {
-    nowX, nowY, startX, startY, endX, endY,
-    gridLines, xLabels, gradientPoints,
-    priceBadgeLabel, pctLabel, progress,
-  } = data;
-
-  const hasSales = progress > 0;
+  const { nowX, nowY, startX, startY, endX, endY, curvePath, horizontalGrid } = data;
 
   return (
-    <View style={styles.container}>
-      <Svg width={SCREEN_WIDTH} height={CHART_HEIGHT}>
-        {/* Background */}
-        <Rect x={0} y={0} width={SCREEN_WIDTH} height={CHART_HEIGHT} fill={COLORS.chartArea} />
+    <View style={styles.outerContainer}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Bonding Curve</Text>
+        <Text style={styles.headerValue}>{(pMax / 1e9).toFixed(4)} → {(pMin / 1e9).toFixed(4)} SOL</Text>
+      </View>
 
-        {/* Horizontal grid lines + Y-axis price labels */}
-        {gridLines.map((gl, i) => (
-          <React.Fragment key={i}>
+      <View style={styles.container}>
+        <Svg width={SCREEN_WIDTH - 40} height={CHART_HEIGHT}>
+          <Defs>
+            <LinearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={COLORS.accent} stopOpacity={0.1} />
+              <Stop offset="1" stopColor={COLORS.accent} stopOpacity={0} />
+            </LinearGradient>
+          </Defs>
+
+          {/* Grid lines (incoming UI) */}
+          {horizontalGrid.map((line, i) => (
             <Line
-              x1={PAD.left} y1={gl.y} x2={PAD.left + PLOT_W} y2={gl.y}
-              stroke={COLORS.chartGrid} strokeWidth={0.5}
+              key={i}
+              x1={0} y1={line.y} x2={SCREEN_WIDTH - 40} y2={line.y}
+              stroke={COLORS.chartGrid}
+              strokeWidth={1}
             />
-            <SvgText
-              x={PAD.left - 6} y={gl.y + 3}
-              fill="rgba(255,255,255,0.6)" fontSize={9} fontFamily="monospace"
-              textAnchor="end"
-            >
-              {gl.label}
-            </SvgText>
-          </React.Fragment>
-        ))}
+          ))}
 
-        {/* Vertical supply% grid lines + X-axis labels */}
-        {xLabels.map((xl, i) => (
-          <React.Fragment key={i}>
-            <Line
-              x1={xl.x} y1={PAD.top} x2={xl.x} y2={PAD.top + PLOT_H}
-              stroke={COLORS.chartGrid} strokeWidth={0.5} strokeDasharray="4,4"
-            />
-            <SvgText
-              x={xl.x} y={CHART_HEIGHT - 8}
-              fill="rgba(255,255,255,0.6)" fontSize={9}
-              textAnchor="middle"
-            >
-              {xl.label}
-            </SvgText>
-          </React.Fragment>
-        ))}
-
-        {/* Gradient fill under sold portion of curve */}
-        <Defs>
-          <LinearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={COLORS.primary} stopOpacity={0.25} />
-            <Stop offset="1" stopColor={COLORS.primary} stopOpacity={0.02} />
-          </LinearGradient>
-        </Defs>
-        {hasSales && (
-          <Polygon points={gradientPoints} fill="url(#areaGrad)" />
-        )}
-
-        {/* Solid line: 0% → current% (sold portion, descending) */}
-        <Line
-          x1={startX} y1={startY}
-          x2={hasSales ? nowX : startX} y2={hasSales ? nowY : startY}
-          stroke="#FFFFFF" strokeWidth={2.5} strokeLinecap="round"
-        />
-
-        {/* Dashed line: current% → 100% (future potential, continuing descent) */}
-        <Line
-          x1={hasSales ? nowX : startX} y1={hasSales ? nowY : startY}
-          x2={endX} y2={endY}
-          stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round"
-          strokeDasharray="6,4" opacity={0.3}
-        />
-
-        {/* Current position vertical dashed line */}
-        {hasSales && (
-          <Line
-            x1={nowX} y1={PAD.top} x2={nowX} y2={PAD.top + PLOT_H}
-            stroke="#FFFFFF" strokeWidth={0.8} strokeDasharray="4,4" opacity={0.3}
+          {/* Fill */}
+          <Path
+            d={`${curvePath} L ${endX - PAD.left} ${CHART_HEIGHT - PAD.bottom} L ${startX - PAD.left} ${CHART_HEIGHT - PAD.bottom} Z`}
+            fill="url(#chartFill)"
+            transform={`translate(${-PAD.left}, 0)`}
           />
-        )}
 
-        {/* Current price dot */}
-        {hasSales && (
-          <>
-            <Circle cx={nowX} cy={nowY} r={8} fill="#FFFFFF" opacity={0.3} />
-            <Circle cx={nowX} cy={nowY} r={5} fill="#FFFFFF" />
-            <Circle cx={nowX} cy={nowY} r={3} fill="#000000" />
-          </>
-        )}
+          {/* Curve */}
+          <Path
+            d={curvePath}
+            fill="none"
+            stroke={COLORS.accent}
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            transform={`translate(${-PAD.left}, 0)`}
+          />
 
-        {/* Price badge */}
-        {hasSales && (
-          <>
-            <Rect
-              x={Math.min(SCREEN_WIDTH - 110, Math.max(PAD.left, nowX - 45))}
-              y={nowY - 26}
-              width={90} height={18} rx={9}
-              fill={COLORS.text}
-            />
-            <SvgText
-              x={Math.min(SCREEN_WIDTH - 65, Math.max(PAD.left + 45, nowX))}
-              y={nowY - 14}
-              fill="#FFFFFF" fontSize={9} fontFamily="monospace"
-              textAnchor="middle"
-            >
-              {priceBadgeLabel} · {pctLabel}
-            </SvgText>
-          </>
-        )}
-      </Svg>
+          {/* Current point indicator */}
+          <Line
+            x1={nowX - PAD.left} y1={0} x2={nowX - PAD.left} y2={CHART_HEIGHT - PAD.bottom}
+            stroke={COLORS.textTertiary}
+            strokeWidth={1}
+            strokeDasharray="4,4"
+            opacity={0.3}
+          />
+
+          {/* Labels (incoming UI) */}
+          <SvgText
+            x={0} y={CHART_HEIGHT - 10}
+            fill={COLORS.textTertiary}
+            fontSize={9}
+            fontFamily="SpaceGrotesk_700Bold"
+            letterSpacing={0.5}
+          >
+            START
+          </SvgText>
+          <SvgText
+            x={SCREEN_WIDTH - 40} y={CHART_HEIGHT - 10}
+            fill={COLORS.accent}
+            fontSize={9}
+            fontFamily="SpaceGrotesk_700Bold"
+            textAnchor="end"
+            letterSpacing={0.5}
+          >
+            GRADUATE
+          </SvgText>
+        </Svg>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  outerContainer: {
+    backgroundColor: '#17181D',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    marginBottom: 20,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  headerTitle: {
+    ...TYPOGRAPHY.caption,
+    fontSize: 10,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    color: COLORS.textTertiary,
+  },
+  headerValue: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 11,
+  },
   container: {
-    width: SCREEN_WIDTH,
+    width: '100%',
     height: CHART_HEIGHT,
+    overflow: 'hidden',
   },
 });

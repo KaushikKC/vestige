@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS } from '../constants/theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import { useComments, Comment } from '../lib/use-comments';
 import { useWallet } from '../lib/use-wallet';
 
@@ -77,7 +77,7 @@ export default function CommentThread({ launchPda }: Props) {
             <TextInput
               style={styles.textInput}
               placeholder="Say something..."
-              placeholderTextColor={COLORS.textMuted}
+              placeholderTextColor={COLORS.textTertiary}
               value={text}
               onChangeText={setText}
               maxLength={500}
@@ -125,89 +125,104 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
   headerTitle: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
+    ...TYPOGRAPHY.caption,
+    fontSize: 10,
+    fontFamily: 'SpaceGrotesk_700Bold',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    color: COLORS.textSecondary,
+    letterSpacing: 1,
+    color: COLORS.textTertiary,
   },
   headerCount: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
+    fontSize: 10,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.sm + 2,
-    paddingVertical: SPACING.xs + 2,
-    marginBottom: SPACING.md,
-    ...SHADOWS.sm,
+    backgroundColor: '#111216',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   textInput: {
+    ...TYPOGRAPHY.caption,
     flex: 1,
     color: COLORS.text,
-    fontSize: FONT_SIZE.sm,
-    paddingVertical: SPACING.xs + 2,
+    fontFamily: 'SpaceGrotesk_500Medium',
+    fontSize: 14,
+    paddingVertical: 12,
   },
   sendBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.primary,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: COLORS.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: SPACING.xs,
+    marginLeft: 12,
   },
   sendBtnDisabled: {
-    opacity: 0.4,
+    opacity: 0.2,
   },
   connectHint: {
+    ...TYPOGRAPHY.caption,
     flex: 1,
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.sm,
+    color: COLORS.textTertiary,
     textAlign: 'center',
-    paddingVertical: SPACING.xs + 2,
+    paddingVertical: 14,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
   },
   loadingWrap: {
-    paddingVertical: SPACING.lg,
+    paddingVertical: 40,
     alignItems: 'center',
   },
   emptyText: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.sm,
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
     textAlign: 'center',
-    paddingVertical: SPACING.md,
+    paddingVertical: 40,
+    fontFamily: 'SpaceGrotesk_500Medium',
   },
   commentCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.sm,
-    padding: SPACING.sm + 2,
-    marginBottom: SPACING.xs + 2,
+    backgroundColor: '#17181D',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   commentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.xs,
+    marginBottom: 8,
   },
   commentWallet: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
-    fontFamily: 'monospace',
-    color: COLORS.primary,
+    ...TYPOGRAPHY.caption,
+    fontSize: 11,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: COLORS.accent,
   },
   commentTime: {
+    ...TYPOGRAPHY.caption,
     fontSize: 10,
-    color: COLORS.textMuted,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_500Medium',
   },
   commentContent: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.text,
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
+    fontSize: 13,
     lineHeight: 20,
+    fontFamily: 'SpaceGrotesk_500Medium',
   },
 });

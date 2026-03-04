@@ -14,7 +14,7 @@ import { PublicKey, Connection } from '@solana/web3.js';
 import * as Clipboard from 'expo-clipboard';
 import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY, GRADIENTS } from '../constants/theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import {
   LaunchData,
   UserPositionData,
@@ -65,12 +65,12 @@ function LoadingSkeleton() {
       {/* Chart placeholder */}
       <SkeletonLoader width="100%" height={320} borderRadius={0} />
       {/* Stats row skeleton */}
-      <View style={{ marginTop: SPACING.md }}>
-        <SkeletonLoader width="100%" height={56} borderRadius={RADIUS.md} />
+      <View style={{ marginTop: 16 }}>
+        <SkeletonLoader width="100%" height={56} borderRadius={RADIUS.pills} />
       </View>
       {/* Buy panel skeleton */}
-      <View style={{ marginTop: SPACING.lg }}>
-        <SkeletonLoader width="100%" height={200} borderRadius={RADIUS.lg} />
+      <View style={{ marginTop: 24 }}>
+        <SkeletonLoader width="100%" height={200} borderRadius={RADIUS.cards} />
       </View>
     </View>
   );
@@ -106,6 +106,7 @@ export default function LaunchDetailScreen({ route }: Props) {
   const [chartMode, setChartMode] = useState<'curve' | 'candles'>('curve');
   const { candles, loading: candlesLoading, interval: candleInterval, setInterval: setCandleInterval, refresh: refreshCandles } = useTradeCandles(launchPdaStr);
 
+  const insets = useSafeAreaInsets();
   const publicKeyStr = publicKey?.toBase58() ?? null;
 
   const fetchData = useCallback(async () => {
@@ -311,9 +312,9 @@ export default function LaunchDetailScreen({ route }: Props) {
     return (
       <View style={styles.center}>
         <BackgroundEffect />
-        <LinearGradient colors={GRADIENTS.error} style={styles.errorIcon}>
-          <Ionicons name="close" size={40} color="#FFF" />
-        </LinearGradient>
+        <View style={styles.errorIcon}>
+          <Ionicons name="close" size={40} color={COLORS.error} />
+        </View>
         <Text style={styles.errorText}>Launch not found</Text>
         <Text style={styles.errorSubtext}>{launchPdaStr}</Text>
       </View>
@@ -346,15 +347,13 @@ export default function LaunchDetailScreen({ route }: Props) {
   const discountPct = pMaxSol > 0 ? ((pMaxSol - priceSol) / pMaxSol) * 100 : 0;
   const discountColor = discountPct > 0 ? COLORS.success : COLORS.textMuted;
 
-  const insets = useSafeAreaInsets();
-
   return (
     <View style={styles.container}>
       <BackgroundEffect />
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
       <ScrollView
         style={styles.container}
-        contentContainerStyle={[styles.content,]}
+        contentContainerStyle={[styles.content, { paddingBottom: 110 }]}
       >
         {/* 1. Compact Token Header */}
         <View style={styles.compactHeader}>
@@ -362,7 +361,7 @@ export default function LaunchDetailScreen({ route }: Props) {
             <Image source={{ uri: tokenImage }} style={styles.headerImage} />
           ) : (
             <View style={styles.headerImagePlaceholder}>
-              <Ionicons name="cube-outline" size={20} color={COLORS.textMuted} />
+              <Ionicons name="cube-outline" size={20} color={COLORS.textTertiary} />
             </View>
           )}
           <View style={styles.headerNameCol}>
@@ -377,7 +376,7 @@ export default function LaunchDetailScreen({ route }: Props) {
             <Text style={styles.mintChipText}>
               {launch.tokenMint.toBase58().slice(0, 4)}...{launch.tokenMint.toBase58().slice(-4)}
             </Text>
-            <Ionicons name="copy-outline" size={11} color={COLORS.textMuted} />
+            <Ionicons name="copy-outline" size={11} color={COLORS.textTertiary} />
           </TouchableOpacity>
         </View>
 
@@ -562,27 +561,27 @@ export default function LaunchDetailScreen({ route }: Props) {
         {!launch.isGraduated && !launch.poolCreated && connected && (
           <View style={styles.section}>
             <TouchableOpacity
-              style={styles.graduateToDexButton}
+              style={[styles.primaryButton, actionLoading && styles.disabledButton]}
               onPress={handleGraduateToDex}
               disabled={actionLoading}
               activeOpacity={0.8}
             >
               {actionLoading ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color="#000" />
               ) : (
-                <Text style={styles.graduateToDexButtonText}>Graduate to Raydium</Text>
+                <Text style={styles.primaryButtonText}>Graduate to Raydium</Text>
               )}
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.graduateButton, { marginTop: SPACING.sm }]}
+              style={[styles.secondaryButton, { marginTop: SPACING.sm }]}
               onPress={handleGraduate}
               disabled={actionLoading}
               activeOpacity={0.8}
             >
               {actionLoading ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={COLORS.primary} />
               ) : (
-                <Text style={styles.graduateButtonText}>Graduate (simple fallback)</Text>
+                <Text style={styles.secondaryButtonText}>Graduate (simple fallback)</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -654,28 +653,30 @@ export default function LaunchDetailScreen({ route }: Props) {
             <View style={styles.vestedActions}>
               <TouchableOpacity
                 style={[
-                  styles.claimFeesButton,
+                  styles.secondaryButton,
+                  styles.vestedActionButton,
+                  styles.vestedActionButtonMain,
                   claimableCreatorFees <= 0 && styles.disabledButton,
                 ]}
                 onPress={handleCreatorClaimFees}
                 disabled={actionLoading || claimableCreatorFees <= 0}
+                activeOpacity={0.8}
               >
                 {actionLoading ? (
                   <ActivityIndicator color={COLORS.text} />
                 ) : (
-                  <Text style={styles.claimFeesButtonText}>
-                    Claim Vested Fees
-                  </Text>
+                  <Text style={styles.secondaryButtonText}>Claim Vested Fees</Text>
                 )}
               </TouchableOpacity>
 
               {milestoneLevel < 4 && (
                 <TouchableOpacity
-                  style={styles.advanceButton}
+                  style={[styles.secondaryButton, styles.vestedActionButton]}
                   onPress={handleAdvanceMilestone}
                   disabled={actionLoading}
+                  activeOpacity={0.8}
                 >
-                  <Text style={styles.advanceButtonText}>Advance</Text>
+                  <Text style={styles.secondaryButtonText}>Advance</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -694,16 +695,15 @@ export default function LaunchDetailScreen({ route }: Props) {
         {canClaimBonus && (
           <View style={styles.section}>
             <TouchableOpacity
-              style={styles.claimBonusButton}
+              style={[styles.primaryButton, actionLoading && styles.disabledButton]}
               onPress={handleClaimBonus}
               disabled={actionLoading}
+              activeOpacity={0.8}
             >
               {actionLoading ? (
-                <ActivityIndicator color={COLORS.primary} />
+                <ActivityIndicator color="#000" />
               ) : (
-                <Text style={styles.claimBonusButtonText}>
-                  Claim Bonus Tokens
-                </Text>
+                <Text style={styles.primaryButtonText}>Claim Bonus Tokens</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -753,11 +753,11 @@ export default function LaunchDetailScreen({ route }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: COLORS.background,
   },
   content: {
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: 80,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
   },
   center: {
     flex: 1,
@@ -771,479 +771,439 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING.md,
-    ...SHADOWS.lg,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
   },
-  // Compact header
   compactHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.lg,
-    backgroundColor: COLORS.surface,
-    padding: SPACING.md,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
-    ...SHADOWS.card,
+    marginTop: 100,
+    marginBottom: 20,
+    backgroundColor: '#17181D',
+    padding: 16,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   headerImage: {
     width: 48,
     height: 48,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.surfaceLight,
+    borderRadius: 12,
+    backgroundColor: '#0C0D10',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.divider,
   },
   headerImagePlaceholder: {
     width: 48,
     height: 48,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.surfaceLight,
+    borderRadius: 12,
+    backgroundColor: '#0C0D10',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.divider,
   },
   headerNameCol: {
     flex: 1,
-    marginLeft: SPACING.md,
+    marginLeft: 16,
   },
   headerName: {
-    ...TYPOGRAPHY.h3,
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 18,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: '#FFF',
   },
   headerSymbol: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textSecondary,
-    fontWeight: '800',
+    fontSize: 12,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
+    color: COLORS.textTertiary,
+    marginTop: 2,
   },
   mintChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#0C0D10',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: RADIUS.full,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   mintChipText: {
-    color: COLORS.text,
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: 10,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: COLORS.textSecondary,
+    letterSpacing: 0.5,
   },
-  // Price hero
   priceHero: {
-    marginBottom: SPACING.lg,
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 12,
-    paddingHorizontal: SPACING.xs,
+    marginBottom: 32,
+    paddingHorizontal: 4,
   },
   heroPrice: {
-    ...TYPOGRAPHY.h1,
-    fontSize: 30,
-    fontWeight: '900',
+    fontSize: 40,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: '#FFF',
+    letterSpacing: -1,
   },
   heroDiscount: {
-    ...TYPOGRAPHY.bodyBold,
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: 16,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    marginTop: 4,
   },
-  // Chart toggle
   chartToggleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: 20,
+    paddingHorizontal: 4,
   },
   chartToggleGroup: {
     flexDirection: 'row',
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.full,
+    backgroundColor: '#111216',
+    borderRadius: 16,
     padding: 4,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
-    ...SHADOWS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   chartToggleBtn: {
     paddingVertical: 8,
-    paddingHorizontal: 18,
-    borderRadius: RADIUS.full,
+    paddingHorizontal: 16,
+    borderRadius: 12,
   },
   chartToggleBtnActive: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#17181D',
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   chartToggleText: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textMuted,
-    fontWeight: '800',
+    fontSize: 12,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   chartToggleTextActive: {
     color: '#FFF',
   },
   intervalGroup: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 8,
   },
   intervalBtn: {
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 10,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
+    borderRadius: 12,
+    backgroundColor: '#111216',
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   intervalBtnActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: '#17181D',
+    borderColor: COLORS.accent,
   },
   intervalText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: COLORS.textSecondary,
+    fontSize: 10,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_700Bold',
   },
   intervalTextActive: {
-    color: '#FFFFFF',
+    color: COLORS.accent,
   },
   chartWrap: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
-    overflow: 'hidden',
-    marginBottom: SPACING.lg,
     height: 320,
-    ...SHADOWS.card,
+    marginBottom: 32,
   },
-  // Stats
   section: {
-    marginBottom: SPACING.xl,
+    marginBottom: 32,
   },
   sectionHeader: {
-    ...TYPOGRAPHY.h3,
-    color: COLORS.primary,
-    marginBottom: SPACING.md,
-    fontSize: 18,
-    fontWeight: '900',
+    fontSize: 10,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: COLORS.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  progressSection: {
+    backgroundColor: '#17181D',
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+  },
+  infoTabRow: {
+    flexDirection: 'row',
+    gap: 4,
+    marginBottom: 16,
+    backgroundColor: '#111216',
+    padding: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+  },
+  infoTab: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoTabActive: {
+    backgroundColor: '#17181D',
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+  },
+  infoTabText: {
+    fontSize: 12,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_700Bold',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  progressSection: {
-    backgroundColor: COLORS.pastelMint,
-    padding: SPACING.lg,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
-    ...SHADOWS.card,
-  },
-  // Tabs
-  infoTabRow: {
-    flexDirection: 'row',
-    marginBottom: SPACING.md,
-    gap: SPACING.lg,
-    backgroundColor: COLORS.background,
-    padding: 4,
-    borderRadius: RADIUS.full,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  infoTab: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: RADIUS.full,
-  },
-  infoTabActive: {
-    backgroundColor: COLORS.pastelIndigo,
-    borderWidth: 1,
-    borderColor: COLORS.borderDark,
-  },
-  infoTabText: {
-    ...TYPOGRAPHY.bodyBold,
-    color: COLORS.textMuted,
-    fontSize: 14,
-  },
   infoTabTextActive: {
-    color: COLORS.primary,
+    color: '#FFF',
   },
-  // List blocks
   infoBox: {
-    backgroundColor: COLORS.pastelRose,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
-    gap: 12,
-    ...SHADOWS.card,
+    backgroundColor: '#17181D',
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    gap: 16,
   },
   infoText: {
-    ...TYPOGRAPHY.body,
-    color: '#333',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    fontFamily: 'SpaceGrotesk_500Medium',
+    lineHeight: 20,
   },
   waitingBox: {
-    backgroundColor: COLORS.pastelYellow,
-    padding: SPACING.xl,
-    borderRadius: RADIUS.xl,
+    backgroundColor: '#111216',
+    padding: 32,
+    borderRadius: 24,
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
-    ...SHADOWS.card,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   waitingTitle: {
-    ...TYPOGRAPHY.h3,
-    marginBottom: 8,
     fontSize: 20,
-    fontWeight: '900',
-    color: COLORS.warning,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    marginBottom: 12,
+    color: COLORS.accent,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   waitingSubtext: {
-    ...TYPOGRAPHY.body,
+    fontSize: 14,
     textAlign: 'center',
-    color: '#444',
-    fontSize: 15,
+    color: COLORS.textSecondary,
     lineHeight: 22,
-    fontWeight: '600',
+    fontFamily: 'SpaceGrotesk_500Medium',
   },
-  graduateToDexButton: {
-    backgroundColor: '#00C2FF',
-    borderRadius: RADIUS.lg,
-    height: 54,
+  primaryButton: {
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: COLORS.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    ...SHADOWS.card,
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  graduateToDexButtonText: {
-    ...TYPOGRAPHY.bodyBold,
-    color: '#000',
+  primaryButtonText: {
     fontSize: 16,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: '#000',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
   },
-  graduateButton: {
-    borderRadius: RADIUS.full,
-    overflow: 'hidden',
-    height: 60,
-    backgroundColor: COLORS.pastelIndigo,
+  secondaryButton: {
+    height: 64,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.borderDark,
-    ...SHADOWS.md,
+    backgroundColor: '#111216',
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
-  graduateButtonText: {
-    ...TYPOGRAPHY.bodyBold,
-    color: COLORS.primary,
-    fontSize: 18,
-    fontWeight: '900',
+  secondaryButtonText: {
+    fontSize: 14,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: '#FFF',
     textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    marginLeft: 4
+  },
+  vestedActionButton: {
+    flex: 1,
+  },
+  vestedActionButtonMain: {
+    flex: 2,
   },
   raydiumLiveBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 194, 255, 0.08)',
+    backgroundColor: 'rgba(34, 197, 94, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(0, 194, 255, 0.3)',
-    borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    marginBottom: SPACING.xl,
-    gap: SPACING.md,
+    borderColor: COLORS.success,
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 40,
+    gap: 20,
   },
   raydiumLiveIcon: {
-    fontSize: 22,
+    fontSize: 28,
   },
   raydiumLiveTextCol: {
     flex: 1,
   },
   raydiumLiveTitle: {
-    ...TYPOGRAPHY.bodyBold,
-    color: '#00E5FF',
-    fontSize: 14,
+    fontSize: 16,
+    color: COLORS.success,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   raydiumLiveSubtext: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textMuted,
-    marginTop: 2,
+    fontSize: 13,
+    color: COLORS.textTertiary,
+    marginTop: 4,
+    fontFamily: 'SpaceGrotesk_500Medium',
   },
   lockedBox: {
-    backgroundColor: COLORS.pastelBlue,
-    padding: SPACING.lg,
-    borderRadius: RADIUS.lg,
-    marginBottom: SPACING.xl,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
-    ...SHADOWS.card,
+    backgroundColor: '#111216',
+    padding: 24,
+    borderRadius: 24,
+    marginBottom: 40,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   lockedTitle: {
-    ...TYPOGRAPHY.h3,
-    color: COLORS.primary,
     fontSize: 18,
-    fontWeight: '900',
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: '#FFF',
+    marginBottom: 8,
   },
   lockedSubtext: {
-    ...TYPOGRAPHY.caption,
-    color: '#333',
-    marginTop: 6,
     fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '700',
+    color: COLORS.textSecondary,
+    lineHeight: 22,
+    fontFamily: 'SpaceGrotesk_500Medium',
   },
   vestedSection: {
-    backgroundColor: COLORS.surface,
-    padding: SPACING.lg,
-    borderRadius: RADIUS.lg,
-    marginBottom: SPACING.xl,
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
-    ...SHADOWS.card,
+    backgroundColor: '#17181D',
+    padding: 24,
+    borderRadius: 24,
+    marginBottom: 40,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   vestedTitle: {
-    ...TYPOGRAPHY.h3,
-    marginBottom: SPACING.lg,
-    fontSize: 20,
-    fontWeight: '900',
+    fontSize: 18,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: '#FFF',
+    marginBottom: 24,
   },
   vestedGrid: {
-    gap: 12,
+    gap: 4,
   },
   vestedItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: COLORS.divider,
   },
   vestedLabel: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textSecondary,
-    fontWeight: '700',
+    fontSize: 12,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_500Medium',
   },
   vestedValue: {
-    ...TYPOGRAPHY.bodyBold,
-    color: COLORS.text,
     fontSize: 14,
+    color: '#FFF',
+    fontFamily: 'SpaceGrotesk_700Bold',
   },
   claimableValue: {
-    ...TYPOGRAPHY.bodyBold,
-    color: COLORS.success,
-    fontSize: 15,
-    fontWeight: '900',
+    fontSize: 16,
+    color: COLORS.accent,
+    fontFamily: 'SpaceGrotesk_700Bold',
   },
   vestedActions: {
     flexDirection: 'row',
-    marginTop: SPACING.xl,
+    marginTop: 32,
     gap: 12,
   },
-  claimFeesButton: {
-    flex: 2,
-    backgroundColor: COLORS.pastelLavender,
-    height: 52,
-    borderRadius: RADIUS.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
-    ...SHADOWS.sm,
-  },
-  claimFeesButtonText: {
-    ...TYPOGRAPHY.bodyBold,
-    color: '#111',
-    fontSize: 14,
-  },
-  advanceButton: {
-    flex: 1,
-    backgroundColor: COLORS.pastelCyan,
-    height: 52,
-    borderRadius: RADIUS.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: COLORS.borderDark,
-    ...SHADOWS.sm,
-  },
-  advanceButtonText: {
-    ...TYPOGRAPHY.bodyBold,
-    color: '#111',
-    fontSize: 14,
-  },
   disabledButton: {
-    opacity: 0.5,
+    opacity: 0.3,
   },
   graduatedBox: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginTop: SPACING.lg,
-    backgroundColor: COLORS.pastelMint,
-    padding: SPACING.md,
-    borderRadius: RADIUS.full,
-    borderWidth: 1.5,
-    borderColor: COLORS.buy,
-    ...SHADOWS.card,
+    gap: 10,
+    marginTop: 20,
+    backgroundColor: 'rgba(245, 241, 0, 0.05)',
+    padding: 14,
+    borderRadius: 32,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 241, 0, 0.2)',
   },
   graduatedLabel: {
-    ...TYPOGRAPHY.bodyBold,
-    color: COLORS.buyDark,
-    fontSize: 16,
+    fontSize: 11,
+    color: COLORS.accent,
+    fontFamily: 'SpaceGrotesk_700Bold',
     textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   milestoneDots: {
     flexDirection: 'row',
-    gap: 8,
-    marginVertical: SPACING.md,
+    gap: 10,
+    marginVertical: 20,
   },
   milestoneDot: {
-    width: 28,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.background,
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#0C0D10',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.divider,
   },
   milestoneDotFilled: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
   },
   milestoneLabel: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textSecondary,
-    fontWeight: '700',
+    fontSize: 11,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_500Medium',
   },
   errorText: {
-    ...TYPOGRAPHY.h3,
+    fontSize: 24,
     color: COLORS.error,
-    marginBottom: SPACING.sm,
+    marginBottom: 8,
+    fontFamily: 'SpaceGrotesk_700Bold',
   },
   errorSubtext: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.xs,
+    fontSize: 12,
+    color: COLORS.textTertiary,
     fontFamily: 'monospace',
   },
-  claimBonusButton: {
-    backgroundColor: COLORS.pastelMint,
-    height: 60,
-    borderRadius: RADIUS.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.buy,
-    ...SHADOWS.md,
-  },
-  claimBonusButtonText: {
-    ...TYPOGRAPHY.bodyBold,
-    color: COLORS.buyDark,
-    fontSize: 18,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
   connectHint: {
+    fontSize: 12,
     textAlign: 'center',
-    color: COLORS.textMuted,
-    fontSize: 14,
-    marginTop: 16,
-    fontWeight: '700',
+    color: COLORS.textTertiary,
+    marginTop: 20,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });
 

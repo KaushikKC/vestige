@@ -6,7 +6,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Connection, PublicKey } from '@solana/web3.js';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../constants/theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, TYPOGRAPHY } from '../constants/theme';
 import { VestigeClient, TOKEN_PRECISION } from '../lib/vestige-client';
 import { RPC_ENDPOINT, CONNECTION_CONFIG } from '../constants/solana';
 
@@ -48,7 +48,6 @@ export default function HolderDistribution({
       const result = await conn.getTokenLargestAccounts(mint);
       const accounts = result.value.slice(0, 10);
 
-      // Resolve owners for each token account
       const items: HolderItem[] = [];
       for (const acct of accounts) {
         const amount = parseFloat(acct.amount);
@@ -61,7 +60,7 @@ export default function HolderDistribution({
             owner = info.value.data.parsed?.info?.owner || owner;
           }
         } catch {
-          // fallback to token account address
+          // fallback
         }
 
         const pct = totalSupply > 0 ? (amount / totalSupply) * 100 : 0;
@@ -73,7 +72,6 @@ export default function HolderDistribution({
         });
       }
 
-      // Sort by amount descending
       items.sort((a, b) => b.amount - a.amount);
       setHolders(items);
     } catch (err) {
@@ -90,7 +88,7 @@ export default function HolderDistribution({
   if (loading) {
     return (
       <View style={styles.loadingWrap}>
-        <ActivityIndicator color={COLORS.primary} />
+        <ActivityIndicator color={COLORS.accent} />
         <Text style={styles.loadingText}>Loading holders...</Text>
       </View>
     );
@@ -100,112 +98,132 @@ export default function HolderDistribution({
 
   return (
     <View>
-      <Text style={styles.headerTitle}>TOP HOLDERS</Text>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Holder Distribution</Text>
+      </View>
 
-      {holders.length === 0 ? (
-        <Text style={styles.emptyText}>No holders found</Text>
-      ) : (
-        holders.map((h, i) => (
-          <View key={h.owner + i} style={styles.holderRow}>
-            <Text style={styles.rank}>{i + 1}.</Text>
-            <View style={styles.holderInfo}>
-              <Text
-                style={[
-                  styles.holderWallet,
-                  h.isVault && styles.vaultWallet,
-                ]}
-              >
-                {h.isVault ? 'Launch Vault' : truncateWallet(h.owner)}
-              </Text>
-              <View style={styles.barRow}>
-                <View
-                  style={[
-                    styles.bar,
-                    {
-                      width: `${Math.max((h.pct / maxPct) * 100, 2)}%`,
-                      backgroundColor: h.isVault
-                        ? COLORS.primary
-                        : COLORS.accent,
-                    },
-                  ]}
-                />
+      <View style={styles.listContainer}>
+        {holders.length === 0 ? (
+          <Text style={styles.emptyText}>No holders found</Text>
+        ) : (
+          holders.map((h, i) => (
+            <View key={h.owner + i} style={[styles.holderRow, i === holders.length - 1 && { borderBottomWidth: 0 }]}>
+              <Text style={styles.rank}>{i + 1}</Text>
+              <View style={styles.holderInfo}>
+                <View style={styles.labelRow}>
+                  <Text
+                    style={[
+                      styles.holderWallet,
+                      h.isVault && styles.vaultWallet,
+                    ]}
+                  >
+                    {h.isVault ? 'Bonding Curve' : truncateWallet(h.owner)}
+                  </Text>
+                  <Text style={styles.pctText}>{h.pct.toFixed(1)}%</Text>
+                </View>
+                <View style={styles.barContainer}>
+                  <View
+                    style={[
+                      styles.bar,
+                      {
+                        width: `${Math.max((h.pct / maxPct) * 100, 2)}%`,
+                        backgroundColor: h.isVault ? COLORS.text : COLORS.accent,
+                      },
+                    ]}
+                  />
+                </View>
               </View>
             </View>
-            <Text style={styles.pctText}>{h.pct.toFixed(1)}%</Text>
-          </View>
-        ))
-      )}
+          ))
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  header: {
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
   headerTitle: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
+    ...TYPOGRAPHY.caption,
+    fontSize: 10,
+    fontFamily: 'SpaceGrotesk_700Bold',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: SPACING.sm,
+    letterSpacing: 1,
+    color: COLORS.textTertiary,
+  },
+  listContainer: {
+    backgroundColor: '#17181D',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   holderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.border,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.divider,
   },
   rank: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
-    width: 24,
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
+    width: 28,
+    fontSize: 10,
+    fontFamily: 'SpaceGrotesk_700Bold',
   },
   holderInfo: {
     flex: 1,
-    marginRight: SPACING.sm,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   holderWallet: {
+    ...TYPOGRAPHY.caption,
     color: COLORS.text,
-    fontSize: FONT_SIZE.sm,
-    fontFamily: 'monospace',
-    fontWeight: '600',
-    marginBottom: 4,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 13,
   },
   vaultWallet: {
-    color: COLORS.primary,
+    color: COLORS.accent,
   },
-  barRow: {
-    height: 6,
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: 3,
+  barContainer: {
+    height: 4,
+    backgroundColor: '#0C0D10',
+    borderRadius: 2,
     overflow: 'hidden',
   },
   bar: {
-    height: 6,
-    borderRadius: 3,
+    height: 4,
+    borderRadius: 2,
   },
   pctText: {
-    color: COLORS.text,
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
-    fontFamily: 'monospace',
-    minWidth: 48,
-    textAlign: 'right',
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 12,
   },
   loadingWrap: {
-    paddingVertical: SPACING.xl,
+    paddingVertical: 60,
     alignItems: 'center',
-    gap: SPACING.sm,
+    gap: 16,
   },
   loadingText: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.sm,
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_500Medium',
   },
   emptyText: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.sm,
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
     textAlign: 'center',
-    paddingVertical: SPACING.lg,
+    paddingVertical: 40,
+    fontFamily: 'SpaceGrotesk_500Medium',
   },
 });

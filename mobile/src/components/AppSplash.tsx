@@ -1,6 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, View, Text, StatusBar } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
+import {
+  useFonts,
+  SpaceGrotesk_400Regular,
+  SpaceGrotesk_500Medium,
+  SpaceGrotesk_600SemiBold,
+  SpaceGrotesk_700Bold
+} from '@expo-google-fonts/space-grotesk';
 import VestigeLogo from './VestigeLogo';
 import { COLORS, FONT_SIZE, TYPOGRAPHY } from '../constants/theme';
 
@@ -11,7 +18,13 @@ interface Props {
 }
 
 export default function AppSplash({ children }: Props) {
-  const [appReady, setAppReady] = useState(false);
+  const [fontsLoaded] = useFonts({
+    SpaceGrotesk_400Regular,
+    SpaceGrotesk_500Medium,
+    SpaceGrotesk_600SemiBold,
+    SpaceGrotesk_700Bold,
+  });
+
   const [splashDone, setSplashDone] = useState(false);
   const opacity = useRef(new Animated.Value(1)).current;
   const scale = useRef(new Animated.Value(0.9)).current;
@@ -32,27 +45,45 @@ export default function AppSplash({ children }: Props) {
         useNativeDriver: true,
       })
     ]).start();
-
-    // Give the app time to mount, then mark ready
-    const timer = setTimeout(() => {
-      setAppReady(true);
-      SplashScreen.hideAsync().catch(() => { });
-    }, 1500);
-    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    if (!appReady) return;
-    // Start fade-out after a brief display
-    const timer = setTimeout(() => {
+    if (!fontsLoaded) return;
+
+    // Once fonts are loaded, wait a bit then fade out
+    const hideTimer = setTimeout(async () => {
+      await SplashScreen.hideAsync().catch(() => { });
+
       Animated.timing(opacity, {
         toValue: 0,
         duration: 500,
         useNativeDriver: true,
       }).start(() => setSplashDone(true));
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [appReady, opacity]);
+    }, 1000);
+
+    return () => clearTimeout(hideTimer);
+  }, [fontsLoaded, opacity]);
+
+  if (!fontsLoaded && !splashDone) {
+    return (
+      <View style={styles.root}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+        <View style={styles.overlay}>
+          <Animated.View style={{
+            opacity: logoOpacity,
+            transform: [{ scale }],
+            alignItems: 'center'
+          }}>
+            <View style={styles.logoContainer}>
+              <VestigeLogo size={100} />
+            </View>
+            <Text style={styles.title}>VESTIGE</Text>
+            <Text style={styles.tagline}>The future of digital artifacts</Text>
+          </Animated.View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>
@@ -92,14 +123,13 @@ const styles = StyleSheet.create({
   logoContainer: {
     padding: 20,
     borderRadius: 30,
-    backgroundColor: 'rgba(29, 4, 225, 0.05)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   title: {
-    ...TYPOGRAPHY.h1,
+    ...TYPOGRAPHY.screenTitle,
     marginTop: 24,
-    color: COLORS.text,
+    color: COLORS.accent,
     letterSpacing: 4,
-    fontSize: 28,
   },
   tagline: {
     ...TYPOGRAPHY.caption,
@@ -109,4 +139,5 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
 });
+
 

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, memo, useEffect, useRef, useMemo, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useCallback, memo, useRef, useMemo, useImperativeHandle, forwardRef } from 'react';
 import {
   View,
   Text,
@@ -17,26 +17,45 @@ import { Keypair } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, SHADOWS, TYPOGRAPHY, GRADIENTS } from '../constants/theme';
+import { COLORS, TYPOGRAPHY, RADIUS, SPACING } from '../constants/theme';
 import { useVestige } from '../lib/use-vestige';
 import { useWallet } from '../lib/use-wallet';
 import { VestigeClient } from '../lib/vestige-client';
 import WalletButton from '../components/WalletButton';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BackgroundEffect from '../components/BackgroundEffect';
 
 const LAMPORTS = 1_000_000_000;
 
 export type IdentityFormRef = { getValues: () => { tokenName: string; tokenSymbol: string; tokenUri: string } };
-const SWITCH_TRACK_COLOR = { true: COLORS.primary, false: COLORS.surfaceLight };
-const GRADIENT_PRIMARY = [COLORS.primary, COLORS.primaryDark] as const;
-const GRADIENT_DISABLED = [COLORS.surfaceLight, COLORS.surface] as const;
-
 interface SuccessViewProps {
   pda: string;
   onNavigateDiscover: () => void;
 }
+
+interface IdentityFieldsProps {
+  tokenNameRef: React.MutableRefObject<string>;
+  tokenSymbolRef: React.MutableRefObject<string>;
+  tokenUriRef: React.MutableRefObject<string>;
+}
+
+interface LaunchFormProps {
+  connected: boolean;
+  publicKey: any;
+  initializeLaunch: any;
+  onCreated: (pda: string) => void;
+}
+
+interface FormFieldProps {
+  label: string;
+  defaultValue: string;
+  valueRef: React.MutableRefObject<string>;
+  keyboardType?: 'default' | 'numeric' | 'decimal-pad';
+  placeholder?: string;
+  hint?: string;
+}
+
+const SWITCH_TRACK_COLOR = { true: 'rgba(245, 241, 0, 0.4)', false: '#1A1B1F' };
 
 const SuccessView = memo(function SuccessView({ pda, onNavigateDiscover }: SuccessViewProps) {
   const copyPda = useCallback(async () => {
@@ -47,22 +66,20 @@ const SuccessView = memo(function SuccessView({ pda, onNavigateDiscover }: Succe
   return (
     <View style={styles.successContainer}>
       <BackgroundEffect />
-      <LinearGradient colors={GRADIENTS.success} style={styles.successIcon}>
-        <Ionicons name="checkmark" size={40} color="#FFF" />
-      </LinearGradient>
+      <View style={styles.successIcon}>
+        <Ionicons name="checkmark-circle" size={48} color={COLORS.success} />
+      </View>
       <Text style={styles.successTitle}>Artifact Launched</Text>
       <Text style={styles.initialBuyNote}>
         Your token is ready for discovery. Make an initial buy to boost visibility.
       </Text>
-      <TouchableOpacity onPress={copyPda} style={styles.pdaCard}>
-        <Text style={styles.pdaLabel}>Launch Address</Text>
+      <TouchableOpacity onPress={copyPda} style={styles.pdaCard} activeOpacity={0.8}>
+        <Text style={styles.pdaLabel}>LAUNCH ADDRESS</Text>
         <Text style={styles.pdaText} numberOfLines={1}>{pda}</Text>
-        <Ionicons name="copy-outline" size={14} color={COLORS.textMuted} style={styles.copyIconMargin} />
+        <Ionicons name="copy-outline" size={14} color={COLORS.textTertiary} style={styles.copyIconMargin} />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.openButton} onPress={onNavigateDiscover}>
-        <LinearGradient colors={GRADIENT_PRIMARY} style={styles.gradient}>
-          <Text style={styles.openButtonText}>View in Discover</Text>
-        </LinearGradient>
+      <TouchableOpacity style={styles.openButton} onPress={onNavigateDiscover} activeOpacity={0.9}>
+        <Text style={styles.openButtonText}>View in Discover</Text>
       </TouchableOpacity>
     </View>
   );
@@ -80,8 +97,6 @@ export default function CreateLaunchScreen({ navigation }: any) {
     navigation.navigate('Discover');
   }, [navigation]);
 
-  // Keep latest initializeLaunch in a ref and pass a stable callback so LaunchForm
-  // memo never fails when parent re-renders (e.g. safe area or wallet context).
   const initLaunchRef = useRef(initializeLaunch);
   initLaunchRef.current = initializeLaunch;
   const stableInitializeLaunch = useCallback(
@@ -91,7 +106,7 @@ export default function CreateLaunchScreen({ navigation }: any) {
   );
 
   const contentContainerStyle = useMemo(
-    () => [styles.content, { paddingTop: insets.top + SPACING.md, paddingBottom: SPACING.xxl + 80 }],
+    () => [styles.content, { paddingTop: insets.top + 20, paddingBottom: 120 }],
     [insets.top],
   );
 
@@ -102,14 +117,6 @@ export default function CreateLaunchScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <BackgroundEffect />
-      {/*
-        KeyboardAvoidingView + ScrollView combo:
-        - KAV adjusts height so inputs are visible above keyboard
-        - No keyboardDismissMode — removing "on-drag" fixes the core bug where
-          ScrollView's auto-scroll-to-input was being detected as a drag,
-          immediately dismissing the keyboard and blurring every input.
-        - keyboardShouldPersistTaps="handled" keeps focus when tapping outside
-      */}
       <KeyboardAvoidingView
         style={StyleSheet.absoluteFill}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -121,20 +128,15 @@ export default function CreateLaunchScreen({ navigation }: any) {
           showsVerticalScrollIndicator={false}
           bounces={true}
         >
-          <StatusBar barStyle="dark-content" />
+          <StatusBar barStyle="light-content" />
           <View style={styles.header}>
             <View>
-              <Text style={styles.headerSubtitle}>Create</Text>
-              <Text style={styles.headerTitle}>Launch Token</Text>
+              <Text style={styles.headerSubtitle}>LAUNCH</Text>
+              <Text style={styles.headerTitle}>Forge Artifact</Text>
             </View>
             <WalletButton />
           </View>
 
-          {/*
-            LaunchForm uses UNCONTROLLED inputs (defaultValue + refs).
-            Typing a character causes ZERO state changes → ZERO re-renders.
-            Only test-mode toggle and submit button state cause re-renders.
-          */}
           <LaunchForm
             connected={connected}
             publicKey={publicKey}
@@ -147,17 +149,6 @@ export default function CreateLaunchScreen({ navigation }: any) {
   );
 }
 
-// ─── Identity Fields (isolated so parent re-renders never touch these inputs) ───
-// Receives only refs — refs are stable, so this component never re-renders.
-// The three TextInputs are truly uncontrolled: defaultValue="" once, no value prop.
-// Typing only mutates refs; no setState, no re-render, no focus loss.
-
-interface IdentityFieldsProps {
-  tokenNameRef: React.MutableRefObject<string>;
-  tokenSymbolRef: React.MutableRefObject<string>;
-  tokenUriRef: React.MutableRefObject<string>;
-}
-
 const IdentityFields = memo(function IdentityFields({
   tokenNameRef,
   tokenSymbolRef,
@@ -165,23 +156,20 @@ const IdentityFields = memo(function IdentityFields({
 }: IdentityFieldsProps) {
   return (
     <View style={styles.formSection}>
-      <Text style={styles.sectionTitle}>Identity</Text>
+      <Text style={styles.sectionTitle}>IDENTITY</Text>
       <FormField
-        key="identity-name"
         label="Token Name"
         defaultValue=""
         valueRef={tokenNameRef}
         placeholder="e.g. Hyperion"
       />
       <FormField
-        key="identity-ticker"
         label="Ticker"
         defaultValue=""
         valueRef={tokenSymbolRef}
         placeholder="e.g. HYP"
       />
       <FormField
-        key="identity-uri"
         label="Metadata URI"
         defaultValue=""
         valueRef={tokenUriRef}
@@ -190,18 +178,6 @@ const IdentityFields = memo(function IdentityFields({
     </View>
   );
 });
-
-// ─── Launch Form ───────────────────────────────────────────────────────────────
-// All field values live in refs. No state update occurs while typing.
-// formKey increments only when test mode is toggled, remounting inputs with
-// new defaultValues. handleCreate reads directly from refs — no field deps.
-
-interface LaunchFormProps {
-  connected: boolean;
-  publicKey: any;
-  initializeLaunch: any;
-  onCreated: (pda: string) => void;
-}
 
 const LaunchForm = memo(function LaunchForm({
   connected,
@@ -221,6 +197,7 @@ const LaunchForm = memo(function LaunchForm({
   const lpPctRef = useRef('10'); // % of token supply reserved for Raydium LP
   const rBestRef = useRef('10');
   const rMinRef = useRef('1');
+  const pMaxRef = useRef('1');
   const graduationTargetRef = useRef('10');
   const durationMinutesRef = useRef('1440');
 
@@ -246,7 +223,6 @@ const LaunchForm = memo(function LaunchForm({
     setFormKey(k => k + 1);
   }, []);
 
-  // handleCreate reads from refs — no field values in deps → never recreated on typing
   const handleCreate = useCallback(async () => {
     if (!connected || !publicKey) {
       Toast.show({ type: 'error', text1: 'Connect wallet first' });
@@ -296,20 +272,21 @@ const LaunchForm = memo(function LaunchForm({
     } finally {
       setLoading(false);
     }
-  }, [connected, publicKey, initializeLaunch, onCreated]); // no field values needed — reads refs
+  }, [connected, publicKey, initializeLaunch, onCreated]);
 
   const createButtonStyle = useMemo(
-    () => [styles.createButton, (!connected || loading) && styles.createButtonDisabled],
+    () => [styles.createButton, (!connected || loading) && styles.disabledButton],
     [connected, loading],
   );
 
   const supply0 = testMode ? '1000' : '1000000';
   const bonus0 = testMode ? '500' : '500000';
+  const pMax0 = '1';
   const grad0 = testMode ? '0.5' : '10';
 
   return (
     <>
-      <View style={styles.card}>
+      <View style={styles.testModeCard}>
         <View style={styles.toggleRow}>
           <View>
             <Text style={styles.inputLabel}>Beta Mode</Text>
@@ -319,7 +296,8 @@ const LaunchForm = memo(function LaunchForm({
             value={testMode}
             onValueChange={applyTestMode}
             trackColor={SWITCH_TRACK_COLOR}
-            thumbColor="#FFF"
+            thumbColor={testMode ? COLORS.accent : '#6E6E73'}
+            ios_backgroundColor="#1A1B1F"
           />
         </View>
       </View>
@@ -331,7 +309,7 @@ const LaunchForm = memo(function LaunchForm({
       />
 
       <View style={styles.formSection}>
-        <Text style={styles.sectionTitle}>Economics</Text>
+        <Text style={styles.sectionTitle}>ECONOMICS</Text>
         <View style={styles.row}>
           <View style={styles.rowItem}>
             <FormField
@@ -377,6 +355,14 @@ const LaunchForm = memo(function LaunchForm({
           </View>
         </View>
         <FormField
+          key={`pmax-${formKey}`}
+          label="Initial Price (SOL)"
+          defaultValue={pMax0}
+          valueRef={pMaxRef}
+          keyboardType="decimal-pad"
+          hint="Drops 10x over duration"
+        />
+        <FormField
           key={`grad-${formKey}`}
           label="Graduation Goal (SOL)"
           defaultValue={grad0}
@@ -396,26 +382,22 @@ const LaunchForm = memo(function LaunchForm({
       />
 
       <TouchableOpacity
-        style={createButtonStyle}
+        style={[styles.createButton, (loading || (!connected)) && styles.disabledButton]}
         onPress={handleCreate}
         disabled={!connected || loading}
+        activeOpacity={0.9}
       >
-        <LinearGradient
-          colors={connected ? GRADIENT_PRIMARY : GRADIENT_DISABLED}
-          style={styles.gradient}
-        >
-          {loading ? (
-            <ActivityIndicator color="#FFF" />
-          ) : (
-            <Text style={styles.createButtonText}>
-              {connected ? 'Forge Artifact' : 'Connect to Forge'}
-            </Text>
-          )}
-        </LinearGradient>
+        {loading ? (
+          <ActivityIndicator color="#000" />
+        ) : (
+          <Text style={styles.createButtonText}>
+            {connected ? 'FORGE ARTIFACT' : 'CONNECT TO FORGE'}
+          </Text>
+        )}
       </TouchableOpacity>
 
       <View style={styles.infoCard}>
-        <Ionicons name="information-circle-outline" size={20} color={COLORS.primaryLight} />
+        <Ionicons name="information-circle-outline" size={20} color={COLORS.accent} />
         <Text style={styles.infoText}>
           Each launch requires a small rent deposit. 1% of all trades are allocated (0.5% Protocol, 0.5% Creator).
         </Text>
@@ -475,15 +457,6 @@ function PricePreview({ supplyRef, lpPctRef, rBestRef, graduationRef, formKey: _
 // UNCONTROLLED: uses defaultValue (not value). Static wrap style so this component
 // never re-renders after mount (no focus state) — avoids RN flicker from style/layout updates.
 
-interface FormFieldProps {
-  label: string;
-  defaultValue: string;
-  valueRef: React.MutableRefObject<string>;
-  keyboardType?: 'default' | 'numeric' | 'decimal-pad';
-  placeholder?: string;
-  hint?: string;
-}
-
 // Uncontrolled Identity inputs: no state, no value prop. Stops Android focus cycling from re-renders.
 const IdentityFormSection = memo(forwardRef<IdentityFormRef, unknown>(function IdentityFormSection(_: unknown, ref: React.Ref<IdentityFormRef>) {
   const tokenNameRef = useRef('');
@@ -509,7 +482,7 @@ const IdentityFormSection = memo(forwardRef<IdentityFormRef, unknown>(function I
             defaultValue=""
             onChangeText={(t) => { tokenNameRef.current = t; }}
             placeholder="e.g. Hyperion"
-            placeholderTextColor={COLORS.textMuted}
+            placeholderTextColor={COLORS.textTertiary}
             blurOnSubmit={false}
             {...(Platform.OS === 'android' && {
               includeFontPadding: false,
@@ -527,7 +500,7 @@ const IdentityFormSection = memo(forwardRef<IdentityFormRef, unknown>(function I
             defaultValue=""
             onChangeText={(t) => { tokenSymbolRef.current = t; }}
             placeholder="e.g. HYP"
-            placeholderTextColor={COLORS.textMuted}
+            placeholderTextColor={COLORS.textTertiary}
             blurOnSubmit={false}
             {...(Platform.OS === 'android' && {
               includeFontPadding: false,
@@ -545,7 +518,7 @@ const IdentityFormSection = memo(forwardRef<IdentityFormRef, unknown>(function I
             defaultValue=""
             onChangeText={(t) => { tokenUriRef.current = t; }}
             placeholder="https://..."
-            placeholderTextColor={COLORS.textMuted}
+            placeholderTextColor={COLORS.textTertiary}
             blurOnSubmit={false}
             {...(Platform.OS === 'android' && {
               includeFontPadding: false,
@@ -584,15 +557,13 @@ const FormField = memo(function FormField({
           onChangeText={handleChangeText}
           keyboardType={keyboardType}
           placeholder={placeholder}
-          placeholderTextColor={COLORS.textMuted}
+          placeholderTextColor={COLORS.textTertiary}
           blurOnSubmit={false}
           autoCapitalize="none"
           autoCorrect={false}
-          spellCheck={false}
           {...(Platform.OS === 'android' && {
             includeFontPadding: false,
             autoComplete: 'off',
-            importantForAutofill: 'no',
           })}
         />
       </View>
@@ -601,141 +572,204 @@ const FormField = memo(function FormField({
   );
 });
 
-// ─── Styles ────────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.surface },
-  content: { paddingHorizontal: SPACING.lg },
+  container: { flex: 1, backgroundColor: '#0C0D10' },
+  content: { paddingHorizontal: 24 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: 32,
   },
   headerSubtitle: {
-    ...TYPOGRAPHY.label,
-    color: COLORS.primaryLight,
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_700Bold',
     letterSpacing: 1,
-    textTransform: 'uppercase',
   },
-  headerTitle: { ...TYPOGRAPHY.h1, fontSize: 28 },
-  card: {
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.sm,
+  headerTitle: {
+    ...TYPOGRAPHY.screenTitle,
+    fontSize: 28,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: COLORS.text,
+  },
+  testModeCard: {
+    backgroundColor: '#111216',
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: SPACING.sm,
+    borderColor: COLORS.divider,
+    marginBottom: 24,
   },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  formSection: { marginBottom: SPACING.sm },
-  sectionTitle: { ...TYPOGRAPHY.label, color: COLORS.textMuted, marginBottom: 4, fontSize: 13 },
-  fieldContainer: { marginBottom: SPACING.sm },
-  inputLabel: { ...TYPOGRAPHY.bodyBold, fontSize: 14, color: COLORS.text, marginBottom: 4 },
-  inputHint: { ...TYPOGRAPHY.caption, color: COLORS.textMuted },
+  formSection: { marginBottom: 24 },
+  sectionTitle: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    letterSpacing: 1,
+    marginBottom: 16,
+  },
+  fieldContainer: { marginBottom: 16 },
+  inputLabel: {
+    fontSize: 10,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: '#FFF',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    opacity: 0.9,
+  },
+  inputHint: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_500Medium',
+  },
   inputWrap: {
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: RADIUS.md,
+    backgroundColor: '#111216',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    minHeight: 44,
+    borderColor: COLORS.divider,
+    minHeight: 52,
     justifyContent: 'center',
   },
-  inputWrapFocused: { borderColor: COLORS.primary, ...SHADOWS.glow },
   input: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     color: COLORS.text,
     fontSize: 16,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
   },
-  hintText: { ...TYPOGRAPHY.caption, color: COLORS.primaryLight, marginTop: 2 },
+  hintText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.accent,
+    marginTop: 6,
+    fontFamily: 'SpaceGrotesk_500Medium',
+  },
   row: { flexDirection: 'row' },
   rowItem: { flex: 1 },
-  rowGap: { width: SPACING.md },
+  rowGap: { width: 12 },
   createButton: {
-    height: 60,
-    borderRadius: RADIUS.lg,
-    overflow: 'hidden',
-    marginTop: 0,
-    ...SHADOWS.card,
-  },
-  createButtonDisabled: { opacity: 0.6 },
-  gradient: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  createButtonText: { ...TYPOGRAPHY.bodyBold, color: '#FFF', fontSize: 18 },
-  infoCard: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(29, 4, 225, 0.06)',
-    padding: SPACING.sm,
-    borderRadius: RADIUS.md,
-    marginTop: 10,
-    // marginBottom: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.borderLight,
-    gap: 10,
-  },
-  infoText: { flex: 1, ...TYPOGRAPHY.caption, color: COLORS.textSecondary, lineHeight: 18 },
-  successContainer: {
-    flex: 1,
-    backgroundColor: COLORS.background,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: COLORS.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: SPACING.xxl,
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 8,
+    marginBottom: 32,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  createButtonText: {
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: '#000',
+    fontSize: 16,
+    letterSpacing: 1,
+  },
+  disabledButton: { opacity: 0.5 },
+  infoCard: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(245, 241, 0, 0.05)',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 241, 0, 0.1)',
+    gap: 12,
+  },
+  infoText: {
+    flex: 1,
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
+    lineHeight: 18,
+    fontFamily: 'SpaceGrotesk_500Medium',
+  },
+  successContainer: {
+    flex: 1,
+    backgroundColor: '#0C0D10',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
   },
   successIcon: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    shadowColor: COLORS.success,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 8,
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING.xl,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.2)',
   },
-  successTitle: { ...TYPOGRAPHY.h2, color: COLORS.text },
-  initialBuyNote: {
-    ...TYPOGRAPHY.body,
+  successTitle: {
+    ...TYPOGRAPHY.screenTitle,
+    color: COLORS.text,
+    fontFamily: 'SpaceGrotesk_700Bold',
     textAlign: 'center',
-    color: COLORS.textSecondary,
-    marginTop: SPACING.md,
-    marginBottom: SPACING.xxl,
+  },
+  initialBuyNote: {
+    ...TYPOGRAPHY.bodySecondary,
+    textAlign: 'center',
+    color: COLORS.textTertiary,
+    marginTop: 12,
+    marginBottom: 40,
+    lineHeight: 22,
   },
   pdaCard: {
-    backgroundColor: COLORS.surface,
-    padding: SPACING.xl,
-    borderRadius: RADIUS.xl,
+    backgroundColor: '#111216',
+    padding: 24,
+    borderRadius: 20,
     width: '100%',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: COLORS.border,
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.primary,
+    borderColor: COLORS.divider,
   },
-  pdaLabel: { ...TYPOGRAPHY.label, color: COLORS.textMuted, marginBottom: 8 },
-  pdaText: { ...TYPOGRAPHY.bodyBold, color: COLORS.primaryLight, fontSize: 12 },
-  copyIconMargin: { marginTop: 8 },
+  pdaLabel: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    marginBottom: 8,
+    letterSpacing: 1,
+  },
+  pdaText: {
+    ...TYPOGRAPHY.bodySecondary,
+    color: COLORS.accent,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 13,
+  },
+  copyIconMargin: { marginTop: 12 },
   openButton: {
     width: '100%',
-    height: 56,
-    borderRadius: RADIUS.lg,
-    overflow: 'hidden',
-    marginTop: SPACING.xxl,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#17181D',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 32,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
-  openButtonText: { ...TYPOGRAPHY.bodyBold, color: '#FFF' },
+  openButtonText: {
+    ...TYPOGRAPHY.bodyPrimary,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: COLORS.text,
+  },
   previewCard: {
     backgroundColor: 'rgba(29, 4, 225, 0.06)',
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.cards,
     padding: SPACING.md,
     marginBottom: SPACING.sm,
     borderWidth: 1,
-    borderColor: COLORS.borderLight,
+    borderColor: COLORS.border,
     gap: 6,
   },
   previewTitle: {
     ...TYPOGRAPHY.label,
-    color: COLORS.primaryLight,
+    color: COLORS.accent,
     fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
@@ -746,7 +780,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  previewLabel: { ...TYPOGRAPHY.caption, color: COLORS.textMuted, fontSize: 12 },
+  previewLabel: { ...TYPOGRAPHY.caption, color: COLORS.textTertiary, fontSize: 12 },
   previewValue: { ...TYPOGRAPHY.bodyBold, color: COLORS.text, fontSize: 13 },
   previewNote: {
     ...TYPOGRAPHY.caption,
