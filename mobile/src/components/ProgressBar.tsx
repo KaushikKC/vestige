@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS } from '../constants/theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 
 interface ProgressBarProps {
   progress: number;
@@ -40,38 +40,36 @@ export default function ProgressBar({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    ...SHADOWS.sm,
+    backgroundColor: 'transparent',
+    width: '100%',
   },
   labelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: 8,
   },
   label: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '600',
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
   },
   percent: {
+    ...TYPOGRAPHY.label,
     color: COLORS.accent,
-    fontSize: FONT_SIZE.md,
-    fontWeight: '800',
+    fontFamily: 'SpaceGrotesk_700Bold',
   },
   track: {
-    height: 10,
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: 5,
+    height: 6,
+    backgroundColor: COLORS.divider,
+    borderRadius: 3,
     overflow: 'hidden',
-    marginBottom: SPACING.sm,
+    marginBottom: 12,
   },
   fill: {
     height: '100%',
     backgroundColor: COLORS.accent,
-    borderRadius: 5,
+    borderRadius: 3,
   },
   amountRow: {
     flexDirection: 'row',
@@ -81,16 +79,15 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   amountLabel: {
-    color: COLORS.textMuted,
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
     fontSize: 10,
-    fontWeight: '600',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
     marginBottom: 2,
   },
   amount: {
-    color: COLORS.text,
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
   },
 });

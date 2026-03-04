@@ -1,16 +1,14 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions, Text } from 'react-native';
 import Svg, {
-  Rect,
-  Line,
-  Circle,
+  Path,
   Defs,
   LinearGradient,
   Stop,
-  Polygon,
+  Line,
   Text as SvgText,
 } from 'react-native-svg';
-import { COLORS } from '../constants/theme';
+import { COLORS, TYPOGRAPHY } from '../constants/theme';
 
 interface Props {
   pMax: number;
@@ -20,8 +18,8 @@ interface Props {
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const CHART_HEIGHT = 320;
-const PAD = { top: 24, bottom: 36, left: 54, right: 16 };
+const CHART_HEIGHT = 220;
+const PAD = { top: 20, bottom: 40, left: 20, right: 20 };
 const PLOT_W = SCREEN_WIDTH - PAD.left - PAD.right;
 const PLOT_H = CHART_HEIGHT - PAD.top - PAD.bottom;
 
@@ -32,8 +30,6 @@ export default function PriceCurveChart({ pMax, pMin, startTime, endTime }: Prop
     const elapsed = Math.max(0, Math.min(duration, now - startTime));
     const progress = duration > 0 ? elapsed / duration : 0;
     const currentPrice = pMax - (pMax - pMin) * progress;
-    const ended = now >= endTime;
-    const notStarted = now < startTime;
 
     const mapX = (t: number) => PAD.left + ((t - startTime) / (duration || 1)) * PLOT_W;
     const mapY = (p: number) => PAD.top + (1 - (p - pMin) / ((pMax - pMin) || 1)) * PLOT_H;
@@ -41,164 +37,143 @@ export default function PriceCurveChart({ pMax, pMin, startTime, endTime }: Prop
     const nowX = mapX(Math.min(now, endTime));
     const nowY = mapY(currentPrice);
 
-    // Y-axis grid: 5 evenly spaced prices
-    const gridLines: { y: number; label: string }[] = [];
-    for (let i = 0; i <= 4; i++) {
-      const p = pMin + ((pMax - pMin) * i) / 4;
-      gridLines.push({ y: mapY(p), label: (p / 1e9).toFixed(4) });
+    const startX = PAD.left;
+    const startY = mapY(pMax);
+    const endX = PAD.left + PLOT_W;
+    const endY = mapY(pMin);
+
+    const curvePath = `M ${startX} ${startY} Q ${(startX + endX) / 2} ${startY} ${endX} ${endY}`;
+
+    const horizontalGrid = [];
+    for (let i = 0; i <= 3; i++) {
+      const p = pMin + ((pMax - pMin) * i) / 3;
+      horizontalGrid.push({ y: mapY(p) });
     }
 
-    // X-axis time labels
-    const timeLabels: { x: number; label: string }[] = [
-      { x: PAD.left, label: 'Start' },
-      { x: PAD.left + PLOT_W * 0.25, label: '+' + formatDuration(duration * 0.25) },
-      { x: PAD.left + PLOT_W * 0.5, label: '+' + formatDuration(duration * 0.5) },
-      { x: PAD.left + PLOT_W * 0.75, label: '+' + formatDuration(duration * 0.75) },
-      { x: PAD.left + PLOT_W, label: 'End' },
-    ];
-
-    // Gradient polygon points (only up to "now")
-    const gradientPoints = `${PAD.left},${mapY(pMax)} ${nowX},${nowY} ${nowX},${PAD.top + PLOT_H} ${PAD.left},${PAD.top + PLOT_H}`;
-
-    // Price badge label
-    const priceBadgeLabel = (currentPrice / 1e9).toFixed(5) + ' SOL';
-
     return {
-      nowX, nowY, currentPrice, ended, notStarted,
-      gridLines, timeLabels, gradientPoints, priceBadgeLabel,
-      startY: mapY(pMax), endX: PAD.left + PLOT_W, endY: mapY(pMin),
+      nowX,
+      nowY,
+      startX,
+      startY,
+      endX,
+      endY,
+      curvePath,
+      horizontalGrid,
     };
-    // Update roughly every 10 seconds
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pMax, pMin, startTime, endTime, Math.floor(Date.now() / 10000)]);
+  }, [pMax, pMin, startTime, endTime]);
 
-  const {
-    nowX, nowY, ended, notStarted,
-    gridLines, timeLabels, gradientPoints, priceBadgeLabel,
-    startY, endX, endY,
-  } = data;
-
-  const active = !ended && !notStarted;
+  const { nowX, nowY, startX, startY, endX, endY, curvePath, horizontalGrid } = data;
 
   return (
-    <View style={styles.container}>
-      <Svg width={SCREEN_WIDTH} height={CHART_HEIGHT}>
-        {/* Background */}
-        <Rect x={0} y={0} width={SCREEN_WIDTH} height={CHART_HEIGHT} fill={COLORS.chartArea} />
+    <View style={styles.outerContainer}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Bonding Curve</Text>
+        <Text style={styles.headerValue}>{(pMax / 1e9).toFixed(4)} → {(pMin / 1e9).toFixed(4)} SOL</Text>
+      </View>
 
-        {/* Horizontal grid lines + Y-axis labels */}
-        {gridLines.map((gl, i) => (
-          <React.Fragment key={i}>
+      <View style={styles.container}>
+        <Svg width={SCREEN_WIDTH - 40} height={CHART_HEIGHT}>
+          <Defs>
+            <LinearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={COLORS.accent} stopOpacity={0.1} />
+              <Stop offset="1" stopColor={COLORS.accent} stopOpacity={0} />
+            </LinearGradient>
+          </Defs>
+
+          {/* Grid lines */}
+          {horizontalGrid.map((line, i) => (
             <Line
-              x1={PAD.left} y1={gl.y} x2={PAD.left + PLOT_W} y2={gl.y}
-              stroke={COLORS.chartGrid} strokeWidth={0.5}
+              key={i}
+              x1={0} y1={line.y} x2={SCREEN_WIDTH - 40} y2={line.y}
+              stroke={COLORS.chartGrid}
+              strokeWidth={1}
             />
-            <SvgText
-              x={PAD.left - 6} y={gl.y + 3}
-              fill="rgba(255, 255, 255, 0.6)" fontSize={9} fontFamily="monospace"
-              textAnchor="end"
-            >
-              {gl.label}
-            </SvgText>
-          </React.Fragment>
-        ))}
+          ))}
 
-        {/* Vertical time grid lines */}
-        {timeLabels.map((tl, i) => (
-          <React.Fragment key={i}>
-            <Line
-              x1={tl.x} y1={PAD.top} x2={tl.x} y2={PAD.top + PLOT_H}
-              stroke={COLORS.chartGrid} strokeWidth={0.5} strokeDasharray="4,4"
-            />
-            <SvgText
-              x={tl.x} y={CHART_HEIGHT - 8}
-              fill="rgba(255, 255, 255, 0.6)" fontSize={9}
-              textAnchor="middle"
-            >
-              {tl.label}
-            </SvgText>
-          </React.Fragment>
-        ))}
-
-        {/* Gradient fill (up to now) */}
-        <Defs>
-          <LinearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={COLORS.primary} stopOpacity={0.25} />
-            <Stop offset="1" stopColor={COLORS.primary} stopOpacity={0.02} />
-          </LinearGradient>
-        </Defs>
-        {active && (
-          <Polygon points={gradientPoints} fill="url(#areaGrad)" />
-        )}
-
-        {/* Solid past line */}
-        <Line
-          x1={PAD.left} y1={startY}
-          x2={active ? nowX : endX} y2={active ? nowY : endY}
-          stroke="#FFFFFF" strokeWidth={2.5} strokeLinecap="round"
-        />
-
-        {/* Dashed future line */}
-        {active && (
-          <Line
-            x1={nowX} y1={nowY} x2={endX} y2={endY}
-            stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round"
-            strokeDasharray="6,4" opacity={0.3}
+          {/* Fill */}
+          <Path
+            d={`${curvePath} L ${endX - PAD.left} ${CHART_HEIGHT - PAD.bottom} L ${startX - PAD.left} ${CHART_HEIGHT - PAD.bottom} Z`}
+            fill="url(#chartFill)"
+            transform={`translate(${-PAD.left}, 0)`}
           />
-        )}
 
-        {/* "Now" vertical dashed line */}
-        {active && (
+          {/* Curve */}
+          <Path
+            d={curvePath}
+            fill="none"
+            stroke={COLORS.accent}
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            transform={`translate(${-PAD.left}, 0)`}
+          />
+
+          {/* Current point indicator */}
           <Line
-            x1={nowX} y1={PAD.top} x2={nowX} y2={PAD.top + PLOT_H}
-            stroke="#FFFFFF" strokeWidth={0.8} strokeDasharray="4,4"
+            x1={nowX - PAD.left} y1={0} x2={nowX - PAD.left} y2={CHART_HEIGHT - PAD.bottom}
+            stroke={COLORS.textTertiary}
+            strokeWidth={1}
+            strokeDasharray="4,4"
             opacity={0.3}
           />
-        )}
 
-        {/* Current price dot */}
-        {active && (
-          <>
-            <Circle cx={nowX} cy={nowY} r={8} fill="#FFFFFF" opacity={0.3} />
-            <Circle cx={nowX} cy={nowY} r={5} fill="#FFFFFF" />
-            <Circle cx={nowX} cy={nowY} r={3} fill="#000000" />
-          </>
-        )}
-
-        {/* Price badge */}
-        {active && (
-          <>
-            <Rect
-              x={Math.min(SCREEN_WIDTH - 110, Math.max(PAD.left, nowX - 45))}
-              y={nowY - 26}
-              width={90} height={18} rx={9}
-              fill={COLORS.text}
-            />
-            <SvgText
-              x={Math.min(SCREEN_WIDTH - 65, Math.max(PAD.left + 45, nowX))}
-              y={nowY - 14}
-              fill="#FFFFFF" fontSize={9} fontFamily="monospace"
-              textAnchor="middle"
-            >
-              {priceBadgeLabel}
-            </SvgText>
-          </>
-        )}
-      </Svg>
+          {/* Labels */}
+          <SvgText
+            x={0} y={CHART_HEIGHT - 10}
+            fill={COLORS.textTertiary}
+            fontSize={9}
+            fontFamily="SpaceGrotesk_700Bold"
+            letterSpacing={0.5}
+          >
+            START
+          </SvgText>
+          <SvgText
+            x={SCREEN_WIDTH - 40} y={CHART_HEIGHT - 10}
+            fill={COLORS.accent}
+            fontSize={9}
+            fontFamily="SpaceGrotesk_700Bold"
+            textAnchor="end"
+            letterSpacing={0.5}
+          >
+            GRADUATE
+          </SvgText>
+        </Svg>
+      </View>
     </View>
   );
 }
 
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const d = Math.floor(seconds / 86400);
-  if (d >= 1) return `${d}d`;
-  return `${h}h`;
-}
-
 const styles = StyleSheet.create({
+  outerContainer: {
+    backgroundColor: '#17181D',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    marginBottom: 20,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  headerTitle: {
+    ...TYPOGRAPHY.caption,
+    fontSize: 10,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    color: COLORS.textTertiary,
+  },
+  headerValue: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 11,
+  },
   container: {
-    width: SCREEN_WIDTH,
+    width: '100%',
     height: CHART_HEIGHT,
+    overflow: 'hidden',
   },
 });

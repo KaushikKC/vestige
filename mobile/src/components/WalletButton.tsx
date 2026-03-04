@@ -27,8 +27,8 @@ export default function WalletButton() {
         onPress={connect}
         activeOpacity={0.7}
       >
-        <View style={[styles.dot, styles.dotGray]} />
-        <Text style={styles.text}>Connect Wallet</Text>
+        <Ionicons name="wallet-outline" size={14} color="#000" />
+        <Text style={styles.text}>Connect</Text>
       </TouchableOpacity>
     );
   }
@@ -40,9 +40,9 @@ export default function WalletButton() {
       onLongPress={disconnect}
       activeOpacity={0.7}
     >
-      <View style={[styles.dot, styles.dotGreen]} />
+      <View style={styles.dotGreen} />
       <Text style={styles.connectedText}>{shortAddress}</Text>
-      <Ionicons name="copy-outline" size={12} color={COLORS.textMuted} />
+      <Ionicons name="copy-outline" size={12} color={COLORS.textTertiary} />
     </TouchableOpacity>
   );
 }
@@ -51,40 +51,37 @@ const styles = StyleSheet.create({
   button: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.sm + 4,
-    paddingVertical: SPACING.xs + 2,
-    borderRadius: RADIUS.lg,
-    gap: SPACING.xs,
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6,
   },
   addressButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: SPACING.sm + 4,
-    paddingVertical: SPACING.xs + 2,
-    borderRadius: RADIUS.lg,
-    gap: SPACING.xs,
+    backgroundColor: '#111216',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
-  dot: {
+  dotGreen: {
     width: 6,
     height: 6,
     borderRadius: 3,
-  },
-  dotGreen: {
-    backgroundColor: COLORS.success,
-  },
-  dotGray: {
-    backgroundColor: COLORS.textMuted,
+    backgroundColor: COLORS.accent,
   },
   text: {
-    color: '#FFFFFF',
+    color: '#000',
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'SpaceGrotesk_700Bold',
   },
   connectedText: {
     color: COLORS.text,
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'SpaceGrotesk_600SemiBold',
   },
 });

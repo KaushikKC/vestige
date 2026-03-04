@@ -12,7 +12,7 @@ interface SkeletonLoaderProps {
 export default function SkeletonLoader({
   width,
   height,
-  borderRadius = RADIUS.sm,
+  borderRadius = 8,
   style,
 }: SkeletonLoaderProps) {
   const opacity = useRef(new Animated.Value(1)).current;
@@ -21,13 +21,13 @@ export default function SkeletonLoader({
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(opacity, {
-          toValue: 0.4,
-          duration: 600,
+          toValue: 0.3,
+          duration: 800,
           useNativeDriver: true,
         }),
         Animated.timing(opacity, {
-          toValue: 1,
-          duration: 600,
+          toValue: 0.6,
+          duration: 800,
           useNativeDriver: true,
         }),
       ])
@@ -43,7 +43,7 @@ export default function SkeletonLoader({
           width: width as any,
           height,
           borderRadius,
-          backgroundColor: COLORS.surfaceLight,
+          backgroundColor: COLORS.divider,
           opacity,
         },
         style,

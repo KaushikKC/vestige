@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Connection, PublicKey } from '@solana/web3.js';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../constants/theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, TYPOGRAPHY } from '../constants/theme';
 import { VestigeClient } from '../lib/vestige-client';
 import { RPC_ENDPOINT, CONNECTION_CONFIG } from '../constants/solana';
 
@@ -53,7 +53,7 @@ export default function TradeFeed({ launchPda }: TradeFeedProps) {
 
       const parsed: TradeItem[] = [];
       // Fetch in small batches to avoid rate limits
-      const BATCH = 3;
+      const BATCH = 5;
       for (let i = 0; i < sigs.length; i += BATCH) {
         const batch = sigs.slice(i, i + BATCH);
         const results = await Promise.allSettled(
@@ -136,14 +136,12 @@ export default function TradeFeed({ launchPda }: TradeFeedProps) {
     const isBuy = item.type === 'buy';
     return (
       <View style={styles.tradeItem}>
-        <Text style={[styles.tradeIcon, { color: isBuy ? COLORS.success : COLORS.error }]}>
-          {isBuy ? '\u25CF' : '\u25CF'}
-        </Text>
+        <View style={[styles.indicator, { backgroundColor: isBuy ? COLORS.accent : COLORS.error }]} />
         <Text style={styles.tradeWallet}>{truncateWallet(item.wallet)}</Text>
         <Text
           style={[
             styles.tradeAmount,
-            { color: isBuy ? COLORS.success : COLORS.error },
+            { color: isBuy ? COLORS.accent : COLORS.error },
           ]}
         >
           {isBuy ? '+' : '-'}
@@ -157,8 +155,8 @@ export default function TradeFeed({ launchPda }: TradeFeedProps) {
   if (loading) {
     return (
       <View style={styles.loadingWrap}>
-        <ActivityIndicator color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading trades...</Text>
+        <ActivityIndicator color={COLORS.accent} />
+        <Text style={styles.loadingText}>Loading activity...</Text>
       </View>
     );
   }
@@ -166,8 +164,8 @@ export default function TradeFeed({ launchPda }: TradeFeedProps) {
   return (
     <View>
       <View style={styles.headerRow}>
-        <Text style={styles.headerTitle}>TRADES</Text>
-        <TouchableOpacity onPress={fetchTrades} activeOpacity={0.7}>
+        <Text style={styles.headerTitle}>Recent Trades</Text>
+        <TouchableOpacity onPress={fetchTrades} activeOpacity={0.7} style={styles.refreshBtn}>
           <Text style={styles.refreshText}>Refresh</Text>
         </TouchableOpacity>
       </View>
@@ -175,12 +173,13 @@ export default function TradeFeed({ launchPda }: TradeFeedProps) {
       {trades.length === 0 ? (
         <Text style={styles.emptyText}>No trades yet</Text>
       ) : (
-        <FlatList
-          data={trades}
-          keyExtractor={(item) => item.signature}
-          renderItem={renderItem}
-          scrollEnabled={false}
-        />
+        <View style={styles.listContainer}>
+          {trades.map((item) => (
+            <React.Fragment key={item.signature}>
+              {renderItem({ item })}
+            </React.Fragment>
+          ))}
+        </View>
       )}
     </View>
   );
@@ -191,63 +190,88 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
   headerTitle: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
+    fontSize: 10,
+    fontFamily: 'SpaceGrotesk_700Bold',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 1.5,
+    color: COLORS.textTertiary,
+  },
+  refreshBtn: {
+    backgroundColor: '#111216',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   refreshText: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
-    color: COLORS.primary,
+    fontSize: 10,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: COLORS.accent,
+    textTransform: 'uppercase',
+  },
+  listContainer: {
+    backgroundColor: '#17181D',
+    borderRadius: 24,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   tradeItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.sm + 2,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.border,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.02)',
   },
-  tradeIcon: {
-    fontSize: 10,
-    marginRight: SPACING.sm,
+  indicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 12,
   },
   tradeWallet: {
     flex: 1,
-    color: COLORS.text,
-    fontSize: FONT_SIZE.sm,
-    fontFamily: 'monospace',
-    fontWeight: '600',
+    color: '#FFF',
+    fontSize: 13,
+    fontFamily: 'SpaceGrotesk_700Bold',
   },
   tradeAmount: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
-    fontFamily: 'monospace',
-    marginRight: SPACING.sm,
+    fontSize: 13,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    marginRight: 16,
+    letterSpacing: -0.2,
   },
   tradeTime: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.xs,
-    minWidth: 48,
+    color: COLORS.textTertiary,
+    fontSize: 10,
+    fontFamily: 'SpaceGrotesk_500Medium',
+    minWidth: 56,
     textAlign: 'right',
   },
   loadingWrap: {
-    paddingVertical: SPACING.xl,
+    paddingVertical: 60,
     alignItems: 'center',
-    gap: SPACING.sm,
+    gap: 16,
   },
   loadingText: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.sm,
+    fontSize: 13,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_500Medium',
   },
   emptyText: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.sm,
+    fontSize: 14,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_500Medium',
     textAlign: 'center',
-    paddingVertical: SPACING.lg,
+    paddingVertical: 48,
+    backgroundColor: '#17181D',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
 });

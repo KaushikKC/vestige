@@ -13,14 +13,11 @@ export default function LandingScreen({ navigation }: any) {
     return (
         <View style={styles.container}>
             <BackgroundEffect />
-            <StatusBar barStyle="dark-content" />
-
-            {/* Background Decor */}
-            {/* <View style={styles.bgGlow} /> */}
+            <StatusBar barStyle="light-content" />
 
             <View style={styles.content}>
                 <View style={styles.header}>
-                    <VestigeLogo size={40} />
+                    <VestigeLogo size={32} color={COLORS.accent} />
                     <Text style={styles.logoText}>Vestige</Text>
                 </View>
 
@@ -30,13 +27,23 @@ export default function LandingScreen({ navigation }: any) {
                     </Text>
 
                     <View style={styles.features}>
-                        <View style={[styles.featureItem, { backgroundColor: COLORS.pastelLavender }]}>
-                            <Ionicons name="flame" size={24} color={COLORS.error} style={{ marginRight: 12 }} />
-                            <Text style={styles.featureText}>Hottest launches</Text>
+                        <View style={styles.featureItem}>
+                            <View style={styles.featureIcon}>
+                                <Ionicons name="flame" size={20} color={COLORS.accent} />
+                            </View>
+                            <View>
+                                <Text style={styles.featureTitle}>Hottest launches</Text>
+                                <Text style={styles.featureSub}>Track real-time market activity</Text>
+                            </View>
                         </View>
-                        <View style={[styles.featureItem, { backgroundColor: COLORS.pastelBlue }]}>
-                            <Ionicons name="flash" size={24} color={COLORS.warning} style={{ marginRight: 12 }} />
-                            <Text style={styles.featureText}>Instant trading</Text>
+                        <View style={styles.featureItem}>
+                            <View style={styles.featureIcon}>
+                                <Ionicons name="flash" size={20} color={COLORS.accent} />
+                            </View>
+                            <View>
+                                <Text style={styles.featureTitle}>Instant trading</Text>
+                                <Text style={styles.featureSub}>Buy and sell in one tap</Text>
+                            </View>
                         </View>
                     </View>
                 </View>
@@ -58,8 +65,7 @@ export default function LandingScreen({ navigation }: any) {
                     </TouchableOpacity>
 
                     <Text style={styles.termsText}>
-                        By continuing, you agree to our <Text style={styles.linkText}>Terms</Text> and{'\n'}
-                        <Text style={styles.linkText}>Privacy Policy</Text>
+                        By continuing, you agree to our <Text style={styles.linkText}>Terms</Text> and <Text style={styles.linkText}>Privacy Policy</Text>
                     </Text>
                 </View>
             </View>
@@ -70,34 +76,23 @@ export default function LandingScreen({ navigation }: any) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: 'transparent',
-    },
-    bgGlow: {
-        position: 'absolute',
-        top: -100,
-        right: -100,
-        width: 300,
-        height: 300,
-        borderRadius: 150,
-        backgroundColor: COLORS.primaryGlow,
-        opacity: 0.3,
+        backgroundColor: '#0C0D10',
     },
     content: {
         flex: 1,
-        paddingHorizontal: SPACING.lg,
-        paddingTop: SPACING.xxxl,
-        paddingBottom: SPACING.xxl,
+        paddingHorizontal: 28,
+        paddingTop: 60,
+        paddingBottom: 48,
     },
     header: {
         alignItems: 'center',
         flexDirection: 'row',
-        marginBottom: SPACING.xl,
+        gap: 12,
     },
     logoText: {
-        ...TYPOGRAPHY.h2,
-        color: COLORS.text,
-        marginLeft: SPACING.sm,
-        fontWeight: '900',
+        fontSize: 24,
+        color: '#FFF',
+        fontFamily: 'SpaceGrotesk_700Bold',
         letterSpacing: -1,
     },
     heroSection: {
@@ -105,79 +100,105 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     heroTitle: {
-        ...TYPOGRAPHY.h1,
-        fontSize: 44,
-        lineHeight: 52,
-        color: COLORS.text,
+        fontSize: 50,
+        lineHeight: 50,
+        color: '#FFF',
+        fontFamily: 'SpaceGrotesk_700Bold',
+        letterSpacing: -2,
     },
     highlightText: {
-        color: COLORS.textMuted,
+        color: COLORS.accent,
     },
     features: {
-        marginTop: SPACING.xl,
-        gap: SPACING.md,
+        marginTop: 10,
+        gap: 16,
     },
     featureItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: SPACING.lg,
-        borderRadius: RADIUS.lg,
-        backgroundColor: COLORS.surface,
-        ...SHADOWS.card,
+        padding: 16,
+        borderRadius: 32,
+        backgroundColor: '#17181D',
+        borderWidth: 1,
+        borderColor: COLORS.divider,
+        gap: 14,
     },
-    featureText: {
-        ...TYPOGRAPHY.bodyBold,
-        fontSize: 18,
+    featureIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 14,
+        backgroundColor: '#0C0D10',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: COLORS.divider,
     },
-    divider: {
-        display: 'none',
+    featureTitle: {
+        fontSize: 16,
+        fontFamily: 'SpaceGrotesk_700Bold',
+        color: '#FFF',
+    },
+    featureSub: {
+        fontSize: 12,
+        color: COLORS.textTertiary,
+        marginTop: 0,
+        fontFamily: 'SpaceGrotesk_500Medium',
     },
     footer: {
         width: '100%',
-        marginTop: SPACING.xxl,
     },
     primaryButton: {
         width: '100%',
         height: 64,
-        borderRadius: RADIUS.full,
-        overflow: 'hidden',
-        marginBottom: SPACING.md,
-        backgroundColor: COLORS.primary,
+        borderRadius: 32,
+        marginBottom: 16,
+        backgroundColor: COLORS.accent,
         justifyContent: 'center',
         alignItems: 'center',
-        ...SHADOWS.md,
-    },
-    gradient: {
-        display: 'none',
+        shadowColor: COLORS.accent,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.35,
+        shadowRadius: 16,
+        elevation: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     buttonText: {
-        ...TYPOGRAPHY.bodyBold,
-        color: '#FFF',
-        fontSize: 18,
+        fontFamily: 'SpaceGrotesk_700Bold',
+        color: '#000',
+        fontSize: 16,
+        textTransform: 'uppercase',
+        letterSpacing: 1.5,
     },
     secondaryButton: {
         width: '100%',
         height: 64,
-        borderRadius: RADIUS.full,
-        backgroundColor: COLORS.surface,
+        borderRadius: 32,
+        backgroundColor: '#111216',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: SPACING.xl,
-        ...SHADOWS.card,
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: COLORS.divider,
     },
     secondaryButtonText: {
-        ...TYPOGRAPHY.bodyBold,
-        color: COLORS.text,
+        fontSize: 15,
+        fontFamily: 'SpaceGrotesk_700Bold',
+        color: '#FFF',
+        textTransform: 'uppercase',
+        letterSpacing: 1.5,
     },
     termsText: {
-        ...TYPOGRAPHY.caption,
+        fontSize: 12,
         textAlign: 'center',
-        color: COLORS.textMuted,
+        color: COLORS.textTertiary,
         lineHeight: 20,
+        fontFamily: 'SpaceGrotesk_500Medium',
+        paddingHorizontal: 20,
     },
     linkText: {
-        color: COLORS.text,
-        fontWeight: '600',
-        textDecorationLine: 'underline',
+        color: '#FFF',
+        fontFamily: 'SpaceGrotesk_700Bold',
+        textDecorationLine: 'none',
     },
 });

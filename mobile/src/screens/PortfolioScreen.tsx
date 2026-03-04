@@ -60,7 +60,6 @@ export default function PortfolioScreen({ navigation }: Props) {
   const [myLaunches, setMyLaunches] = useState<LaunchData[]>([]);
   const [positions, setPositions] = useState<PositionWithLaunch[]>([]);
   const [loading, setLoading] = useState(true);
-  const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const [solBalance, setSolBalance] = useState<number | null>(null);
@@ -110,8 +109,6 @@ export default function PortfolioScreen({ navigation }: Props) {
     if (!publicKey) return;
     try {
       const launches = await getAllLaunches(true);
-      const createdByMe = launches.filter((l) => l.creator.toBase58() === publicKey.toBase58());
-      setMyLaunches(createdByMe);
       const results: PositionWithLaunch[] = [];
       const BATCH_SIZE = 4;
       for (let i = 0; i < launches.length; i += BATCH_SIZE) {
@@ -127,7 +124,6 @@ export default function PortfolioScreen({ navigation }: Props) {
       console.warn('Failed to fetch portfolio:', err);
     } finally {
       setLoading(false);
-      setInitialLoadDone(true);
       setRefreshing(false);
     }
   }, [publicKey, getAllLaunches, getUserPosition]);
@@ -154,15 +150,15 @@ export default function PortfolioScreen({ navigation }: Props) {
     return (
       <View style={styles.emptyCenter}>
         <BackgroundEffect />
-        <StatusBar barStyle="dark-content" />
-        <VestigeLogo size={100} style={{ marginBottom: SPACING.xl }} />
-        <Text style={styles.emptyTitle}>CONNECT WALLET</Text>
+        <StatusBar barStyle="light-content" />
+        <VestigeLogo size={80} color={COLORS.accent} style={{ marginBottom: 32 }} />
+        <Text style={styles.emptyTitle}>Sign in to Vestige</Text>
         <Text style={styles.emptySubtext}>
-          Securely manage your digital artifacts and track your performance in real-time.
+          Securely manage your digital artifacts and track performance in real-time.
         </Text>
         <TouchableOpacity style={styles.connectButton} onPress={connect} activeOpacity={0.8}>
-          <Ionicons name="wallet-outline" size={22} color="#FFF" style={{ marginRight: 10 }} />
-          <Text style={styles.connectButtonText}>Sign In with Wallet</Text>
+          <Ionicons name="wallet-outline" size={24} color="#000" style={{ marginRight: 12 }} />
+          <Text style={styles.connectButtonText}>Connect Wallet</Text>
         </TouchableOpacity>
       </View>
     );
@@ -171,20 +167,20 @@ export default function PortfolioScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <BackgroundEffect />
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
       <FlatList
         data={[]}
         renderItem={() => null}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.accent} />}
         ListHeaderComponent={
-          <View style={[styles.content, { paddingTop: insets.top + SPACING.md }]}>
+          <View style={[styles.content, { paddingTop: insets.top + 20 }]}>
             <View style={styles.headerRow}>
               <View>
-                <Text style={styles.headerSubtitle}>Portfolio</Text>
-                <Text style={styles.headerTitle}>Overview</Text>
+                <Text style={styles.headerSubtitle}>ACCOUNT</Text>
+                <Text style={styles.headerTitle}>Portfolio</Text>
               </View>
               <TouchableOpacity onPress={disconnect} style={styles.logoutBtn}>
-                <Ionicons name="log-out-outline" size={22} color={COLORS.textSecondary} />
+                <Ionicons name="log-out-outline" size={20} color={COLORS.textTertiary} />
               </TouchableOpacity>
             </View>
 
@@ -194,7 +190,7 @@ export default function PortfolioScreen({ navigation }: Props) {
                 <TouchableOpacity onPress={copyAddress} style={styles.addressPill}>
                   <View style={styles.activeDot} />
                   <Text style={styles.addressText}>{shortAddress}</Text>
-                  <Ionicons name="copy-outline" size={14} color={COLORS.textMuted} />
+                  <Ionicons name="copy-outline" size={14} color={COLORS.textTertiary} />
                 </TouchableOpacity>
               </View>
               <Text style={styles.balanceLabel}>Total Balance</Text>
@@ -203,19 +199,19 @@ export default function PortfolioScreen({ navigation }: Props) {
 
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{myLaunches.length}</Text>
-                  <Text style={styles.statLabel}>Launches</Text>
+                  <Text style={styles.statValue}>{positions.length}</Text>
+                  <Text style={styles.statLabel}>Active Positions</Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{positions.length}</Text>
-                  <Text style={styles.statLabel}>Positions</Text>
+                  <Text style={styles.statValue}>1</Text>
+                  <Text style={styles.statLabel}>Watchlist</Text>
                 </View>
               </View>
             </View>
 
             {loading ? (
-              <View style={{ gap: SPACING.md }}>
+              <View style={{ gap: 16 }}>
                 <SkeletonPositionCard />
                 <SkeletonPositionCard />
               </View>
@@ -225,14 +221,14 @@ export default function PortfolioScreen({ navigation }: Props) {
                   <Text style={styles.sectionTitle}>Asset Allocations</Text>
                 </View>
 
-                {positions.length === 0 && myLaunches.length === 0 ? (
+                {positions.length === 0 ? (
                   <View style={styles.emptyList}>
-                    <Ionicons name="analytics" size={48} color={COLORS.border} />
+                    <Ionicons name="analytics-outline" size={48} color={COLORS.divider} />
                     <Text style={styles.emptyListTitle}>No assets found</Text>
                     <Text style={styles.emptyListDesc}>Start exploring to build your digital artifact collection.</Text>
                   </View>
                 ) : (
-                  <View style={{ gap: SPACING.md }}>
+                  <View style={{ gap: 16 }}>
                     {positions.map((item) => (
                       <TouchableOpacity
                         key={item.position.publicKey.toBase58()}
@@ -247,7 +243,7 @@ export default function PortfolioScreen({ navigation }: Props) {
             )}
           </View>
         }
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 110 }}
       />
     </View>
   );
@@ -255,98 +251,196 @@ export default function PortfolioScreen({ navigation }: Props) {
 
 const skeletonStyles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    gap: SPACING.sm,
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 20,
+    padding: 20,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
   row: { flexDirection: 'row', justifyContent: 'space-between' },
 });
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent' },
-  content: { paddingHorizontal: SPACING.lg },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  content: { paddingHorizontal: 20 },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
-    marginBottom: SPACING.xl,
+    marginBottom: 40,
   },
-  headerSubtitle: { ...TYPOGRAPHY.label, color: COLORS.textMuted, letterSpacing: 0.5 },
-  headerTitle: { ...TYPOGRAPHY.h1, fontSize: 32 },
-  logoutBtn: { padding: SPACING.sm },
+  headerSubtitle: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    letterSpacing: 1.5,
+    fontSize: 10,
+    textTransform: 'uppercase',
+  },
+  headerTitle: {
+    ...TYPOGRAPHY.screenTitle,
+    fontSize: 32,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: '#FFF',
+    letterSpacing: -1,
+  },
+  logoutBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#17181D',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+  },
   walletCard: {
-    borderRadius: RADIUS.xl,
-    padding: SPACING.xl,
-    marginBottom: SPACING.xl,
-    backgroundColor: COLORS.pastelBlue,
-    ...SHADOWS.md,
+    borderRadius: 32,
+    padding: 28,
+    marginBottom: 40,
+    backgroundColor: '#17181D',
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  walletHeader: { flexDirection: 'row', marginBottom: SPACING.lg },
+  walletHeader: { flexDirection: 'row', marginBottom: 32 },
   addressPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.6)',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 6,
-    borderRadius: RADIUS.full,
-    gap: 8,
+    backgroundColor: '#0C0D10',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    gap: 10,
   },
-  activeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.success },
-  addressText: { color: COLORS.text, fontSize: 13, fontWeight: '700' },
-  balanceLabel: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary, fontWeight: '600' },
-  balanceAmount: { ...TYPOGRAPHY.h1, fontSize: 40, marginTop: 4 },
-  usdAmount: { ...TYPOGRAPHY.body, color: COLORS.textSecondary, marginTop: 2, fontWeight: '600' },
+  activeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.accent },
+  addressText: { color: COLORS.textSecondary, fontSize: 13, fontFamily: 'SpaceGrotesk_700Bold' },
+  balanceLabel: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 8,
+    fontSize: 10,
+  },
+  balanceAmount: {
+    fontSize: 40,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: '#FFF',
+    letterSpacing: -1,
+  },
+  usdAmount: {
+    fontSize: 16,
+    color: COLORS.textTertiary,
+    marginTop: 4,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
+  },
   statsRow: {
     flexDirection: 'row',
-    marginTop: SPACING.xl,
-    paddingTop: SPACING.xl,
+    marginTop: 32,
+    paddingTop: 32,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
+    borderTopColor: COLORS.divider,
   },
   statItem: { flex: 1, alignItems: 'center' },
-  statValue: { ...TYPOGRAPHY.h3, color: COLORS.text },
-  statLabel: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary, fontWeight: '600' },
-  statDivider: { width: 1, height: '80%', backgroundColor: 'rgba(0,0,0,0.05)' },
-  sectionHeader: { marginBottom: SPACING.md, marginTop: SPACING.md },
-  sectionTitle: { ...TYPOGRAPHY.h3, fontSize: 18 },
+  statValue: {
+    color: COLORS.accent,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 24,
+  },
+  statLabel: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    marginTop: 4,
+    fontSize: 10,
+    textTransform: 'uppercase',
+  },
+  statDivider: { width: 1, height: '60%', alignSelf: 'center', backgroundColor: COLORS.divider },
+  sectionHeader: { marginBottom: 20, marginTop: 8, paddingHorizontal: 4 },
+  sectionTitle: {
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: '#FFF',
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
   emptyCenter: {
     flex: 1,
-    padding: SPACING.xl,
+    padding: 40,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyTitle: {
-    ...TYPOGRAPHY.h1,
-    marginTop: SPACING.xl,
-    color: COLORS.text,
+    fontSize: 32,
+    marginTop: 32,
+    color: '#FFF',
+    fontFamily: 'SpaceGrotesk_700Bold',
+    textAlign: 'center',
+    letterSpacing: -1,
   },
   emptySubtext: {
-    ...TYPOGRAPHY.body,
-    marginTop: SPACING.md,
-    color: COLORS.textSecondary,
-    fontSize: 18,
-    lineHeight: 26,
+    fontSize: 15,
+    marginTop: 16,
+    color: COLORS.textTertiary,
+    textAlign: 'center',
+    lineHeight: 24,
+    fontFamily: 'SpaceGrotesk_500Medium',
   },
   connectButton: {
     width: '100%',
     height: 64,
-    marginTop: SPACING.xxl,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.primary,
+    marginTop: 48,
+    borderRadius: 32,
+    backgroundColor: COLORS.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    ...SHADOWS.md,
+    flexDirection: 'row',
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  connectButtonText: { ...TYPOGRAPHY.bodyBold, color: '#FFF' },
+  connectButtonText: {
+    fontSize: 16,
+    color: '#000',
+    fontFamily: 'SpaceGrotesk_700Bold',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
   emptyList: {
     alignItems: 'center',
-    paddingTop: SPACING.xxl,
-    paddingBottom: SPACING.xxxl,
-    backgroundColor: COLORS.cardBg,
-    borderRadius: RADIUS.lg,
-    ...SHADOWS.card,
+    paddingVertical: 60,
+    backgroundColor: '#17181D',
+    borderRadius: 32,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
   },
-  emptyListTitle: { ...TYPOGRAPHY.h3, marginTop: SPACING.md },
-  emptyListDesc: { ...TYPOGRAPHY.body, textAlign: 'center', marginTop: 8, paddingHorizontal: SPACING.xl },
+  emptyListTitle: {
+    fontSize: 18,
+    marginTop: 20,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: '#FFF',
+  },
+  emptyListDesc: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 12,
+    paddingHorizontal: 48,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_500Medium',
+    lineHeight: 20,
+  },
 });
 
