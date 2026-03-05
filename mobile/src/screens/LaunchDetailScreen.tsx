@@ -134,6 +134,12 @@ export default function LaunchDetailScreen({ route }: Props) {
     fetchData();
   }, [fetchData]);
 
+  // Auto-refresh launch data every 15 seconds so curve + price stay live
+  useEffect(() => {
+    const id = setInterval(fetchData, 15_000);
+    return () => clearInterval(id);
+  }, [fetchData]);
+
   useEffect(() => {
     if (!launch) return;
     const update = () => {

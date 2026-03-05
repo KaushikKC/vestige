@@ -62,7 +62,8 @@ function aggregateCandles(trades: TradePoint[], interval: Interval): Candle[] {
 
 // Regex for on-chain logs:
 // Buy: 500000000 lamports (net 495000000 after fees) -> 990000000 base tokens + 0 bonus entitled
-const BUY_RE = /Buy:\s*(\d+)\s*lamports\s*\(net\s*\d+\s*after fees\)\s*->\s*(\d+)\s*base tokens/;
+// Using [\s\S]*? so middle section matches even if fee format varies slightly
+const BUY_RE = /Buy:\s*(\d+)\s*lamports[\s\S]*?->\s*(\d+)\s*base tokens/;
 // Sell: 990000000 tokens -> 500000000 lamports (net 495000000 after fees)
 const SELL_RE = /Sell:\s*(\d+)\s*tokens\s*->\s*(\d+)\s*lamports/;
 
@@ -154,6 +155,12 @@ export function useTradeCandles(launchPda: string) {
 
   useEffect(() => {
     fetchTrades();
+  }, [fetchTrades]);
+
+  // Auto-refresh candles every 30 seconds
+  useEffect(() => {
+    const id = setInterval(fetchTrades, 30_000);
+    return () => clearInterval(id);
   }, [fetchTrades]);
 
   const candles = aggregateCandles(trades, interval);

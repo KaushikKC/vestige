@@ -15,9 +15,11 @@ interface Props {
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+// Account for 20px horizontal padding on each side in the parent content container
+const CHART_WIDTH = SCREEN_WIDTH - 40;
 const CHART_HEIGHT = 320;
 const PAD = { top: 24, bottom: 36, left: 54, right: 16 };
-const PLOT_W = SCREEN_WIDTH - PAD.left - PAD.right;
+const PLOT_W = CHART_WIDTH - PAD.left - PAD.right;
 const PLOT_H = CHART_HEIGHT - PAD.top - PAD.bottom;
 const VOLUME_HEIGHT = PLOT_H * 0.18;
 
@@ -75,12 +77,12 @@ export default function CandlestickChart({ candles, loading }: Props) {
 
   return (
     <View style={styles.container}>
-      <Svg width={SCREEN_WIDTH} height={CHART_HEIGHT}>
+      <Svg width={CHART_WIDTH} height={CHART_HEIGHT}>
         {/* Background Grid */}
         {gridLines.map((gl, i) => (
           <React.Fragment key={`g${i}`}>
             <Line
-              x1={PAD.left} y1={gl.y} x2={PAD.left + PLOT_W} y2={gl.y}
+              x1={PAD.left} y1={gl.y} x2={CHART_WIDTH - PAD.right} y2={gl.y}
               stroke={COLORS.chartGrid} strokeWidth={1}
             />
             <SvgText
@@ -159,7 +161,7 @@ export default function CandlestickChart({ candles, loading }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    width: SCREEN_WIDTH,
+    width: CHART_WIDTH,
     height: CHART_HEIGHT,
     backgroundColor: 'transparent',
   },

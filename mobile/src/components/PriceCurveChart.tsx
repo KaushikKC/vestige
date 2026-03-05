@@ -6,6 +6,7 @@ import Svg, {
   LinearGradient,
   Stop,
   Line,
+  Circle,
   Text as SvgText,
 } from 'react-native-svg';
 import { COLORS, TYPOGRAPHY } from '../constants/theme';
@@ -35,7 +36,9 @@ export default function PriceCurveChart({ pMax, pMin, tokenSupply, totalBaseSold
     const mapY = (p: number) => PAD.top + ((pMax - p) / ((pMax - pMin) || 1)) * PLOT_H;
 
     const nowX = mapX(progress);
-    const nowY = mapY(currentPrice);
+    // Use quadratic bezier Y formula (t^2) so dot sits ON the visual curve
+    // The bezier Q control point is at (midX, startY), so By(t) = startY + t^2 * PLOT_H
+    const nowY = PAD.top + progress * progress * PLOT_H;
     // Start point: top-left (pMax at 0% sold)
     const startX = mapX(0);
     const startY = mapY(pMax);
@@ -44,11 +47,6 @@ export default function PriceCurveChart({ pMax, pMin, tokenSupply, totalBaseSold
     const endY = mapY(pMin);
 
     // Master UI: curve path and horizontal grid (incoming UI)
-    const startX = PAD.left;
-    const startY = mapY(pMax);
-    const endX = PAD.left + PLOT_W;
-    const endY = mapY(pMin);
-
     const curvePath = `M ${startX} ${startY} Q ${(startX + endX) / 2} ${startY} ${endX} ${endY}`;
 
     const horizontalGrid: { y: number }[] = [];
@@ -60,6 +58,7 @@ export default function PriceCurveChart({ pMax, pMin, tokenSupply, totalBaseSold
     return {
       nowX,
       nowY,
+      currentPrice,
       startX,
       startY,
       endX,
@@ -69,7 +68,12 @@ export default function PriceCurveChart({ pMax, pMin, tokenSupply, totalBaseSold
     };
   }, [pMax, pMin, tokenSupply, totalBaseSold]);
 
-  const { nowX, nowY, startX, startY, endX, endY, curvePath, horizontalGrid } = data;
+  const { nowX, nowY, currentPrice, startX, startY, endX, endY, curvePath, horizontalGrid } = data;
+  const dotX = nowX - PAD.left;
+  const priceLabelText = (currentPrice / 1e9).toFixed(6) + ' SOL';
+  // Anchor label left/right depending on position to avoid clipping
+  const labelAnchor = dotX > (PLOT_W * 0.65) ? 'end' : 'start';
+  const labelX = labelAnchor === 'end' ? dotX - 10 : dotX + 10;
 
   return (
     <View style={styles.outerContainer}>
@@ -114,13 +118,40 @@ export default function PriceCurveChart({ pMax, pMin, tokenSupply, totalBaseSold
             transform={`translate(${-PAD.left}, 0)`}
           />
 
-          {/* Current point indicator */}
+          {/* Current point indicator - vertical dashed line */}
           <Line
-            x1={nowX - PAD.left} y1={0} x2={nowX - PAD.left} y2={CHART_HEIGHT - PAD.bottom}
-            stroke={COLORS.textTertiary}
+            x1={dotX} y1={0} x2={dotX} y2={CHART_HEIGHT - PAD.bottom}
+            stroke={COLORS.accent}
             strokeWidth={1}
             strokeDasharray="4,4"
-            opacity={0.3}
+            opacity={0.5}
+          />
+
+          {/* Current price label */}
+          <SvgText
+            x={labelX}
+            y={Math.max(nowY - 10, PAD.top + 4)}
+            fill={COLORS.accent}
+            fontSize={10}
+            fontFamily="SpaceGrotesk_700Bold"
+            textAnchor={labelAnchor}
+          >
+            {priceLabelText}
+          </SvgText>
+
+          {/* Current position dot ON the bezier curve */}
+          <Circle
+            cx={dotX}
+            cy={nowY}
+            r={5}
+            fill={COLORS.accent}
+          />
+          <Circle
+            cx={dotX}
+            cy={nowY}
+            r={9}
+            fill={COLORS.accent}
+            opacity={0.2}
           />
 
           {/* Labels (incoming UI) */}
