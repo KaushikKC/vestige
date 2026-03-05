@@ -43,12 +43,6 @@ export default function PriceCurveChart({ pMax, pMin, tokenSupply, totalBaseSold
     const endX = mapX(1);
     const endY = mapY(pMin);
 
-    // Master UI: curve path and horizontal grid (incoming UI)
-    const startX = PAD.left;
-    const startY = mapY(pMax);
-    const endX = PAD.left + PLOT_W;
-    const endY = mapY(pMin);
-
     const curvePath = `M ${startX} ${startY} Q ${(startX + endX) / 2} ${startY} ${endX} ${endY}`;
 
     const horizontalGrid: { y: number }[] = [];
