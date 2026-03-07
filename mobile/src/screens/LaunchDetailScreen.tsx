@@ -351,7 +351,7 @@ export default function LaunchDetailScreen({ route }: Props) {
 
   // How much the price has dropped from the starting price (pMax)
   const discountPct = pMaxSol > 0 ? ((pMaxSol - priceSol) / pMaxSol) * 100 : 0;
-  const discountColor = discountPct > 0 ? COLORS.success : COLORS.textMuted;
+  const discountColor = discountPct > 0 ? COLORS.success : 'rgba(245, 241, 0, 0.9)';
 
   return (
     <View style={styles.container}>
@@ -791,7 +791,12 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: COLORS.divider,
+    borderColor: 'rgba(245, 241, 0, 0.35)',
+    shadowColor: 'rgba(245, 241, 0, 0.7)',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 10,
   },
   headerImage: {
     width: 48,
@@ -857,6 +862,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'SpaceGrotesk_700Bold',
     marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(245, 241, 0, 0.06)',
   },
   chartToggleRow: {
     flexDirection: 'row',
