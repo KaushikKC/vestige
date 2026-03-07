@@ -121,7 +121,7 @@ export default function CandlestickChart({ candles, loading }: Props) {
               width={candleWidth}
               height={barH}
               fill={isGreen ? COLORS.success : COLORS.error}
-              opacity={0.05}
+              opacity={0.25}
             />
           );
         })}
@@ -149,6 +149,8 @@ export default function CandlestickChart({ candles, loading }: Props) {
                 width={candleWidth}
                 height={bodyH}
                 fill={color}
+                stroke={color}
+                strokeWidth={0.5}
                 rx={1}
               />
             </React.Fragment>

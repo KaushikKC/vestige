@@ -30,6 +30,7 @@ import TradePanel from '../components/TradePanel';
 import PositionCard from '../components/PositionCard';
 import SkeletonLoader from '../components/SkeletonLoader';
 import PriceCurveChart from '../components/PriceCurveChart';
+import PriceLineChart from '../components/PriceLineChart';
 import CandlestickChart from '../components/CandlestickChart';
 import CompactStatRow from '../components/CompactStatRow';
 import CommentThread from '../components/CommentThread';
@@ -429,12 +430,16 @@ export default function LaunchDetailScreen({ route }: Props) {
         </View>
         <View style={styles.chartWrap}>
           {chartMode === 'curve' ? (
-            <PriceCurveChart
-              pMax={launch.pMax.toNumber()}
-              pMin={launch.pMin.toNumber()}
-              tokenSupply={launch.tokenSupply.toNumber()}
-              totalBaseSold={launch.totalBaseSold.toNumber()}
-            />
+            candles.length > 0 || candlesLoading ? (
+              <PriceLineChart candles={candles} loading={candlesLoading} />
+            ) : (
+              <PriceCurveChart
+                pMax={launch.pMax.toNumber()}
+                pMin={launch.pMin.toNumber()}
+                totalSolCollected={launch.totalSolCollected.toNumber()}
+                graduationTarget={launch.graduationTarget.toNumber()}
+              />
+            )
           ) : (
             <CandlestickChart candles={candles} loading={candlesLoading} />
           )}

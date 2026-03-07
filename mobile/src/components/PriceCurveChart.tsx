@@ -12,86 +12,92 @@ import Svg, {
 import { COLORS, TYPOGRAPHY } from "../constants/theme";
 
 interface Props {
-  pMax: number; // starting price (lamports) at 0% supply sold
-  pMin: number; // ending price (lamports) at 100% supply sold
-  tokenSupply: number; // total base token supply (raw, 9 decimals)
-  totalBaseSold: number; // base tokens sold so far (raw, 9 decimals)
+  pMax: number; // starting price (lamports) at 0% SOL raised
+  pMin: number; // ending price (lamports) at 100% SOL raised (graduation)
+  totalSolCollected: number; // SOL raised so far (lamports)
+  graduationTarget: number; // SOL needed to graduate (lamports)
 }
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const CHART_HEIGHT = 220;
 const PAD = { top: 20, bottom: 40, left: 20, right: 20 };
-const PLOT_W = SCREEN_WIDTH - PAD.left - PAD.right;
+// SVG lives inside outerContainer (padding:20 each side) which is inside content (paddingHorizontal:20 each side)
+// Available width = SCREEN_WIDTH - 20 - 20 (screen margins) - 20 - 20 (outerContainer padding) = SCREEN_WIDTH - 80
+const SVG_W = SCREEN_WIDTH - 80;
+const PLOT_W = SVG_W - PAD.left - PAD.right;
 const PLOT_H = CHART_HEIGHT - PAD.top - PAD.bottom;
 
 export default function PriceCurveChart({
   pMax,
   pMin,
-  tokenSupply,
-  totalBaseSold,
+  totalSolCollected,
+  graduationTarget,
 }: Props) {
   const data = useMemo(() => {
-    const progress =
-      tokenSupply > 0 ? Math.min(1, totalBaseSold / tokenSupply) : 0;
-    // Inverted: price starts at pMax (0% sold) and decreases to pMin (100% sold)
-    const currentPrice = pMax - (pMax - pMin) * progress;
+    const T = graduationTarget > 0 ? Math.min(1, totalSolCollected / graduationTarget) : 0;
+    const currentPrice = pMax - (pMax - pMin) * T;
 
-    // X: 0% sold (left) → 100% sold (right)
-    const mapX = (pct: number) => PAD.left + pct * PLOT_W;
-    // Y: pMax at top, pMin at bottom (inverted axis — higher price = higher on chart)
-    const mapY = (p: number) =>
-      PAD.top + ((pMax - p) / (pMax - pMin || 1)) * PLOT_H;
+    // All coordinates in SVG space (no translate needed)
+    // Bezier: P0=(PAD.left,PAD.top), ctrl=(PAD.left+PLOT_W/2,PAD.top), P2=(PAD.left+PLOT_W,PAD.top+PLOT_H)
+    // x(t) = PAD.left + t*PLOT_W  (linear)
+    // y(t) = PAD.top + t²*PLOT_H  (quadratic)
+    const x0 = PAD.left;
+    const y0 = PAD.top;
+    const xE = PAD.left + PLOT_W;
+    const yE = PAD.top + PLOT_H;
 
-    const nowX = mapX(progress);
-    // Use quadratic bezier Y formula (t^2) so dot sits ON the visual curve
-    // The bezier Q control point is at (midX, startY), so By(t) = startY + t^2 * PLOT_H
-    const nowY = PAD.top + progress * progress * PLOT_H;
-    // Start point: top-left (pMax at 0% sold)
-    const startX = mapX(0);
-    const startY = mapY(pMax);
-    // End point: bottom-right (pMin at 100% sold)
-    const endX = mapX(1);
-    const endY = mapY(pMin);
+    const nowX = PAD.left + T * PLOT_W;
+    const nowY = PAD.top + T * T * PLOT_H;
 
-    const curvePath = `M ${startX} ${startY} Q ${
-      (startX + endX) / 2
-    } ${startY} ${endX} ${endY}`;
+    // Realized bezier [0→T] via De Casteljau subdivision
+    const realizedPath =
+      T > 0.001
+        ? `M ${x0} ${y0} Q ${x0 + (T * PLOT_W) / 2} ${y0} ${nowX} ${nowY}`
+        : null;
+
+    // Potential bezier [T→1] via De Casteljau subdivision
+    // ctrl = (1-T)*P1 + T*P2, where P1=(PAD.left+PLOT_W/2, PAD.top)
+    const potCtrlX = PAD.left + (PLOT_W * (1 + T)) / 2;
+    const potCtrlY = PAD.top + T * PLOT_H;
+    const potentialPath = `M ${nowX} ${nowY} Q ${potCtrlX} ${potCtrlY} ${xE} ${yE}`;
+
+    // Fill only under the realized portion
+    const fillPath =
+      T > 0.001
+        ? `M ${x0} ${y0} Q ${x0 + (T * PLOT_W) / 2} ${y0} ${nowX} ${nowY} L ${nowX} ${CHART_HEIGHT - PAD.bottom} L ${x0} ${CHART_HEIGHT - PAD.bottom} Z`
+        : null;
 
     const horizontalGrid: { y: number }[] = [];
     for (let i = 0; i <= 3; i++) {
       const p = pMin + ((pMax - pMin) * i) / 3;
-      horizontalGrid.push({ y: mapY(p) });
+      const y = PAD.top + ((pMax - p) / (pMax - pMin || 1)) * PLOT_H;
+      horizontalGrid.push({ y });
     }
 
     return {
       nowX,
       nowY,
       currentPrice,
-      startX,
-      startY,
-      endX,
-      endY,
-      curvePath,
+      realizedPath,
+      potentialPath,
+      fillPath,
       horizontalGrid,
     };
-  }, [pMax, pMin, tokenSupply, totalBaseSold]);
+  }, [pMax, pMin, totalSolCollected, graduationTarget]);
 
   const {
     nowX,
     nowY,
     currentPrice,
-    startX,
-    startY,
-    endX,
-    endY,
-    curvePath,
+    realizedPath,
+    potentialPath,
+    fillPath,
     horizontalGrid,
   } = data;
-  const dotX = nowX - PAD.left;
   const priceLabelText = (currentPrice / 1e9).toFixed(6) + " SOL";
   // Anchor label left/right depending on position to avoid clipping
-  const labelAnchor = dotX > PLOT_W * 0.65 ? "end" : "start";
-  const labelX = labelAnchor === "end" ? dotX - 10 : dotX + 10;
+  const labelAnchor = (nowX - PAD.left) > PLOT_W * 0.65 ? "end" : "start";
+  const labelX = labelAnchor === "end" ? nowX - 10 : nowX + 10;
 
   return (
     <View style={styles.outerContainer}>
@@ -103,7 +109,7 @@ export default function PriceCurveChart({
       </View>
 
       <View style={styles.container}>
-        <Svg width={SCREEN_WIDTH - 40} height={CHART_HEIGHT}>
+        <Svg width={SVG_W} height={CHART_HEIGHT}>
           <Defs>
             <LinearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
               <Stop offset="0" stopColor={COLORS.accent} stopOpacity={0.1} />
@@ -111,43 +117,51 @@ export default function PriceCurveChart({
             </LinearGradient>
           </Defs>
 
-          {/* Grid lines (incoming UI) */}
+          {/* Grid lines */}
           {horizontalGrid.map((line, i) => (
             <Line
               key={i}
-              x1={0}
+              x1={PAD.left}
               y1={line.y}
-              x2={SCREEN_WIDTH - 40}
+              x2={SVG_W - PAD.right}
               y2={line.y}
               stroke={COLORS.chartGrid}
               strokeWidth={1}
             />
           ))}
 
-          {/* Fill */}
+          {/* Potential (remaining) curve — dim dashed */}
           <Path
-            d={`${curvePath} L ${endX - PAD.left} ${
-              CHART_HEIGHT - PAD.bottom
-            } L ${startX - PAD.left} ${CHART_HEIGHT - PAD.bottom} Z`}
-            fill="url(#chartFill)"
-            transform={`translate(${-PAD.left}, 0)`}
-          />
-
-          {/* Curve */}
-          <Path
-            d={curvePath}
+            d={potentialPath}
             fill="none"
-            stroke={COLORS.accent}
+            stroke={COLORS.textTertiary}
             strokeWidth={1.5}
             strokeLinecap="round"
-            transform={`translate(${-PAD.left}, 0)`}
+            strokeDasharray="5,4"
+            opacity={0.35}
           />
+
+          {/* Fill under realized portion */}
+          {fillPath && (
+            <Path d={fillPath} fill="url(#chartFill)" />
+          )}
+
+          {/* Realized (traded) curve — bright solid */}
+          {realizedPath && (
+            <Path
+              d={realizedPath}
+              fill="none"
+              stroke={COLORS.accent}
+              strokeWidth={2}
+              strokeLinecap="round"
+            />
+          )}
 
           {/* Current point indicator - vertical dashed line */}
           <Line
-            x1={dotX}
+            x1={nowX}
             y1={0}
-            x2={dotX}
+            x2={nowX}
             y2={CHART_HEIGHT - PAD.bottom}
             stroke={COLORS.accent}
             strokeWidth={1}
@@ -168,9 +182,9 @@ export default function PriceCurveChart({
           </SvgText>
 
           {/* Current position dot ON the bezier curve */}
-          <Circle cx={dotX} cy={nowY} r={5} fill={COLORS.accent} />
+          <Circle cx={nowX} cy={nowY} r={5} fill={COLORS.accent} />
           <Circle
-            cx={dotX}
+            cx={nowX}
             cy={nowY}
             r={9}
             fill={COLORS.accent}
@@ -189,7 +203,7 @@ export default function PriceCurveChart({
             START
           </SvgText>
           <SvgText
-            x={SCREEN_WIDTH - 40}
+            x={SVG_W}
             y={CHART_HEIGHT - 10}
             fill={COLORS.accent}
             fontSize={9}
