@@ -195,15 +195,61 @@ export default function TradePanel({
 
           {buyEstimate && (
             <View style={styles.estimateSection}>
-              <View style={styles.estimateGrid}>
-                <View style={styles.estimateItem}>
-                  <Text style={styles.estimateLabel}>Receive</Text>
-                  <Text style={styles.estimateValue}>{formatTokens(buyEstimate.baseTokens)} tokens</Text>
+              {/* Token breakdown */}
+              <View style={styles.breakdownCard}>
+                <View style={styles.breakdownRow}>
+                  <Text style={styles.breakdownLabel}>Base tokens</Text>
+                  <Text style={styles.breakdownValue}>{formatTokens(buyEstimate.baseTokens)}</Text>
                 </View>
-                <View style={styles.estimateItem}>
-                  <Text style={styles.estimateLabel}>Fees (1%)</Text>
-                  <Text style={styles.estimateValue}>{(buyEstimate.protocolFee / 1e9 + buyEstimate.creatorFee / 1e9).toFixed(5)} SOL</Text>
+                {buyEstimate.bonus > 0 && (
+                  <View style={styles.breakdownRow}>
+                    <View style={styles.bonusLabelRow}>
+                      <Text style={styles.breakdownLabel}>Bonus tokens</Text>
+                      <View style={styles.bonusBadge}>
+                        <Text style={styles.bonusBadgeText}>{buyEstimate.riskWeight.toFixed(1)}x early</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.bonusValue}>+{formatTokens(buyEstimate.bonus)}</Text>
+                  </View>
+                )}
+                <View style={styles.breakdownDivider} />
+                <View style={styles.breakdownRow}>
+                  <Text style={styles.totalLabel}>Total you receive</Text>
+                  <Text style={styles.totalValue}>
+                    {formatTokens(buyEstimate.baseTokens + buyEstimate.bonus)} tokens
+                  </Text>
                 </View>
+              </View>
+
+              {/* Price comparison */}
+              <View style={styles.priceCompCard}>
+                <View style={styles.priceCompRow}>
+                  <View style={styles.priceCompCol}>
+                    <Text style={styles.priceCompLabel}>Visual price</Text>
+                    <Text style={styles.priceCompVisual}>
+                      {(buyEstimate.curvePrice / 1e9).toFixed(6)} SOL
+                    </Text>
+                  </View>
+                  <View style={styles.priceArrow}>
+                    <Text style={styles.priceArrowText}>→</Text>
+                  </View>
+                  <View style={[styles.priceCompCol, styles.priceCompColRight]}>
+                    <Text style={styles.priceCompLabel}>Your effective entry</Text>
+                    <Text style={styles.priceCompEffective}>
+                      {(buyEstimate.effectivePrice).toFixed(6)} SOL
+                    </Text>
+                  </View>
+                </View>
+                {buyEstimate.bonus > 0 && (
+                  <View style={styles.savingsRow}>
+                    <Text style={styles.savingsText}>
+                      You save{' '}
+                      {(((buyEstimate.curvePrice / 1e9) - buyEstimate.effectivePrice) /
+                        (buyEstimate.curvePrice / 1e9) * 100).toFixed(1)}%
+                      {' '}vs visual price
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
           )}
@@ -398,32 +444,157 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   estimateSection: {
-    marginBottom: 28,
+    marginBottom: 20,
+    gap: 8,
   },
   estimateGrid: {
+    backgroundColor: '#111216',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
   },
   estimateItem: {
     flex: 1,
-    backgroundColor: '#111216',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.divider,
+    gap: 4,
   },
   estimateLabel: {
     color: COLORS.textTertiary,
-    fontFamily: 'SpaceGrotesk_700Bold',
-    fontSize: 9,
+    fontFamily: 'SpaceGrotesk_500Medium',
+    fontSize: 11,
     textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 6,
+    letterSpacing: 0.8,
   },
   estimateValue: {
     color: COLORS.text,
     fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 14,
+  },
+  // Token breakdown card
+  breakdownCard: {
+    backgroundColor: '#111216',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    gap: 10,
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  breakdownLabel: {
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_500Medium',
+    fontSize: 12,
+  },
+  breakdownValue: {
+    color: COLORS.textSecondary,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
     fontSize: 13,
+  },
+  bonusLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  bonusBadge: {
+    backgroundColor: 'rgba(245, 241, 0, 0.12)',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 241, 0, 0.25)',
+  },
+  bonusBadgeText: {
+    color: COLORS.accent,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 9,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  bonusValue: {
+    color: COLORS.accent,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 13,
+  },
+  breakdownDivider: {
+    height: 1,
+    backgroundColor: COLORS.divider,
+  },
+  totalLabel: {
+    color: COLORS.text,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 13,
+  },
+  totalValue: {
+    color: COLORS.text,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 15,
+  },
+  // Price comparison card
+  priceCompCard: {
+    backgroundColor: 'rgba(245, 241, 0, 0.04)',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 241, 0, 0.15)',
+  },
+  priceCompRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  priceCompCol: {
+    flex: 1,
+  },
+  priceCompColRight: {
+    alignItems: 'flex-end',
+  },
+  priceCompLabel: {
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_500Medium',
+    fontSize: 9,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  priceCompVisual: {
+    color: COLORS.textSecondary,
+    fontFamily: 'SpaceGrotesk_600SemiBold',
+    fontSize: 12,
+    textDecorationLine: 'line-through',
+    opacity: 0.6,
+  },
+  priceArrow: {
+    paddingHorizontal: 8,
+    paddingTop: 12,
+  },
+  priceArrowText: {
+    color: COLORS.accent,
+    fontSize: 16,
+    fontFamily: 'SpaceGrotesk_700Bold',
+  },
+  priceCompEffective: {
+    color: COLORS.accent,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 15,
+  },
+  savingsRow: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(245, 241, 0, 0.12)',
+    alignItems: 'center',
+  },
+  savingsText: {
+    color: COLORS.accent,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   primaryButton: {
     backgroundColor: COLORS.accent,

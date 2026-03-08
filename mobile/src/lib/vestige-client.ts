@@ -184,16 +184,17 @@ export class VestigeClient {
     return pMax - Math.floor((priceRange * sold) / tokenSupply);
   }
 
+  /** Fill-progress based risk weight — matches on-chain logic exactly.
+   *  rBest when curve is empty (price highest), rMin when fully funded. */
   static getCurrentRiskWeight(launch: LaunchData): number {
-    const now = Math.floor(Date.now() / 1000);
     const rBest = launch.rBest;
     const rMin = launch.rMin;
-    if (now <= launch.startTime) return rBest;
-    if (now >= launch.endTime) return rMin;
-    const elapsed = now - launch.startTime;
-    const duration = launch.endTime - launch.startTime;
+    const target = launch.graduationTarget.toNumber();
+    if (target <= 0) return rBest;
+    const collected = launch.totalSolCollected.toNumber();
+    const progress = Math.min(1, collected / target);
     const weightRange = (rBest - rMin) * WEIGHT_PRECISION;
-    const decrease = Math.floor((weightRange * elapsed) / duration);
+    const decrease = Math.floor(weightRange * progress);
     return (rBest * WEIGHT_PRECISION - decrease) / WEIGHT_PRECISION;
   }
 
@@ -286,6 +287,51 @@ export class VestigeClient {
     const target = launch.graduationTarget.toNumber();
     if (target <= 0) return 0;
     return Math.min(100, (launch.totalSolCollected.toNumber() / target) * 100);
+  }
+
+  /** True when time has passed endTime — on-chain graduate() accepts time_expired as a condition. */
+  static isTimeExpired(launch: LaunchData): boolean {
+    return Math.floor(Date.now() / 1000) > launch.endTime;
+  }
+
+  /** True when the on-chain graduate() / graduate_to_dex() should succeed. */
+  static canGraduate(launch: LaunchData): boolean {
+    if (launch.isGraduated) return false;
+    const targetReached = launch.totalSolCollected.gte(launch.graduationTarget);
+    return targetReached || VestigeClient.isTimeExpired(launch);
+  }
+
+  /** SOL still needed to hit the graduation target (0 if already met or expired). */
+  static getSolRemainingToGraduation(launch: LaunchData): number {
+    const remaining = launch.graduationTarget.toNumber() - launch.totalSolCollected.toNumber();
+    return Math.max(0, remaining) / LAMPORTS_PER_SOL;
+  }
+
+  // Matches on-chain MILESTONE_INTERVAL (5 min testing / 7 days production)
+  static readonly MILESTONE_INTERVAL_SECONDS = 5 * 60;
+
+  /** Unix timestamp when the next milestone becomes claimable, or null if none pending. */
+  static getNextMilestoneUnlockTime(launch: LaunchData): number | null {
+    if (!launch.isGraduated) return null;
+    if (launch.milestonesUnlocked >= 4) return null;
+    const intervals = launch.milestonesUnlocked; // 1, 2, or 3
+    return launch.graduationTime + VestigeClient.MILESTONE_INTERVAL_SECONDS * intervals;
+  }
+
+  /** True when the time-lock has elapsed and creator can call advance_milestone. */
+  static canAdvanceMilestone(launch: LaunchData): boolean {
+    const unlockTime = VestigeClient.getNextMilestoneUnlockTime(launch);
+    if (unlockTime === null) return false;
+    return Math.floor(Date.now() / 1000) >= unlockTime;
+  }
+
+  /** Human-readable countdown to next milestone, or 'Ready' if unlocked. */
+  static getMilestoneCountdown(launch: LaunchData): string {
+    const unlockTime = VestigeClient.getNextMilestoneUnlockTime(launch);
+    if (unlockTime === null) return '';
+    const now = Math.floor(Date.now() / 1000);
+    if (now >= unlockTime) return 'Ready';
+    return VestigeClient.getTimeRemaining(unlockTime);
   }
 
   /** Returns claimable creator fees in lamports based on current milestone */

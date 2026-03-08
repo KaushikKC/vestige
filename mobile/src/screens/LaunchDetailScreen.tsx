@@ -102,9 +102,10 @@ export default function LaunchDetailScreen({ route }: Props) {
   const [curvePrice, setCurvePrice] = useState(0);
   const [riskWeight, setRiskWeight] = useState(0);
   const [timeLeft, setTimeLeft] = useState('');
+  const [milestoneCountdown, setMilestoneCountdown] = useState('');
   const [tokenImage, setTokenImage] = useState<string | null>(null);
   const [infoTab, setInfoTab] = useState<'comments' | 'trades' | 'holders'>('comments');
-  const [chartMode, setChartMode] = useState<'curve' | 'candles'>('curve');
+  const [chartMode, setChartMode] = useState<'price' | 'candle' | 'curve'>('price');
   const { candles, loading: candlesLoading, interval: candleInterval, setInterval: setCandleInterval, refresh: refreshCandles } = useTradeCandles(launchPdaStr);
 
   const insets = useSafeAreaInsets();
@@ -147,6 +148,7 @@ export default function LaunchDetailScreen({ route }: Props) {
       setCurvePrice(VestigeClient.getCurrentCurvePrice(launch));
       setRiskWeight(VestigeClient.getCurrentRiskWeight(launch));
       setTimeLeft(VestigeClient.getTimeRemaining(launch.endTime));
+      setMilestoneCountdown(VestigeClient.getMilestoneCountdown(launch));
     };
     update();
     const interval = setInterval(update, 1000);
@@ -347,8 +349,18 @@ export default function LaunchDetailScreen({ route }: Props) {
   const waitingForCreatorBuy =
     !launch.hasInitialBuy && connected && !isCreator;
 
-  // No time-based expiry — launch only ends when it graduates (reaches market cap target)
-  const isExpired = false;
+  // True when time has passed endTime — on-chain graduate() accepts this as a graduation condition
+  const isExpired = VestigeClient.isTimeExpired(launch);
+
+  // Graduation is possible when target is met OR time expired
+  const canGraduateNow = VestigeClient.canGraduate(launch);
+
+  // Show closer banner when curve is ≥80% filled and not yet graduated
+  const solRemaining = VestigeClient.getSolRemainingToGraduation(launch);
+  const showCloserBanner = !launch.isGraduated && progress >= 80;
+
+  // Milestone state
+  const milestoneReady = VestigeClient.canAdvanceMilestone(launch);
 
   // How much the price has dropped from the starting price (pMax)
   const discountPct = pMaxSol > 0 ? ((pMaxSol - priceSol) / pMaxSol) * 100 : 0;
@@ -398,7 +410,7 @@ export default function LaunchDetailScreen({ route }: Props) {
         {/* 3. Chart Toggle + Trading Chart */}
         <View style={styles.chartToggleRow}>
           <View style={styles.chartToggleGroup}>
-            {(['curve', 'candles'] as const).map((mode) => (
+            {(['price', 'candle', 'curve'] as const).map((mode) => (
               <TouchableOpacity
                 key={mode}
                 style={[styles.chartToggleBtn, chartMode === mode && styles.chartToggleBtnActive]}
@@ -406,12 +418,12 @@ export default function LaunchDetailScreen({ route }: Props) {
                 activeOpacity={0.7}
               >
                 <Text style={[styles.chartToggleText, chartMode === mode && styles.chartToggleTextActive]}>
-                  {mode === 'curve' ? 'Curve' : 'Candles'}
+                  {mode === 'price' ? 'Price' : mode === 'candle' ? 'Candles' : 'Curve'}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
-          {chartMode === 'candles' && (
+          {(chartMode === 'price' || chartMode === 'candle') && (
             <View style={styles.intervalGroup}>
               {(['1m', '5m', '15m'] as Interval[]).map((iv) => (
                 <TouchableOpacity
@@ -428,20 +440,36 @@ export default function LaunchDetailScreen({ route }: Props) {
             </View>
           )}
         </View>
+
+        {/* Ideology tagline — the pitch in one sentence */}
+        {!launch.isGraduated && (
+          <View style={styles.ideologyBanner}>
+            <Text style={styles.ideologyText}>
+              {riskWeight > 1.05
+                ? `Buy now at ${riskWeight.toFixed(1)}x bonus — early buyers pay the highest price, but receive the most tokens. Your effective entry is already lower than the visual price.`
+                : `Curve nearly full. Bonus is minimal — you're buying close to the Raydium listing price.`}
+            </Text>
+          </View>
+        )}
+
         <View style={styles.chartWrap}>
-          {chartMode === 'curve' ? (
-            candles.length > 0 || candlesLoading ? (
-              <PriceLineChart candles={candles} loading={candlesLoading} />
-            ) : (
-              <PriceCurveChart
-                pMax={launch.pMax.toNumber()}
-                pMin={launch.pMin.toNumber()}
-                totalSolCollected={launch.totalSolCollected.toNumber()}
-                graduationTarget={launch.graduationTarget.toNumber()}
-              />
-            )
-          ) : (
+          {chartMode === 'price' && (
+            <PriceLineChart
+              candles={candles}
+              loading={candlesLoading}
+              currentPrice={curvePrice}
+            />
+          )}
+          {chartMode === 'candle' && (
             <CandlestickChart candles={candles} loading={candlesLoading} />
+          )}
+          {chartMode === 'curve' && (
+            <PriceCurveChart
+              pMax={launch.pMax.toNumber()}
+              pMin={launch.pMin.toNumber()}
+              totalSolCollected={launch.totalSolCollected.toNumber()}
+              graduationTarget={launch.graduationTarget.toNumber()}
+            />
           )}
         </View>
 
@@ -471,7 +499,42 @@ export default function LaunchDetailScreen({ route }: Props) {
           />
         </View>
 
-        {/* 6. Tabbed Section: Comments / Trades / Holders */}
+        {/* 6. Closer Opportunity Banner */}
+        {showCloserBanner && (
+          <View style={[styles.section, styles.closerBanner]}>
+            <View style={styles.closerBannerRow}>
+              <Text style={styles.closerBannerIcon}>⚡</Text>
+              <View style={styles.closerBannerText}>
+                <Text style={styles.closerBannerTitle}>
+                  {isExpired
+                    ? 'Curve Expired — Ready to Graduate'
+                    : `Closer Opportunity — ${progress.toFixed(1)}% Filled`}
+                </Text>
+                <Text style={styles.closerBannerSubtext}>
+                  {isExpired
+                    ? 'Time has expired. Anyone can trigger graduation to Raydium now.'
+                    : `Only ${solRemaining.toFixed(3)} SOL left to complete this curve. The buyer who closes it triggers immediate graduation.`}
+                </Text>
+              </View>
+            </View>
+            {canGraduateNow && connected && (
+              <TouchableOpacity
+                style={[styles.closerGraduateBtn, actionLoading && styles.disabledButton]}
+                onPress={handleGraduateToDex}
+                disabled={actionLoading}
+                activeOpacity={0.8}
+              >
+                {actionLoading ? (
+                  <ActivityIndicator color="#000" size="small" />
+                ) : (
+                  <Text style={styles.closerGraduateBtnText}>Graduate Now →</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* 7. Tabbed Section: Comments / Trades / Holders */}
         <View style={styles.section}>
           <View style={styles.infoTabRow}>
             {(['comments', 'trades', 'holders'] as const).map((t) => (
@@ -565,6 +628,17 @@ export default function LaunchDetailScreen({ route }: Props) {
             <Text style={styles.milestoneLabel}>
               {VestigeClient.getMilestoneDescription(milestoneLevel)}
             </Text>
+            {milestoneLevel < 4 && (
+              <View style={styles.milestoneCountdownRow}>
+                {milestoneReady ? (
+                  <Text style={styles.milestoneReadyText}>Next milestone unlocked</Text>
+                ) : (
+                  <Text style={styles.milestoneCountdownText}>
+                    Next milestone in {milestoneCountdown}
+                  </Text>
+                )}
+              </View>
+            )}
           </View>
         )}
 
@@ -680,7 +754,7 @@ export default function LaunchDetailScreen({ route }: Props) {
                 )}
               </TouchableOpacity>
 
-              {milestoneLevel < 4 && (
+              {milestoneLevel < 4 && milestoneReady && (
                 <TouchableOpacity
                   style={[styles.secondaryButton, styles.vestedActionButton]}
                   onPress={handleAdvanceMilestone}
@@ -702,11 +776,40 @@ export default function LaunchDetailScreen({ route }: Props) {
           </View>
         )}
 
-        {/* Claim Bonus */}
-        {canClaimBonus && (
-          <View style={styles.section}>
+        {/* Claim Bonus — celebration card */}
+        {canClaimBonus && position && (
+          <View style={styles.bonusCelebCard}>
+            <View style={styles.bonusCelebHeader}>
+              <Text style={styles.bonusCelebIcon}>🎉</Text>
+              <View style={styles.bonusCelebHeaderText}>
+                <Text style={styles.bonusCelebTitle}>Your Bonus is Ready</Text>
+                <Text style={styles.bonusCelebSubtitle}>
+                  Reward for buying early on this launch
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.bonusCelebAmountRow}>
+              <View style={styles.bonusCelebAmountBox}>
+                <Text style={styles.bonusCelebAmountLabel}>BONUS TOKENS</Text>
+                <Text style={styles.bonusCelebAmount}>
+                  {(position.totalBonusEntitled.toNumber() / 1e9).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </Text>
+              </View>
+              <View style={styles.bonusCelebAmountBox}>
+                <Text style={styles.bonusCelebAmountLabel}>EST. VALUE</Text>
+                <Text style={styles.bonusCelebAmount}>
+                  {(position.totalBonusEntitled.toNumber() / 1e9 * VestigeClient.lamportsToSol(launch.pMin.toNumber())).toFixed(4)} SOL
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.bonusCelebNote}>
+              These are extra tokens you earned for being an early buyer — on top of the tokens you already received.
+            </Text>
+
             <TouchableOpacity
-              style={[styles.primaryButton, actionLoading && styles.disabledButton]}
+              style={[styles.bonusCelebButton, actionLoading && styles.disabledButton]}
               onPress={handleClaimBonus}
               disabled={actionLoading}
               activeOpacity={0.8}
@@ -714,7 +817,7 @@ export default function LaunchDetailScreen({ route }: Props) {
               {actionLoading ? (
                 <ActivityIndicator color="#000" />
               ) : (
-                <Text style={styles.primaryButtonText}>Claim Bonus Tokens</Text>
+                <Text style={styles.bonusCelebButtonText}>Claim Your Bonus Tokens</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -1204,6 +1307,165 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textTertiary,
     fontFamily: 'SpaceGrotesk_500Medium',
+  },
+  milestoneCountdownRow: {
+    marginTop: 10,
+  },
+  milestoneCountdownText: {
+    fontSize: 11,
+    color: COLORS.textTertiary,
+    fontFamily: 'SpaceGrotesk_500Medium',
+  },
+  milestoneReadyText: {
+    fontSize: 11,
+    color: COLORS.accent,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  closerBanner: {
+    backgroundColor: 'rgba(245, 241, 0, 0.05)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 241, 0, 0.2)',
+    padding: 16,
+  },
+  closerBannerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 12,
+  },
+  closerBannerIcon: {
+    fontSize: 18,
+  },
+  closerBannerText: {
+    flex: 1,
+  },
+  closerBannerTitle: {
+    fontSize: 13,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: COLORS.accent,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  closerBannerSubtext: {
+    fontSize: 12,
+    fontFamily: 'SpaceGrotesk_500Medium',
+    color: COLORS.textSecondary,
+    lineHeight: 18,
+  },
+  closerGraduateBtn: {
+    backgroundColor: COLORS.accent,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  closerGraduateBtnText: {
+    fontSize: 13,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: '#000',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  // Ideology tagline
+  ideologyBanner: {
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  ideologyText: {
+    fontSize: 12,
+    fontFamily: 'SpaceGrotesk_500Medium',
+    color: COLORS.textSecondary,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  // Bonus celebration card
+  bonusCelebCard: {
+    backgroundColor: 'rgba(245, 241, 0, 0.05)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 241, 0, 0.3)',
+    padding: 24,
+    marginHorizontal: 0,
+    marginBottom: SPACING.md,
+  },
+  bonusCelebHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+  },
+  bonusCelebIcon: {
+    fontSize: 36,
+  },
+  bonusCelebHeaderText: {
+    flex: 1,
+  },
+  bonusCelebTitle: {
+    fontSize: 20,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: COLORS.text,
+    marginBottom: 2,
+  },
+  bonusCelebSubtitle: {
+    fontSize: 13,
+    fontFamily: 'SpaceGrotesk_500Medium',
+    color: COLORS.textSecondary,
+  },
+  bonusCelebAmountRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  bonusCelebAmountBox: {
+    flex: 1,
+    backgroundColor: 'rgba(245, 241, 0, 0.08)',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 241, 0, 0.2)',
+  },
+  bonusCelebAmountLabel: {
+    fontSize: 9,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: COLORS.accent,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+  bonusCelebAmount: {
+    fontSize: 22,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: COLORS.text,
+  },
+  bonusCelebNote: {
+    fontSize: 12,
+    fontFamily: 'SpaceGrotesk_500Medium',
+    color: COLORS.textSecondary,
+    lineHeight: 18,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  bonusCelebButton: {
+    backgroundColor: COLORS.accent,
+    borderRadius: 32,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  bonusCelebButtonText: {
+    fontSize: 16,
+    fontFamily: 'SpaceGrotesk_700Bold',
+    color: '#000',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
   },
   errorText: {
     fontSize: 24,

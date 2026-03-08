@@ -57,21 +57,21 @@ fn get_curve_price(launch: &Launch, total_base_sold: u64) -> u64 {
     launch.p_max.saturating_sub(decrease as u64)
 }
 
-/// Linear interpolation: r_best -> r_min over the launch duration
-/// Returns weight * WEIGHT_PRECISION for fractional accuracy
-fn get_risk_weight_scaled(launch: &Launch, current_time: i64) -> u128 {
-    if current_time <= launch.start_time {
+/// Fill-progress interpolation: r_best (curve empty) -> r_min (curve full).
+/// Weight decays as SOL is raised, not as time passes — early buyers (when the
+/// curve is mostly empty and the visual price is highest) earn the most bonus.
+/// Returns weight * WEIGHT_PRECISION for fractional accuracy.
+fn get_risk_weight_scaled(launch: &Launch, _current_time: i64) -> u128 {
+    if launch.graduation_target == 0 {
         return (launch.r_best as u128) * WEIGHT_PRECISION;
     }
-    if current_time >= launch.end_time {
-        return (launch.r_min as u128) * WEIGHT_PRECISION;
-    }
-    let elapsed = (current_time - launch.start_time) as u128;
-    let duration = (launch.end_time - launch.start_time) as u128;
+    let collected = launch.total_sol_collected as u128;
+    let target = launch.graduation_target as u128;
+    let progress = collected.min(target);
     let weight_range = ((launch.r_best - launch.r_min) as u128) * WEIGHT_PRECISION;
-    let decrease = weight_range.checked_mul(elapsed).unwrap() / duration;
+    let decrease = weight_range.checked_mul(progress).unwrap_or(0) / target;
     let best_scaled = (launch.r_best as u128) * WEIGHT_PRECISION;
-    best_scaled.checked_sub(decrease).unwrap()
+    best_scaled.saturating_sub(decrease)
 }
 
 /// base_tokens = sol_amount * TOKEN_PRECISION / curve_price

@@ -197,7 +197,6 @@ const LaunchForm = memo(function LaunchForm({
   const lpPctRef = useRef('10'); // % of token supply reserved for Raydium LP
   const rBestRef = useRef('10');
   const rMinRef = useRef('1');
-  const pMaxRef = useRef('1');
   const graduationTargetRef = useRef('10');
   const durationMinutesRef = useRef('1440');
 
@@ -281,7 +280,6 @@ const LaunchForm = memo(function LaunchForm({
 
   const supply0 = testMode ? '1000' : '1000000';
   const bonus0 = testMode ? '500' : '500000';
-  const pMax0 = '1';
   const grad0 = testMode ? '0.5' : '10';
 
   return (
@@ -334,41 +332,33 @@ const LaunchForm = memo(function LaunchForm({
         <View style={styles.row}>
           <View style={styles.rowItem}>
             <FormField
-              key={`lppct-${formKey}`}
-              label="LP Allocation %"
+              key={`rbest-${formKey}`}
+              label="Early Bonus Multiplier"
               defaultValue="10"
-              valueRef={lpPctRef}
-              keyboardType="decimal-pad"
-              hint="% of supply → Raydium LP"
+              valueRef={rBestRef}
+              keyboardType="numeric"
+              hint="Early buyers receive this many extra tokens"
             />
           </View>
           <View style={styles.rowGap} />
           <View style={styles.rowItem}>
             <FormField
-              key={`rbest-${formKey}`}
-              label="Early Bonus (x)"
+              key={`lppct-${formKey}`}
+              label="Raydium LP %"
               defaultValue="10"
-              valueRef={rBestRef}
-              keyboardType="numeric"
-              hint="Multiplier for early buyers"
+              valueRef={lpPctRef}
+              keyboardType="decimal-pad"
+              hint="% of supply seeded into DEX pool"
             />
           </View>
         </View>
         <FormField
-          key={`pmax-${formKey}`}
-          label="Initial Price (SOL)"
-          defaultValue={pMax0}
-          valueRef={pMaxRef}
-          keyboardType="decimal-pad"
-          hint="Drops 10x over duration"
-        />
-        <FormField
           key={`grad-${formKey}`}
-          label="Graduation Goal (SOL)"
+          label="SOL to Graduate"
           defaultValue={grad0}
           valueRef={graduationTargetRef}
           keyboardType="decimal-pad"
-          hint="DEX listing price = Goal ÷ LP tokens"
+          hint="Raise this much SOL → token lists on Raydium"
         />
       </View>
 
@@ -447,7 +437,7 @@ function PricePreview({ supplyRef, lpPctRef, rBestRef, graduationRef, formKey: _
         <Text style={styles.previewValue}>{fdvSol.toFixed(2)} SOL</Text>
       </View>
       <Text style={styles.previewNote}>
-        Early buyers pay {rBest}x higher visual price but receive {rBest}x bonus tokens → same effective entry as late buyers
+        Early buyers pay the highest visual price but receive {rBest}x more bonus tokens — their effective entry price is actually the lowest.
       </Text>
     </View>
   );

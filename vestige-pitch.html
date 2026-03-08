@@ -1,0 +1,1639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vestige — Investor Deck</title>
+
+    <!-- Space Grotesk — matches the Vestige mobile app exactly -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* ===========================================
+           VESTIGE THEME — Directly from theme.ts
+           =========================================== */
+        :root {
+            /* Brand colors from COLORS in theme.ts */
+            --bg-primary:     #0C0D10;
+            --bg-surface:     #111216;
+            --bg-card:        #17181D;
+            --accent:         #F5F100;
+            --accent-hover:   #E6E200;
+            --accent-glow:    rgba(245, 241, 0, 0.25);
+            --accent-glow-sm: rgba(245, 241, 0, 0.12);
+
+            --text-primary:   #FFFFFF;
+            --text-secondary: #B3B3B8;
+            --text-tertiary:  #6E6E73;
+
+            --divider:  #23242A;
+            --border:   rgba(255, 255, 255, 0.04);
+
+            --success: #22C55E;
+            --error:   #EF4444;
+            --warning: #FF9F0A;
+
+            /* Typography — Space Grotesk only, matching TYPOGRAPHY */
+            --font:       'Space Grotesk', sans-serif;
+            --title-size: clamp(2rem, 5.5vw, 4.5rem);
+            --h2-size:    clamp(1.4rem, 3.2vw, 2.75rem);
+            --h3-size:    clamp(1rem, 2vw, 1.5rem);
+            --body-size:  clamp(0.8rem, 1.4vw, 1.05rem);
+            --small-size: clamp(0.65rem, 1vw, 0.85rem);
+            --label-size: clamp(0.6rem, 0.9vw, 0.75rem);
+
+            /* Spacing */
+            --slide-padding: clamp(1.5rem, 5vw, 5rem);
+            --content-gap:   clamp(0.75rem, 2vw, 2rem);
+            --element-gap:   clamp(0.4rem, 1vw, 0.875rem);
+
+            /* Easing */
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-bounce:   cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* ===========================================
+           VIEWPORT FITTING — MANDATORY BASE
+           =========================================== */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            height: 100%;
+            overflow-x: hidden;
+            font-family: var(--font);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        html {
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+        }
+
+        /* Each slide = exact viewport */
+        .slide {
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            scroll-snap-align: start;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            background: var(--bg-primary);
+        }
+
+        .slide-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            max-height: 100%;
+            overflow: hidden;
+            padding: var(--slide-padding);
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Cards / containers */
+        .card, .container, .content-box {
+            max-width: min(90vw, 1000px);
+            max-height: min(80vh, 700px);
+        }
+
+        /* Lists */
+        .feature-list, .bullet-list {
+            gap: clamp(0.4rem, 1vh, 1rem);
+        }
+        .feature-list li, .bullet-list li {
+            font-size: var(--body-size);
+            line-height: 1.4;
+        }
+
+        /* Grids */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+            gap: clamp(0.5rem, 1.5vw, 1rem);
+        }
+
+        img, .image-container {
+            max-width: 100%;
+            max-height: min(50vh, 400px);
+            object-fit: contain;
+        }
+
+        /* Short viewports */
+        @media (max-height: 700px) {
+            :root {
+                --slide-padding: clamp(1rem, 3vw, 2.5rem);
+                --content-gap: clamp(0.4rem, 1.5vw, 1rem);
+                --title-size: clamp(1.5rem, 4.5vw, 3rem);
+                --h2-size: clamp(1.1rem, 2.8vw, 2rem);
+            }
+        }
+        @media (max-height: 600px) {
+            :root {
+                --slide-padding: clamp(0.5rem, 2.5vw, 1.5rem);
+                --content-gap: clamp(0.3rem, 1vw, 0.75rem);
+                --title-size: clamp(1.2rem, 4vw, 2rem);
+                --body-size: clamp(0.7rem, 1.2vw, 0.9rem);
+            }
+            .nav-dots, .keyboard-hint, .decorative { display: none; }
+        }
+        @media (max-height: 500px) {
+            :root {
+                --slide-padding: clamp(0.4rem, 2vw, 1rem);
+                --title-size: clamp(1rem, 3.5vw, 1.5rem);
+                --h2-size: clamp(0.9rem, 2.5vw, 1.25rem);
+                --body-size: clamp(0.65rem, 1vw, 0.85rem);
+            }
+        }
+        @media (max-width: 600px) {
+            :root { --title-size: clamp(1.5rem, 8vw, 2.5rem); }
+            .grid { grid-template-columns: 1fr; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.2s !important;
+            }
+            html { scroll-behavior: auto; }
+        }
+
+        /* ===========================================
+           BACKGROUND ELEMENTS
+           Subtle grid + noise texture
+           =========================================== */
+        .bg-grid {
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(245, 241, 0, 0.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(245, 241, 0, 0.025) 1px, transparent 1px);
+            background-size: 60px 60px;
+            z-index: 0;
+        }
+
+        /* Yellow glow blob — bottom-right atmospheric light */
+        .bg-glow {
+            position: absolute;
+            width: clamp(300px, 50vw, 700px);
+            height: clamp(300px, 50vw, 700px);
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(245, 241, 0, 0.07) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .bg-glow.bottom-right { bottom: -20%; right: -10%; }
+        .bg-glow.top-left     { top: -20%; left: -10%; }
+        .bg-glow.center       { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+
+        /* Horizontal accent line */
+        .accent-line {
+            width: clamp(40px, 6vw, 80px);
+            height: 3px;
+            background: var(--accent);
+            box-shadow: 0 0 12px var(--accent-glow);
+            border-radius: 2px;
+        }
+
+        /* ===========================================
+           ANIMATIONS — Triggered by .visible class
+           =========================================== */
+        .reveal {
+            opacity: 0;
+            transform: translateY(24px);
+            transition: opacity 0.65s var(--ease-out-expo),
+                        transform 0.65s var(--ease-out-expo);
+        }
+        .reveal-left {
+            opacity: 0;
+            transform: translateX(-32px);
+            transition: opacity 0.65s var(--ease-out-expo),
+                        transform 0.65s var(--ease-out-expo);
+        }
+        .reveal-scale {
+            opacity: 0;
+            transform: scale(0.92);
+            transition: opacity 0.6s var(--ease-out-expo),
+                        transform 0.6s var(--ease-out-expo);
+        }
+        .slide.visible .reveal,
+        .slide.visible .reveal-left,
+        .slide.visible .reveal-scale {
+            opacity: 1;
+            transform: none;
+        }
+
+        /* Stagger delays — children animate sequentially */
+        .stagger > *:nth-child(1) { transition-delay: 0.05s; }
+        .stagger > *:nth-child(2) { transition-delay: 0.15s; }
+        .stagger > *:nth-child(3) { transition-delay: 0.25s; }
+        .stagger > *:nth-child(4) { transition-delay: 0.35s; }
+        .stagger > *:nth-child(5) { transition-delay: 0.45s; }
+        .stagger > *:nth-child(6) { transition-delay: 0.55s; }
+
+        /* Counter animation for numbers */
+        @keyframes count-up {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Yellow pulse for accent elements */
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 8px var(--accent-glow-sm); }
+            50%       { box-shadow: 0 0 24px var(--accent-glow); }
+        }
+
+        /* Title slide scan-line animation */
+        @keyframes slide-in-right {
+            from { transform: translateX(60px); opacity: 0; }
+            to   { transform: translateX(0); opacity: 1; }
+        }
+
+        /* ===========================================
+           GLOBAL UI ELEMENTS
+           Progress bar, nav dots, keyboard hint
+           =========================================== */
+
+        /* Top progress bar */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 2px;
+            background: var(--accent);
+            box-shadow: 0 0 8px var(--accent-glow);
+            transition: width 0.3s ease;
+            z-index: 1000;
+            width: 0%;
+        }
+
+        /* Slide counter — top right */
+        .slide-counter {
+            position: fixed;
+            top: clamp(16px, 2.5vw, 28px);
+            right: clamp(16px, 3vw, 36px);
+            font-size: var(--label-size);
+            font-weight: 500;
+            letter-spacing: 0.15em;
+            color: var(--text-tertiary);
+            z-index: 1000;
+            font-family: var(--font);
+        }
+        .slide-counter span { color: var(--accent); }
+
+        /* Navigation dots — right side */
+        .nav-dots {
+            position: fixed;
+            right: clamp(12px, 2vw, 24px);
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 1000;
+            list-style: none;
+        }
+        .nav-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--text-tertiary);
+            cursor: pointer;
+            transition: all 0.3s var(--ease-out-expo);
+            border: none;
+            padding: 0;
+        }
+        .nav-dot.active {
+            background: var(--accent);
+            box-shadow: 0 0 8px var(--accent-glow);
+            transform: scale(1.5);
+        }
+        .nav-dot:hover { background: var(--text-secondary); transform: scale(1.3); }
+
+        /* Keyboard hint — bottom center */
+        .keyboard-hint {
+            position: fixed;
+            bottom: clamp(12px, 2vh, 24px);
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: var(--label-size);
+            color: var(--text-tertiary);
+            letter-spacing: 0.08em;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            opacity: 0.7;
+        }
+        .key-badge {
+            border: 1px solid var(--divider);
+            border-radius: 4px;
+            padding: 1px 6px;
+            font-size: calc(var(--label-size) * 0.9);
+            color: var(--text-tertiary);
+            background: var(--bg-surface);
+        }
+
+        /* ===========================================
+           SLIDE 1: TITLE
+           =========================================== */
+        .slide-title {
+            background: var(--bg-primary);
+        }
+
+        .title-layout {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            height: 100%;
+            gap: var(--content-gap);
+        }
+
+        .vestige-wordmark {
+            font-size: var(--title-size);
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            line-height: 0.95;
+            color: var(--text-primary);
+        }
+        .vestige-wordmark .accent-v {
+            color: var(--accent);
+            text-shadow: 0 0 30px var(--accent-glow), 0 0 60px var(--accent-glow-sm);
+        }
+
+        .title-tagline {
+            font-size: var(--h3-size);
+            font-weight: 400;
+            color: var(--text-secondary);
+            max-width: 520px;
+            line-height: 1.5;
+        }
+
+        .title-meta {
+            display: flex;
+            align-items: center;
+            gap: clamp(12px, 2vw, 24px);
+            flex-wrap: wrap;
+        }
+        .meta-chip {
+            font-size: var(--small-size);
+            font-weight: 500;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            padding: 5px 12px;
+            border: 1px solid var(--divider);
+            border-radius: 100px;
+            background: var(--bg-surface);
+        }
+        .meta-chip.accent-chip {
+            border-color: rgba(245, 241, 0, 0.3);
+            color: var(--accent);
+            background: rgba(245, 241, 0, 0.07);
+        }
+
+        /* Large decorative character — right panel */
+        .title-deco {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 45%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        .deco-curve {
+            position: relative;
+            width: clamp(200px, 30vw, 420px);
+            height: clamp(200px, 30vw, 420px);
+        }
+        .deco-ring {
+            position: absolute;
+            border-radius: 50%;
+            border: 1px solid;
+        }
+        .deco-ring:nth-child(1) {
+            inset: 0;
+            border-color: rgba(245, 241, 0, 0.12);
+            animation: spin-slow 20s linear infinite;
+        }
+        .deco-ring:nth-child(2) {
+            inset: 12%;
+            border-color: rgba(245, 241, 0, 0.08);
+            animation: spin-slow 30s linear infinite reverse;
+        }
+        .deco-ring:nth-child(3) {
+            inset: 26%;
+            border-color: rgba(245, 241, 0, 0.18);
+            border-style: dashed;
+            animation: spin-slow 15s linear infinite;
+        }
+        .deco-dot {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: var(--accent);
+            border-radius: 50%;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            box-shadow: 0 0 16px var(--accent-glow);
+        }
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+
+        /* Bonding curve SVG line */
+        .title-curve-svg {
+            position: absolute;
+            inset: 0;
+            opacity: 0.15;
+            z-index: 0;
+        }
+
+        @media (max-width: 768px) { .title-deco { display: none; } }
+
+        /* ===========================================
+           SLIDE 2: PROBLEM
+           =========================================== */
+        .problem-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: clamp(0.75rem, 1.5vw, 1.25rem);
+            margin-top: var(--content-gap);
+        }
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--divider);
+            border-radius: 16px;
+            padding: clamp(0.875rem, 2vw, 1.5rem);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .stat-number {
+            font-size: clamp(1.5rem, 3.5vw, 3rem);
+            font-weight: 700;
+            letter-spacing: -0.04em;
+            line-height: 1;
+        }
+        .stat-number.danger { color: var(--error); }
+        .stat-label {
+            font-size: var(--small-size);
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        @media (max-width: 600px) {
+            .problem-stats { grid-template-columns: 1fr; }
+        }
+
+        /* ===========================================
+           SLIDE 3: SOLUTION
+           =========================================== */
+        .solution-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: clamp(1rem, 3vw, 2.5rem);
+            align-items: center;
+            height: 100%;
+        }
+        .solution-text { display: flex; flex-direction: column; gap: var(--content-gap); }
+
+        /* Bonding curve diagram */
+        .curve-diagram {
+            background: var(--bg-card);
+            border: 1px solid var(--divider);
+            border-radius: 20px;
+            padding: clamp(1rem, 2.5vw, 2rem);
+            aspect-ratio: 1 / 0.75;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            max-height: min(45vh, 340px);
+        }
+
+        @media (max-width: 768px) {
+            .solution-split { grid-template-columns: 1fr; }
+            .curve-diagram  { display: none; }
+        }
+
+        /* ===========================================
+           SLIDE 4: HOW IT WORKS (MECHANICS)
+           =========================================== */
+        .steps-flow {
+            display: flex;
+            flex-direction: column;
+            gap: clamp(0.5rem, 1.5vh, 1.25rem);
+            margin-top: var(--content-gap);
+        }
+        .step-row {
+            display: flex;
+            align-items: flex-start;
+            gap: clamp(10px, 2vw, 20px);
+            background: var(--bg-card);
+            border: 1px solid var(--divider);
+            border-radius: 14px;
+            padding: clamp(0.7rem, 1.8vw, 1.25rem) clamp(1rem, 2vw, 1.5rem);
+            position: relative;
+            transition: border-color 0.2s;
+        }
+        .step-row:hover { border-color: rgba(245, 241, 0, 0.2); }
+        .step-num {
+            font-size: var(--small-size);
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 0.05em;
+            min-width: 28px;
+            padding-top: 2px;
+        }
+        .step-body h4 {
+            font-size: var(--body-size);
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 3px;
+        }
+        .step-body p {
+            font-size: var(--small-size);
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+        .step-badge {
+            margin-left: auto;
+            font-size: calc(var(--label-size) * 0.9);
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 3px 10px;
+            border-radius: 100px;
+        }
+        .badge-buy  { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+        .badge-sell { background: rgba(239, 68, 68, 0.15);  color: var(--error); }
+        .badge-grad { background: rgba(245, 241, 0, 0.15);  color: var(--accent); }
+
+        /* ===========================================
+           SLIDE 5: PRODUCT FEATURES
+           =========================================== */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: clamp(0.6rem, 1.5vw, 1.1rem);
+            margin-top: var(--content-gap);
+        }
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--divider);
+            border-radius: 16px;
+            padding: clamp(0.875rem, 2vw, 1.5rem);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            transition: border-color 0.2s, transform 0.2s;
+            cursor: default;
+        }
+        .feature-card:hover {
+            border-color: rgba(245, 241, 0, 0.2);
+            transform: translateY(-2px);
+        }
+        .feature-icon {
+            width: clamp(28px, 3.5vw, 40px);
+            height: clamp(28px, 3.5vw, 40px);
+            border-radius: 10px;
+            background: rgba(245, 241, 0, 0.1);
+            border: 1px solid rgba(245, 241, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(12px, 1.5vw, 18px);
+        }
+        .feature-name {
+            font-size: var(--body-size);
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .feature-desc {
+            font-size: var(--small-size);
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        @media (max-width: 600px) {
+            .features-grid { grid-template-columns: 1fr 1fr; }
+        }
+
+        /* ===========================================
+           SLIDE 6: TECH STACK
+           =========================================== */
+        .tech-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: clamp(1rem, 3vw, 2.5rem);
+            margin-top: var(--content-gap);
+        }
+        .tech-col h3 {
+            font-size: var(--h3-size);
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: clamp(0.5rem, 1.5vh, 1rem);
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--divider);
+        }
+        .tech-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: clamp(6px, 1vh, 12px);
+        }
+        .tech-list li {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: var(--body-size);
+            color: var(--text-secondary);
+        }
+        .tech-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 6px var(--accent-glow-sm);
+            flex-shrink: 0;
+        }
+        .tech-dot.green { background: var(--success); box-shadow: none; }
+
+        @media (max-width: 600px) {
+            .tech-split { grid-template-columns: 1fr; }
+        }
+
+        /* ===========================================
+           SLIDE 7: MARKET OPPORTUNITY
+           =========================================== */
+        .market-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: clamp(0.75rem, 1.5vw, 1.25rem);
+            margin-top: var(--content-gap);
+        }
+        .market-card {
+            background: var(--bg-card);
+            border: 1px solid var(--divider);
+            border-radius: 16px;
+            padding: clamp(0.875rem, 2vw, 1.5rem);
+        }
+        .market-title {
+            font-size: var(--small-size);
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            margin-bottom: 8px;
+        }
+        .market-figure {
+            font-size: clamp(1.6rem, 3.5vw, 3rem);
+            font-weight: 700;
+            letter-spacing: -0.04em;
+            color: var(--accent);
+            text-shadow: 0 0 20px var(--accent-glow-sm);
+        }
+        .market-sub {
+            font-size: var(--small-size);
+            color: var(--text-secondary);
+            margin-top: 6px;
+            line-height: 1.4;
+        }
+
+        @media (max-width: 600px) {
+            .market-row { grid-template-columns: 1fr; }
+        }
+
+        /* ===========================================
+           SLIDE 8: ROADMAP
+           =========================================== */
+        .roadmap-track {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: clamp(0.6rem, 1.5vw, 1rem);
+            margin-top: var(--content-gap);
+            position: relative;
+        }
+        .roadmap-track::before {
+            content: '';
+            position: absolute;
+            top: clamp(24px, 3.5vw, 36px);
+            left: 10%;
+            right: 10%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--divider), var(--divider), transparent);
+            z-index: 0;
+        }
+        .phase-card {
+            background: var(--bg-card);
+            border: 1px solid var(--divider);
+            border-radius: 16px;
+            padding: clamp(0.75rem, 1.8vw, 1.25rem);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            position: relative;
+            z-index: 1;
+        }
+        .phase-card.active {
+            border-color: rgba(245, 241, 0, 0.35);
+            background: rgba(245, 241, 0, 0.04);
+        }
+        .phase-label {
+            font-size: var(--label-size);
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+        .phase-label.done    { color: var(--success); }
+        .phase-label.active  { color: var(--accent); }
+        .phase-label.soon    { color: var(--text-tertiary); }
+        .phase-name {
+            font-size: var(--body-size);
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .phase-items {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .phase-items li {
+            font-size: var(--small-size);
+            color: var(--text-secondary);
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+        .phase-items li::before { content: '→'; color: var(--text-tertiary); }
+
+        @media (max-width: 600px) {
+            .roadmap-track { grid-template-columns: 1fr 1fr; }
+            .roadmap-track::before { display: none; }
+        }
+
+        /* ===========================================
+           SLIDE 9: THE ASK (CTA)
+           =========================================== */
+        .ask-layout {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            height: 100%;
+            gap: var(--content-gap);
+        }
+        .ask-amount {
+            font-size: clamp(3rem, 8vw, 7rem);
+            font-weight: 700;
+            letter-spacing: -0.05em;
+            color: var(--accent);
+            text-shadow:
+                0 0 40px rgba(245, 241, 0, 0.4),
+                0 0 80px rgba(245, 241, 0, 0.15);
+            line-height: 1;
+        }
+        .ask-sub {
+            font-size: var(--h3-size);
+            font-weight: 400;
+            color: var(--text-secondary);
+            max-width: 480px;
+        }
+        .ask-use-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: clamp(0.6rem, 1.5vw, 1rem);
+            width: 100%;
+            max-width: 700px;
+        }
+        .use-chip {
+            background: var(--bg-card);
+            border: 1px solid var(--divider);
+            border-radius: 12px;
+            padding: clamp(0.6rem, 1.5vw, 1rem);
+            font-size: var(--small-size);
+            color: var(--text-secondary);
+        }
+        .use-chip strong {
+            display: block;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 3px;
+            font-size: var(--body-size);
+        }
+        .contact-row {
+            display: flex;
+            gap: clamp(8px, 2vw, 20px);
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .contact-pill {
+            font-size: var(--small-size);
+            font-weight: 500;
+            color: var(--text-tertiary);
+            padding: 6px 16px;
+            border: 1px solid var(--divider);
+            border-radius: 100px;
+            background: var(--bg-surface);
+            letter-spacing: 0.04em;
+        }
+        .cta-btn {
+            font-size: var(--body-size);
+            font-weight: 600;
+            color: #0C0D10;
+            background: var(--accent);
+            border: none;
+            border-radius: 100px;
+            padding: clamp(10px, 1.5vh, 16px) clamp(24px, 4vw, 48px);
+            cursor: pointer;
+            letter-spacing: -0.01em;
+            transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
+            box-shadow: 0 0 24px var(--accent-glow);
+        }
+        .cta-btn:hover {
+            background: var(--accent-hover);
+            box-shadow: 0 0 36px var(--accent-glow);
+            transform: translateY(-1px);
+        }
+
+        @media (max-width: 600px) {
+            .ask-use-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ===========================================
+           INLINE EDITING SYSTEM
+           User opted in — hover top-left to reveal edit toggle
+           =========================================== */
+        .edit-hotzone {
+            position: fixed;
+            top: 0; left: 0;
+            width: 80px; height: 80px;
+            z-index: 10000;
+            cursor: pointer;
+        }
+        .edit-toggle {
+            position: fixed;
+            top: 16px; left: 16px;
+            width: 36px; height: 36px;
+            border-radius: 10px;
+            background: var(--bg-card);
+            border: 1px solid var(--divider);
+            color: var(--text-secondary);
+            font-size: 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10001;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease, background 0.2s;
+        }
+        .edit-toggle.show,
+        .edit-toggle.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .edit-toggle.active {
+            background: rgba(245, 241, 0, 0.15);
+            border-color: rgba(245, 241, 0, 0.4);
+            color: var(--accent);
+        }
+
+        /* Visual cue when in edit mode */
+        body.edit-mode [contenteditable="true"] {
+            outline: 1px dashed rgba(245, 241, 0, 0.3);
+            border-radius: 4px;
+            cursor: text;
+        }
+        body.edit-mode [contenteditable="true"]:focus {
+            outline: 1px solid rgba(245, 241, 0, 0.6);
+        }
+
+        /* Edit banner */
+        .edit-banner {
+            position: fixed;
+            bottom: 40px; left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-card);
+            border: 1px solid rgba(245, 241, 0, 0.3);
+            border-radius: 100px;
+            padding: 8px 20px;
+            font-size: var(--small-size);
+            color: var(--text-secondary);
+            z-index: 9999;
+            display: none;
+            gap: 12px;
+            align-items: center;
+        }
+        .edit-banner.visible { display: flex; }
+        .save-btn {
+            font-size: var(--small-size);
+            font-weight: 600;
+            background: var(--accent);
+            color: #0C0D10;
+            border: none;
+            border-radius: 100px;
+            padding: 4px 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .save-btn:hover { background: var(--accent-hover); }
+    </style>
+</head>
+<body>
+
+    <!-- ===================== GLOBAL UI ===================== -->
+    <div class="progress-bar" id="progressBar"></div>
+
+    <div class="slide-counter" id="slideCounter">
+        <span id="currentNum">01</span> / 09
+    </div>
+
+    <nav class="nav-dots" id="navDots" aria-label="Slide navigation"></nav>
+
+    <div class="keyboard-hint" aria-hidden="true">
+        <span class="key-badge">↑↓</span>
+        <span class="key-badge">Space</span>
+        Navigate &nbsp;·&nbsp; Press <span class="key-badge">E</span> to edit
+    </div>
+
+    <!-- Inline editing controls -->
+    <div class="edit-hotzone" id="editHotzone" title="Edit mode"></div>
+    <button class="edit-toggle" id="editToggle" title="Toggle edit mode (E)">✏️</button>
+    <div class="edit-banner" id="editBanner">
+        Edit mode — click any text
+        <button class="save-btn" id="saveBtn">Save ⌘S</button>
+        <button class="save-btn" id="exportBtn">Export</button>
+    </div>
+
+
+    <!-- ===================== SLIDE 1: TITLE ===================== -->
+    <section class="slide slide-title" id="slide-1" aria-label="Title slide">
+        <div class="bg-grid"></div>
+        <div class="bg-glow bottom-right"></div>
+
+        <!-- Decorative spinning rings — right side -->
+        <div class="title-deco" aria-hidden="true">
+            <div class="deco-curve">
+                <div class="deco-ring"><div class="deco-dot"></div></div>
+                <div class="deco-ring"></div>
+                <div class="deco-ring"></div>
+            </div>
+        </div>
+
+        <div class="slide-content stagger" style="max-width: 600px;">
+            <div class="meta-chip accent-chip reveal" style="width: fit-content; margin-bottom: 4px;">
+                Solana Mobile Hackathon 2025
+            </div>
+            <h1 class="vestige-wordmark reveal">
+                <span class="accent-v">V</span>ESTIGE
+            </h1>
+            <div class="accent-line reveal"></div>
+            <p class="title-tagline reveal">
+                Fair-launch token trading with an inverted bonding curve — built natively for Solana Mobile.
+            </p>
+            <div class="title-meta reveal">
+                <span class="meta-chip">Solana</span>
+                <span class="meta-chip">DeFi</span>
+                <span class="meta-chip">Mobile-First</span>
+                <span class="meta-chip">Raydium CPMM</span>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ===================== SLIDE 2: PROBLEM ===================== -->
+    <section class="slide" id="slide-2" aria-label="The Problem">
+        <div class="bg-grid"></div>
+        <div class="bg-glow top-left"></div>
+
+        <div class="slide-content">
+            <div class="stagger">
+                <div class="accent-line reveal" style="margin-bottom: 12px;"></div>
+                <p class="reveal" style="font-size: var(--small-size); font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px;">The Problem</p>
+                <h2 class="reveal" style="font-size: var(--h2-size); font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; margin-bottom: 4px;">
+                    Token launches are broken.
+                </h2>
+                <p class="reveal" style="font-size: var(--body-size); color: var(--text-secondary); max-width: 560px; line-height: 1.6;">
+                    Insider-heavy launches, bot-driven rug pulls, and zero mobile UX leave retail traders with no fair entry point.
+                </p>
+            </div>
+
+            <div class="problem-stats stagger">
+                <div class="stat-card reveal">
+                    <div class="stat-number danger">~80%</div>
+                    <div class="stat-label">of meme coins on pump.fun are abandoned within 48 hours</div>
+                </div>
+                <div class="stat-card reveal">
+                    <div class="stat-number" style="color: var(--warning);">$2B+</div>
+                    <div class="stat-label">lost to rug pulls and insider dumps in 2024 alone</div>
+                </div>
+                <div class="stat-card reveal">
+                    <div class="stat-number" style="color: var(--text-secondary);">0</div>
+                    <div class="stat-label">major native Solana Mobile token-launch apps exist today</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ===================== SLIDE 3: SOLUTION ===================== -->
+    <section class="slide" id="slide-3" aria-label="The Solution">
+        <div class="bg-grid"></div>
+        <div class="bg-glow bottom-right"></div>
+
+        <div class="slide-content">
+            <div class="solution-split">
+                <!-- Left: text -->
+                <div class="solution-text stagger">
+                    <div>
+                        <div class="accent-line reveal" style="margin-bottom: 12px;"></div>
+                        <p class="reveal" style="font-size: var(--small-size); font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px;">The Solution</p>
+                        <h2 class="reveal" style="font-size: var(--h2-size); font-weight: 700; letter-spacing: -0.03em; line-height: 1.1;">
+                            An <span style="color: var(--accent);">inverted</span> bonding curve that rewards early holders.
+                        </h2>
+                    </div>
+                    <p class="reveal" style="font-size: var(--body-size); color: var(--text-secondary); line-height: 1.65;">
+                        Vestige starts tokens at their <strong style="color: var(--text-primary);">maximum price</strong> and decreases it as supply is sold — creating a built-in incentive for early participation and eliminating the insider advantage.
+                    </p>
+                    <p class="reveal" style="font-size: var(--body-size); color: var(--text-secondary); line-height: 1.65;">
+                        Once the SOL graduation target is hit, the token <strong style="color: var(--accent);">graduates automatically to Raydium CPMM</strong> — giving it real on-chain liquidity.
+                    </p>
+                </div>
+
+                <!-- Right: curve diagram -->
+                <div class="curve-diagram reveal-scale">
+                    <svg viewBox="0 0 300 200" width="100%" height="100%" style="overflow: visible;">
+                        <!-- Axes -->
+                        <line x1="40" y1="175" x2="280" y2="175" stroke="#23242A" stroke-width="1.5"/>
+                        <line x1="40" y1="20"  x2="40"  y2="175" stroke="#23242A" stroke-width="1.5"/>
+
+                        <!-- Axis labels -->
+                        <text x="160" y="195" text-anchor="middle" fill="#6E6E73" font-size="10" font-family="Space Grotesk">Token Supply Sold</text>
+                        <text x="20" y="100" text-anchor="middle" fill="#6E6E73" font-size="10" font-family="Space Grotesk" transform="rotate(-90, 20, 100)">Price</text>
+
+                        <!-- Inverted curve: price decreases as supply sells -->
+                        <defs>
+                            <linearGradient id="curveGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%"   stop-color="#F5F100" stop-opacity="0.3"/>
+                                <stop offset="100%" stop-color="#F5F100" stop-opacity="0.02"/>
+                            </linearGradient>
+                        </defs>
+                        <path d="M 40 25 Q 160 25 280 165" fill="none" stroke="#F5F100" stroke-width="2.5" stroke-linecap="round"/>
+                        <path d="M 40 25 Q 160 25 280 165 L 280 175 L 40 175 Z" fill="url(#curveGrad)"/>
+
+                        <!-- Current position dot -->
+                        <circle cx="148" cy="87" r="6" fill="#F5F100" opacity="0.9"/>
+                        <circle cx="148" cy="87" r="10" fill="none" stroke="#F5F100" stroke-opacity="0.3" stroke-width="1.5"/>
+
+                        <!-- pMax label -->
+                        <text x="44" y="22" fill="#B3B3B8" font-size="9" font-family="Space Grotesk">pMax</text>
+                        <!-- pMin label -->
+                        <text x="248" y="162" fill="#B3B3B8" font-size="9" font-family="Space Grotesk">pMin</text>
+
+                        <!-- Graduation target arrow -->
+                        <line x1="240" y1="60" x2="278" y2="140" stroke="#22C55E" stroke-width="1" stroke-dasharray="3 3"/>
+                        <text x="240" y="56" fill="#22C55E" font-size="8" font-family="Space Grotesk">→ Raydium</text>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ===================== SLIDE 4: HOW IT WORKS ===================== -->
+    <section class="slide" id="slide-4" aria-label="How It Works">
+        <div class="bg-grid"></div>
+        <div class="bg-glow top-left"></div>
+
+        <div class="slide-content">
+            <div>
+                <div class="accent-line" style="margin-bottom: 12px;"></div>
+                <p style="font-size: var(--small-size); font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px;">Mechanism</p>
+                <h2 style="font-size: var(--h2-size); font-weight: 700; letter-spacing: -0.03em; line-height: 1.1;">
+                    How It Works
+                </h2>
+            </div>
+
+            <div class="steps-flow stagger">
+                <div class="step-row reveal">
+                    <div class="step-num">01</div>
+                    <div class="step-body">
+                        <h4>Creator Launches a Token</h4>
+                        <p>Sets name, symbol, supply, and the graduation SOL target. Token starts at pMax.</p>
+                    </div>
+                    <span class="step-badge badge-grad">Launch</span>
+                </div>
+                <div class="step-row reveal">
+                    <div class="step-num">02</div>
+                    <div class="step-body">
+                        <h4>Traders Buy &amp; Sell via Bonding Curve</h4>
+                        <p>price = pMax − (pMax − pMin) × (totalBaseSold / supply). Every buy pushes cost down for the next buyer.</p>
+                    </div>
+                    <span class="step-badge badge-buy">Buy / Sell</span>
+                </div>
+                <div class="step-row reveal">
+                    <div class="step-num">03</div>
+                    <div class="step-body">
+                        <h4>Live Price Feed &amp; Trade History</h4>
+                        <p>Candlestick chart, bonding curve visualization, and real-time trade feed parsed from on-chain logs.</p>
+                    </div>
+                    <span class="step-badge" style="background:rgba(179,179,184,0.1); color: var(--text-secondary);">Charts</span>
+                </div>
+                <div class="step-row reveal">
+                    <div class="step-num">04</div>
+                    <div class="step-body">
+                        <h4>Automatic Raydium Graduation</h4>
+                        <p>When totalSolCollected ≥ graduationTarget, liquidity is seeded into Raydium CPMM automatically.</p>
+                    </div>
+                    <span class="step-badge badge-grad">Graduate</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ===================== SLIDE 5: PRODUCT FEATURES ===================== -->
+    <section class="slide" id="slide-5" aria-label="Product Features">
+        <div class="bg-grid"></div>
+        <div class="bg-glow bottom-right"></div>
+
+        <div class="slide-content">
+            <div>
+                <div class="accent-line" style="margin-bottom: 12px;"></div>
+                <p style="font-size: var(--small-size); font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px;">Product</p>
+                <h2 style="font-size: var(--h2-size); font-weight: 700; letter-spacing: -0.03em;">
+                    Built for traders on the go
+                </h2>
+            </div>
+
+            <div class="features-grid stagger">
+                <div class="feature-card reveal">
+                    <div class="feature-icon">📈</div>
+                    <div class="feature-name">Bonding Curve Chart</div>
+                    <div class="feature-desc">Real-time SVG visualization of the inverted curve with a live position dot.</div>
+                </div>
+                <div class="feature-card reveal">
+                    <div class="feature-icon">🕯️</div>
+                    <div class="feature-name">Candlestick Charts</div>
+                    <div class="feature-desc">Custom OHLC candles aggregated from on-chain transaction logs.</div>
+                </div>
+                <div class="feature-card reveal">
+                    <div class="feature-icon">⚡</div>
+                    <div class="feature-name">Live Trade Feed</div>
+                    <div class="feature-desc">Parsed buy/sell events streamed from Solana logs in real time.</div>
+                </div>
+                <div class="feature-card reveal">
+                    <div class="feature-icon">🚀</div>
+                    <div class="feature-name">One-Tap Launch</div>
+                    <div class="feature-desc">Create and launch a token in seconds from a Solana Mobile device.</div>
+                </div>
+                <div class="feature-card reveal">
+                    <div class="feature-icon">🎓</div>
+                    <div class="feature-name">Auto Graduation</div>
+                    <div class="feature-desc">Automatic Raydium CPMM seeding when the SOL target is reached.</div>
+                </div>
+                <div class="feature-card reveal">
+                    <div class="feature-icon">📱</div>
+                    <div class="feature-name">Mobile-Native</div>
+                    <div class="feature-desc">React Native with Solana Mobile SDK — hardware wallet signing on-device.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ===================== SLIDE 6: TECH STACK ===================== -->
+    <section class="slide" id="slide-6" aria-label="Tech Stack">
+        <div class="bg-grid"></div>
+        <div class="bg-glow top-left"></div>
+
+        <div class="slide-content">
+            <div>
+                <div class="accent-line" style="margin-bottom: 12px;"></div>
+                <p style="font-size: var(--small-size); font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px;">Architecture</p>
+                <h2 style="font-size: var(--h2-size); font-weight: 700; letter-spacing: -0.03em;">
+                    Fully on-chain, fully mobile
+                </h2>
+            </div>
+
+            <div class="tech-split stagger">
+                <div class="tech-col reveal">
+                    <h3>On-Chain (Solana)</h3>
+                    <ul class="tech-list">
+                        <li><span class="tech-dot"></span>Anchor framework — Rust programs</li>
+                        <li><span class="tech-dot"></span>Custom inverted bonding curve logic</li>
+                        <li><span class="tech-dot"></span>Raydium CPMM graduation CPI</li>
+                        <li><span class="tech-dot"></span>On-chain log emission for trade events</li>
+                        <li><span class="tech-dot"></span>BN arithmetic for lamport precision</li>
+                    </ul>
+                </div>
+                <div class="tech-col reveal">
+                    <h3>Mobile (React Native)</h3>
+                    <ul class="tech-list">
+                        <li><span class="tech-dot green"></span>Solana Mobile SDK (MWA)</li>
+                        <li><span class="tech-dot green"></span>React Native + TypeScript</li>
+                        <li><span class="tech-dot green"></span>Custom SVG candle + curve charts</li>
+                        <li><span class="tech-dot green"></span>Real-time log parsing &amp; candle aggregation</li>
+                        <li><span class="tech-dot green"></span>Auto-refresh every 15 / 30 seconds</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ===================== SLIDE 7: MARKET OPPORTUNITY ===================== -->
+    <section class="slide" id="slide-7" aria-label="Market Opportunity">
+        <div class="bg-grid"></div>
+        <div class="bg-glow bottom-right"></div>
+
+        <div class="slide-content">
+            <div>
+                <div class="accent-line" style="margin-bottom: 12px;"></div>
+                <p style="font-size: var(--small-size); font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px;">Opportunity</p>
+                <h2 style="font-size: var(--h2-size); font-weight: 700; letter-spacing: -0.03em; line-height: 1.1;">
+                    A massive, underserved market
+                </h2>
+            </div>
+
+            <div class="market-row stagger">
+                <div class="market-card reveal">
+                    <div class="market-title">Solana DEX Volume</div>
+                    <div class="market-figure">$40B+</div>
+                    <div class="market-sub">Monthly on-chain volume across Solana DEXs in early 2025</div>
+                </div>
+                <div class="market-card reveal">
+                    <div class="market-title">pump.fun Launches</div>
+                    <div class="market-figure">4M+</div>
+                    <div class="market-sub">Tokens launched on pump.fun since 2024 — demand is proven</div>
+                </div>
+                <div class="market-card reveal">
+                    <div class="market-title">Solana Mobile Users</div>
+                    <div class="market-figure">~200K</div>
+                    <div class="market-sub">Saga + Chapter 2 device owners — zero native launch apps exist</div>
+                </div>
+            </div>
+
+            <p class="reveal" style="font-size: var(--body-size); color: var(--text-secondary); line-height: 1.65; margin-top: var(--content-gap); max-width: 660px;">
+                Vestige captures the intersection of <strong style="color: var(--text-primary);">fair-launch demand</strong>, <strong style="color: var(--text-primary);">Solana DeFi growth</strong>, and the <strong style="color: var(--accent);">untapped Solana Mobile ecosystem</strong> — a vertical no competitor is targeting natively.
+            </p>
+        </div>
+    </section>
+
+
+    <!-- ===================== SLIDE 8: ROADMAP ===================== -->
+    <section class="slide" id="slide-8" aria-label="Roadmap">
+        <div class="bg-grid"></div>
+        <div class="bg-glow top-left"></div>
+
+        <div class="slide-content">
+            <div>
+                <div class="accent-line" style="margin-bottom: 12px;"></div>
+                <p style="font-size: var(--small-size); font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px;">Roadmap</p>
+                <h2 style="font-size: var(--h2-size); font-weight: 700; letter-spacing: -0.03em;">
+                    What's next for Vestige
+                </h2>
+            </div>
+
+            <div class="roadmap-track stagger">
+                <div class="phase-card reveal">
+                    <div class="phase-label done">✓ Complete</div>
+                    <div class="phase-name">Foundation</div>
+                    <ul class="phase-items">
+                        <li>Anchor bonding curve program</li>
+                        <li>Mobile buy / sell UI</li>
+                        <li>Price + candle charts</li>
+                        <li>Raydium graduation CPI</li>
+                    </ul>
+                </div>
+                <div class="phase-card active reveal">
+                    <div class="phase-label active">▶ Now</div>
+                    <div class="phase-name">Hackathon MVP</div>
+                    <ul class="phase-items">
+                        <li>Live trade feed</li>
+                        <li>Create launch screen</li>
+                        <li>Portfolio view</li>
+                        <li>Mainnet beta</li>
+                    </ul>
+                </div>
+                <div class="phase-card reveal">
+                    <div class="phase-label soon">Q3 2025</div>
+                    <div class="phase-name">Growth</div>
+                    <ul class="phase-items">
+                        <li>Creator analytics</li>
+                        <li>Social trading feed</li>
+                        <li>Push notifications</li>
+                        <li>Token metadata CDN</li>
+                    </ul>
+                </div>
+                <div class="phase-card reveal">
+                    <div class="phase-label soon">Q4 2025</div>
+                    <div class="phase-name">Scale</div>
+                    <ul class="phase-items">
+                        <li>Multi-chain support</li>
+                        <li>Revenue share for creators</li>
+                        <li>SDK for third-party launchpads</li>
+                        <li>DAO governance</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ===================== SLIDE 9: THE ASK ===================== -->
+    <section class="slide" id="slide-9" aria-label="The Ask">
+        <div class="bg-grid"></div>
+        <div class="bg-glow center"></div>
+
+        <div class="slide-content">
+            <div class="ask-layout stagger">
+                <div class="reveal" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                    <div class="accent-line" style="margin: 0 auto 12px;"></div>
+                    <p style="font-size: var(--small-size); font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-tertiary);">Seed Round</p>
+                </div>
+                <div class="ask-amount reveal">$500K</div>
+                <p class="ask-sub reveal">to take Vestige from hackathon MVP to the #1 fair-launch app on Solana Mobile.</p>
+
+                <div class="ask-use-grid reveal">
+                    <div class="use-chip">
+                        <strong>40%</strong>Engineering — 2 senior Solana devs
+                    </div>
+                    <div class="use-chip">
+                        <strong>30%</strong>Growth &amp; community incentives
+                    </div>
+                    <div class="use-chip">
+                        <strong>30%</strong>Security audits &amp; infrastructure
+                    </div>
+                </div>
+
+                <div class="contact-row reveal">
+                    <span class="contact-pill">vestige.app</span>
+                    <span class="contact-pill">@vestige_sol</span>
+                    <span class="contact-pill">team@vestige.app</span>
+                </div>
+
+                <button class="cta-btn reveal">Let's Build Together →</button>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ===================== JAVASCRIPT ===================== -->
+    <script>
+        /* ===========================================
+           SLIDE PRESENTATION CONTROLLER
+           Keyboard, touch, mouse wheel navigation
+           + intersection observer for animations
+           + inline editing system
+           =========================================== */
+
+        class SlidePresentation {
+            constructor() {
+                this.slides      = Array.from(document.querySelectorAll('.slide'));
+                this.currentIdx  = 0;
+                this.isScrolling = false;
+                this.touchStartY = 0;
+
+                this.progressBar = document.getElementById('progressBar');
+                this.currentNum  = document.getElementById('currentNum');
+                this.navDotsEl   = document.getElementById('navDots');
+
+                this.init();
+            }
+
+            init() {
+                this.buildNavDots();
+                this.setupIntersectionObserver();
+                this.setupKeyboard();
+                this.setupTouch();
+                this.setupWheel();
+                this.updateUI(0);
+
+                // Trigger first slide immediately
+                this.slides[0].classList.add('visible');
+            }
+
+            /* Build right-side nav dots */
+            buildNavDots() {
+                this.slides.forEach((_, i) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'nav-dot' + (i === 0 ? ' active' : '');
+                    btn.setAttribute('aria-label', `Go to slide ${i + 1}`);
+                    btn.addEventListener('click', () => this.goTo(i));
+                    this.navDotsEl.appendChild(btn);
+                });
+            }
+
+            /* Intersection observer — adds .visible to trigger CSS animations */
+            setupIntersectionObserver() {
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('visible');
+                            const idx = this.slides.indexOf(entry.target);
+                            if (idx !== -1) this.updateUI(idx);
+                        }
+                    });
+                }, { threshold: 0.5 });
+
+                this.slides.forEach(s => observer.observe(s));
+            }
+
+            /* Keyboard navigation */
+            setupKeyboard() {
+                document.addEventListener('keydown', (e) => {
+                    // Skip when user is editing text
+                    if (e.target.getAttribute('contenteditable')) return;
+
+                    if (['ArrowDown', 'ArrowRight', ' ', 'PageDown'].includes(e.key)) {
+                        e.preventDefault();
+                        this.goTo(this.currentIdx + 1);
+                    } else if (['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.key)) {
+                        e.preventDefault();
+                        this.goTo(this.currentIdx - 1);
+                    }
+                });
+            }
+
+            /* Touch / swipe navigation */
+            setupTouch() {
+                document.addEventListener('touchstart', (e) => {
+                    this.touchStartY = e.touches[0].clientY;
+                }, { passive: true });
+
+                document.addEventListener('touchend', (e) => {
+                    const delta = this.touchStartY - e.changedTouches[0].clientY;
+                    if (Math.abs(delta) > 50) this.goTo(this.currentIdx + (delta > 0 ? 1 : -1));
+                }, { passive: true });
+            }
+
+            /* Mouse wheel navigation with debounce */
+            setupWheel() {
+                document.addEventListener('wheel', (e) => {
+                    if (this.isScrolling) return;
+                    this.isScrolling = true;
+                    this.goTo(this.currentIdx + (e.deltaY > 0 ? 1 : -1));
+                    setTimeout(() => { this.isScrolling = false; }, 800);
+                }, { passive: true });
+            }
+
+            /* Navigate to a specific slide index */
+            goTo(idx) {
+                const clamped = Math.max(0, Math.min(idx, this.slides.length - 1));
+                if (clamped === this.currentIdx) return;
+                this.slides[clamped].scrollIntoView({ behavior: 'smooth' });
+                this.currentIdx = clamped;
+                this.updateUI(clamped);
+            }
+
+            /* Update progress bar, counter, and nav dots */
+            updateUI(idx) {
+                this.currentIdx = idx;
+                const pct = ((idx + 1) / this.slides.length) * 100;
+                this.progressBar.style.width = pct + '%';
+                this.currentNum.textContent  = String(idx + 1).padStart(2, '0');
+
+                document.querySelectorAll('.nav-dot').forEach((dot, i) => {
+                    dot.classList.toggle('active', i === idx);
+                });
+            }
+        }
+
+        /* ===========================================
+           INLINE EDITING SYSTEM
+           Hover top-left corner or press E to reveal
+           =========================================== */
+
+        class InlineEditor {
+            constructor() {
+                this.isActive   = false;
+                this.editToggle = document.getElementById('editToggle');
+                this.editBanner = document.getElementById('editBanner');
+                this.hotzone    = document.getElementById('editHotzone');
+                this.saveBtn    = document.getElementById('saveBtn');
+                this.exportBtn  = document.getElementById('exportBtn');
+
+                this._hideTimeout = null;
+                this.setupHotzone();
+                this.setupKeyboard();
+                this.setupSave();
+                this.loadFromStorage();
+            }
+
+            /* JS-based hover with 400ms grace period — DO NOT use CSS ~ selector */
+            setupHotzone() {
+                const show = () => {
+                    clearTimeout(this._hideTimeout);
+                    this.editToggle.classList.add('show');
+                };
+                const hide = () => {
+                    this._hideTimeout = setTimeout(() => {
+                        if (!this.isActive) this.editToggle.classList.remove('show');
+                    }, 400);
+                };
+
+                this.hotzone.addEventListener('mouseenter', show);
+                this.hotzone.addEventListener('mouseleave', hide);
+                this.editToggle.addEventListener('mouseenter', show);
+                this.editToggle.addEventListener('mouseleave', hide);
+                this.hotzone.addEventListener('click', () => this.toggle());
+                this.editToggle.addEventListener('click', () => this.toggle());
+            }
+
+            /* E key shortcut */
+            setupKeyboard() {
+                document.addEventListener('keydown', (e) => {
+                    if ((e.key === 'e' || e.key === 'E') && !e.target.getAttribute('contenteditable')) {
+                        this.toggle();
+                    }
+                    /* Ctrl+S / Cmd+S to save */
+                    if ((e.ctrlKey || e.metaKey) && e.key === 's' && this.isActive) {
+                        e.preventDefault();
+                        this.save();
+                    }
+                });
+            }
+
+            setupSave() {
+                this.saveBtn.addEventListener('click', () => this.save());
+                this.exportBtn.addEventListener('click', () => this.exportFile());
+            }
+
+            toggle() {
+                this.isActive = !this.isActive;
+                this.editToggle.classList.toggle('active', this.isActive);
+                this.editToggle.classList.add('show');
+                document.body.classList.toggle('edit-mode', this.isActive);
+                this.editBanner.classList.toggle('visible', this.isActive);
+
+                /* Make all text nodes editable / non-editable */
+                document.querySelectorAll('h1, h2, h3, h4, p, li, .meta-chip, .stat-number, .stat-label, .market-figure, .market-sub, .phase-name, .feature-name, .feature-desc, .ask-amount, .ask-sub, .contact-pill, .step-body h4, .step-body p, .tech-list li, .use-chip').forEach(el => {
+                    el.contentEditable = this.isActive ? 'true' : 'false';
+                });
+            }
+
+            /* Save edited content to localStorage */
+            save() {
+                const content = {};
+                document.querySelectorAll('[contenteditable]').forEach((el, i) => {
+                    if (el.innerHTML.trim()) content[i] = el.innerHTML;
+                });
+                localStorage.setItem('vestige-slides', JSON.stringify(content));
+                this.flashSave();
+            }
+
+            /* Restore saved content on load */
+            loadFromStorage() {
+                const saved = localStorage.getItem('vestige-slides');
+                if (!saved) return;
+                const content = JSON.parse(saved);
+                document.querySelectorAll('h1, h2, h3, h4, p, li, .meta-chip, .stat-number, .stat-label, .market-figure, .market-sub, .phase-name, .feature-name, .feature-desc, .ask-amount, .ask-sub, .contact-pill, .step-body h4, .step-body p, .tech-list li, .use-chip').forEach((el, i) => {
+                    if (content[i]) el.innerHTML = content[i];
+                });
+            }
+
+            /* Export current HTML state to file */
+            exportFile() {
+                const clone = document.documentElement.cloneNode(true);
+                /* Remove edit controls from export */
+                clone.querySelectorAll('.edit-hotzone, .edit-toggle, .edit-banner').forEach(el => el.remove());
+                /* Make nothing editable in export */
+                clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+
+                const html = '<!DOCTYPE html>\n' + clone.outerHTML;
+                const blob = new Blob([html], { type: 'text/html' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'vestige-pitch.html';
+                a.click();
+            }
+
+            /* Brief visual feedback on save */
+            flashSave() {
+                this.saveBtn.textContent = '✓ Saved';
+                setTimeout(() => { this.saveBtn.textContent = 'Save ⌘S'; }, 1500);
+            }
+        }
+
+        /* Boot everything */
+        const presentation = new SlidePresentation();
+        const editor       = new InlineEditor();
+    </script>
+</body>
+</html>
