@@ -9,8 +9,8 @@
 | | |
 |---|---|
 | **Live web app** | [**https://vestige-eight.vercel.app/**](https://vestige-eight.vercel.app/) |
-| **Live APK** | _[Add APK download link]_ |
-| **App video demo** | _[Add video demo link]_ |
+| **Live APK** | _[https://drive.google.com/drive/folders/1L701ixpTgw5cnC2PY3pULcgcyg_8B8Yo?usp=sharing](https://drive.google.com/drive/folders/1L701ixpTgw5cnC2PY3pULcgcyg_8B8Yo?usp=sharing)_ |
+| **App video demo** | _[https://youtu.be/i2NOh9wczHU](https://youtu.be/i2NOh9wczHU)_ |
 
 ---
 
